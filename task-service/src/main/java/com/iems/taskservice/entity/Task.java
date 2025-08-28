@@ -35,7 +35,7 @@ public class Task {
     private UUID createdBy;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false)
+    @Column(name = "status")
     private TaskStatus status; // Using enum instead of String
 
     @Enumerated(EnumType.STRING)
