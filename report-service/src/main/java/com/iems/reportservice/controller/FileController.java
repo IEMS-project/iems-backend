@@ -1,6 +1,10 @@
 package com.iems.reportservice.controller;
 
 import com.iems.reportservice.service.FileService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -12,15 +16,18 @@ import java.io.InputStream;
 
 @RestController
 @RequestMapping("/files")
+@Tag(name = "File API", description = "File upload and download management")
 public class FileController {
 
     @Autowired
     private FileService fileService;
 
-    /**
-     * Upload file lên MinIO
-     */
     @PostMapping("/upload")
+    @Operation(summary = "Upload file", description = "Upload a file to MinIO storage")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "File uploaded successfully"),
+            @ApiResponse(responseCode = "500", description = "Failed to upload file")
+    })
     public ResponseEntity<String> uploadFile(@RequestParam("file") MultipartFile file) {
         try {
             fileService.uploadFile(
@@ -29,16 +36,18 @@ public class FileController {
                     file.getSize(),
                     file.getContentType()
             );
-            return ResponseEntity.ok("Upload thành công: " + file.getOriginalFilename());
+            return ResponseEntity.ok("File uploaded successfully: " + file.getOriginalFilename());
         } catch (Exception e) {
-            return ResponseEntity.internalServerError().body("Upload thất bại: " + e.getMessage());
+            return ResponseEntity.internalServerError().body("Failed to upload file: " + e.getMessage());
         }
     }
 
-    /**
-     * Download file từ MinIO
-     */
     @GetMapping("/download/{fileName}")
+    @Operation(summary = "Download file", description = "Download a file from MinIO storage")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "File downloaded successfully"),
+            @ApiResponse(responseCode = "500", description = "Failed to download file")
+    })
     public ResponseEntity<byte[]> downloadFile(@PathVariable String fileName) {
         try (InputStream inputStream = fileService.downloadFile(fileName)) {
             byte[] content = inputStream.readAllBytes();
