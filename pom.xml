@@ -41,7 +41,7 @@
         <module>task-service</module>
         <module>department-service</module>
         <module>iam-service</module>
-        <module>report-service</module>
+        <module>document-service</module>
 	</modules>
 
 	<build>
