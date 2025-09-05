@@ -1,6 +1,7 @@
 package com.iems.userservice.dto.request;
 
 import com.iems.userservice.entity.enums.Gender;
+import com.iems.userservice.entity.enums.ContractType;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -20,4 +21,8 @@ public class UserRequestDto {
     private Gender gender;
     private String personalID;
     private String image;
+    private String bankAccountNumber;
+    private String bankName;
+    private ContractType contractType;
+    private Date startDate;
 }

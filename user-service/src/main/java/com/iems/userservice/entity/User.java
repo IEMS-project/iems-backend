@@ -1,6 +1,7 @@
 package com.iems.userservice.entity;
 
 import com.iems.userservice.entity.enums.Gender;
+import com.iems.userservice.entity.enums.ContractType;
 import jakarta.persistence.*;
 import lombok.Data;
 import org.hibernate.annotations.UuidGenerator;
@@ -44,6 +45,20 @@ public class User {
     @Column(length = 255)
     private String image;
 
+    @Column(name = "bank_account_number", length = 50)
+    private String bankAccountNumber;
+
+    @Column(name = "bank_name", length = 150)
+    private String bankName;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "contract_type", length = 20)
+    private ContractType contractType;
+
+    @Temporal(TemporalType.DATE)
+    @Column(name = "start_date")
+    private Date startDate;
+
     @Temporal(TemporalType.TIMESTAMP)
     @Column(name = "created_at", updatable = false)
     private Date createdAt = new Date();
@@ -51,5 +66,4 @@ public class User {
     @Temporal(TemporalType.TIMESTAMP)
     @Column(name = "updated_at")
     private Date updatedAt = new Date();
-
 }

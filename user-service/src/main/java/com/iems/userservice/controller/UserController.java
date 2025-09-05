@@ -92,4 +92,48 @@ public class UserController {
         }
     }
 
+    @Operation(summary = "Update user by ID", description = "Update a user's information by ID")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "User updated successfully"),
+            @ApiResponse(responseCode = "404", description = "User not found"),
+            @ApiResponse(responseCode = "500", description = "Failed to update user")
+    })
+    @PutMapping("/{id}")
+    public ResponseEntity<ApiResponseDto<UserResponseDto>> updateUser(
+            @PathVariable UUID id,
+            @RequestBody UserRequestDto userRequest
+    ) {
+        try {
+            return service.updateUser(id, userRequest)
+                    .map(updated -> ResponseEntity.ok(new ApiResponseDto<>(HttpStatus.OK.value(), "User updated successfully", updated)))
+                    .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND)
+                            .body(new ApiResponseDto<>(HttpStatus.NOT_FOUND.value(), "User not found", null)));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ApiResponseDto<>(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Failed to update user: " + e.getMessage(), null));
+        }
+    }
+
+    @Operation(summary = "Update my profile", description = "Update the profile of the authenticated user. Temporary: identify user by X-User-Id header")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Profile updated successfully"),
+            @ApiResponse(responseCode = "401", description = "Unauthorized"),
+            @ApiResponse(responseCode = "500", description = "Failed to update profile")
+    })
+    @PutMapping("/me")
+    public ResponseEntity<ApiResponseDto<UserResponseDto>> updateMyProfile(
+            @RequestHeader(value = "X-User-Id") UUID userId,
+            @RequestBody UserRequestDto userRequest
+    ) {
+        try {
+            return service.updateMyProfile(userId, userRequest)
+                    .map(updated -> ResponseEntity.ok(new ApiResponseDto<>(HttpStatus.OK.value(), "Profile updated successfully", updated)))
+                    .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND)
+                            .body(new ApiResponseDto<>(HttpStatus.NOT_FOUND.value(), "User not found", null)));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ApiResponseDto<>(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Failed to update profile: " + e.getMessage(), null));
+        }
+    }
+
 }
