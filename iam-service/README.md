@@ -1,72 +1,72 @@
 # IAM Service
 
-IAM Service là một microservice quản lý tài khoản người dùng, vai trò (roles) và quyền (permissions) trong hệ thống IEMS.
+IAM Service is a microservice that manages user accounts, roles, and permissions in the IEMS system.
 
-## Các Use Case Được Hỗ Trợ
+## Supported Use Cases
 
-### UC01: Tạo Quyền (Permission)
+### UC01: Create Permission
 - **Endpoint**: `POST /api/iam/permissions`
-- **Mô tả**: Tạo một quyền mới
+- **Description**: Create a new permission
 
-### UC02: Danh sách Quyền
+### UC02: List Permissions
 - **Endpoint**: `GET /api/iam/permissions`
-- **Mô tả**: Lấy danh sách quyền
+- **Description**: Get list of permissions
 
-### UC03: Chi tiết Quyền
+### UC03: Permission Details
 - **Endpoint**: `GET /api/iam/permissions/{id}`
-- **Mô tả**: Lấy thông tin chi tiết của quyền
+- **Description**: Get detailed permission information
 
-### UC04: Cập nhật Quyền
+### UC04: Update Permission
 - **Endpoint**: `PUT /api/iam/permissions/{id}`
-- **Mô tả**: Cập nhật tên quyền
+- **Description**: Update permission name
 
-### UC05: Xóa Quyền
+### UC05: Delete Permission
 - **Endpoint**: `DELETE /api/iam/permissions/{id}`
-- **Mô tả**: Xóa quyền
+- **Description**: Delete permission
 
-### UC06: Tạo Vai trò (Role)
+### UC06: Create Role
 - **Endpoint**: `POST /api/iam/roles`
-- **Mô tả**: Tạo vai trò và gán danh sách quyền theo mã
+- **Description**: Create role and assign list of permissions by code
 
-### UC07: Danh sách Vai trò
+### UC07: List Roles
 - **Endpoint**: `GET /api/iam/roles`
-- **Mô tả**: Lấy danh sách vai trò
+- **Description**: Get list of roles
 
-### UC08: Chi tiết Vai trò
+### UC08: Role Details
 - **Endpoint**: `GET /api/iam/roles/{id}`
-- **Mô tả**: Lấy thông tin chi tiết của vai trò
+- **Description**: Get detailed role information
 
-### UC09: Cập nhật Vai trò
+### UC09: Update Role
 - **Endpoint**: `PUT /api/iam/roles/{id}`
-- **Mô tả**: Cập nhật tên và quyền của vai trò
+- **Description**: Update role name and permissions
 
-### UC10: Xóa Vai trò
+### UC10: Delete Role
 - **Endpoint**: `DELETE /api/iam/roles/{id}`
-- **Mô tả**: Xóa vai trò
+- **Description**: Delete role
 
-### UC11: Tạo Tài khoản (User)
+### UC11: Create User Account
 - **Endpoint**: `POST /api/iam/users`
-- **Mô tả**: Tạo tài khoản, mã hóa mật khẩu và gán vai trò
+- **Description**: Create account, encrypt password and assign roles
 
-### UC12: Danh sách Tài khoản
+### UC12: List User Accounts
 - **Endpoint**: `GET /api/iam/users`
-- **Mô tả**: Lấy danh sách tài khoản
+- **Description**: Get list of user accounts
 
-### UC13: Chi tiết Tài khoản
+### UC13: User Account Details
 - **Endpoint**: `GET /api/iam/users/{id}`
-- **Mô tả**: Lấy thông tin chi tiết tài khoản
+- **Description**: Get detailed user account information
 
-### UC14: Cập nhật Tài khoản
+### UC14: Update User Account
 - **Endpoint**: `PUT /api/iam/users/{id}`
-- **Mô tả**: Cập nhật email, trạng thái và vai trò
+- **Description**: Update email, status and roles
 
-### UC15: Xóa Tài khoản
+### UC15: Delete User Account
 - **Endpoint**: `DELETE /api/iam/users/{id}`
-- **Mô tả**: Xóa tài khoản
+- **Description**: Delete user account
 
 ## API Endpoints (HTTP Examples)
 
-### Tạo Quyền
+### Create Permission
 ```http
 POST /api/iam/permissions
 Content-Type: application/json
@@ -77,17 +77,17 @@ Content-Type: application/json
 }
 ```
 
-### Danh sách Quyền
+### List Permissions
 ```http
 GET /api/iam/permissions
 ```
 
-### Chi tiết Quyền
+### Permission Details
 ```http
 GET /api/iam/permissions/1
 ```
 
-### Cập nhật Quyền
+### Update Permission
 ```http
 PUT /api/iam/permissions/1
 Content-Type: application/json
@@ -97,12 +97,12 @@ Content-Type: application/json
 }
 ```
 
-### Xóa Quyền
+### Delete Permission
 ```http
 DELETE /api/iam/permissions/1
 ```
 
-### Tạo Vai trò
+### Create Role
 ```http
 POST /api/iam/roles
 Content-Type: application/json
@@ -114,17 +114,17 @@ Content-Type: application/json
 }
 ```
 
-### Danh sách Vai trò
+### List Roles
 ```http
 GET /api/iam/roles
 ```
 
-### Chi tiết Vai trò
+### Role Details
 ```http
 GET /api/iam/roles/1
 ```
 
-### Cập nhật Vai trò
+### Update Role
 ```http
 PUT /api/iam/roles/1
 Content-Type: application/json
@@ -135,12 +135,12 @@ Content-Type: application/json
 }
 ```
 
-### Xóa Vai trò
+### Delete Role
 ```http
 DELETE /api/iam/roles/1
 ```
 
-### Tạo Tài khoản
+### Create User Account
 ```http
 POST /api/iam/users
 Content-Type: application/json
@@ -153,17 +153,17 @@ Content-Type: application/json
 }
 ```
 
-### Danh sách Tài khoản
+### List User Accounts
 ```http
 GET /api/iam/users
 ```
 
-### Chi tiết Tài khoản
+### User Account Details
 ```http
 GET /api/iam/users/1
 ```
 
-### Cập nhật Tài khoản
+### Update User Account
 ```http
 PUT /api/iam/users/1
 Content-Type: application/json
@@ -175,25 +175,25 @@ Content-Type: application/json
 }
 ```
 
-### Xóa Tài khoản
+### Delete User Account
 ```http
 DELETE /api/iam/users/1
 ```
 
-## Trạng thái và Quy ước
+## Status and Conventions
 
-- Phản hồi chuẩn dạng:
+- Standard response format:
 ```json
 {
   "status": "success|error",
-  "message": "mô tả ngắn",
+  "message": "short description",
   "data": {}
 }
 ```
-- Mật khẩu được mã hóa với BCrypt (theo PasswordEncoder).
-- Quan hệ: User ⟷ Role (n-n), Role ⟷ Permission (n-n).
+- Passwords are encrypted with BCrypt (via PasswordEncoder).
+- Relationships: User ⟷ Role (n-n), Role ⟷ Permission (n-n).
 
-## Chạy Service
+## Running the Service
 
 ```bash
 # Windows PowerShell
@@ -202,4 +202,4 @@ cd iam-service
 ```
 
 - Base URL: `http://localhost:8086`
-- Hiện tại tất cả endpoint đều permitAll (có thể siết chặt sau).
+- Currently all endpoints are permitAll (can be tightened later).
