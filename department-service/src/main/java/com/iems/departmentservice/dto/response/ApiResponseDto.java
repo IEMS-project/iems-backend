@@ -1,4 +1,4 @@
-package com.iems.departmentservice.dto;
+package com.iems.departmentservice.dto.response;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
