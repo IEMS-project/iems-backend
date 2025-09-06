@@ -1,13 +1,13 @@
 package com.iems.departmentservice.controller;
 
-import com.iems.departmentservice.dto.ApiResponseDto;
-import com.iems.departmentservice.dto.CreateDepartmentDto;
-import com.iems.departmentservice.dto.DepartmentResponseDto;
+import com.iems.departmentservice.dto.request.AddUserToDepartmentDto;
+import com.iems.departmentservice.dto.response.ApiResponseDto;
+import com.iems.departmentservice.dto.request.CreateDepartmentDto;
+import com.iems.departmentservice.dto.response.DepartmentResponseDto;
+import com.iems.departmentservice.dto.response.DepartmentUserDto;
 import com.iems.departmentservice.service.DepartmentService;
-import com.iems.departmentservice.dto.UpdateDepartmentDto;
+import com.iems.departmentservice.dto.request.UpdateDepartmentDto;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,12 +29,6 @@ public class DepartmentController {
 
     @PostMapping
     @Operation(summary = "Create a new department", description = "Add a new department with provided details")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Department created successfully"),
-            @ApiResponse(responseCode = "400", description = "Invalid request or missing fields"),
-            @ApiResponse(responseCode = "500", description = "Internal server error")
-    })
-
     public ResponseEntity<ApiResponseDto<DepartmentResponseDto>> saveDepartment(
             @Valid @RequestBody CreateDepartmentDto createDto, @RequestHeader("X-User-Id") UUID userId) {
         try {
@@ -49,10 +43,6 @@ public class DepartmentController {
 
     @GetMapping
     @Operation(summary = "Get all departments", description = "Get a list of all departments")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Departments get successfully"),
-            @ApiResponse(responseCode = "500", description = "Failed to get departments")
-    })
     public ResponseEntity<ApiResponseDto<List<DepartmentResponseDto>>> getAllDepartments() {
         try {
             List<DepartmentResponseDto> departments = service.getAllDepartments();
@@ -64,11 +54,6 @@ public class DepartmentController {
 
     @GetMapping("/{id}")
     @Operation(summary = "Get department by ID", description = "Retrieve details of a department by its ID")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Department retrieved successfully"),
-            @ApiResponse(responseCode = "404", description = "Department not found"),
-            @ApiResponse(responseCode = "500", description = "Failed to retrieve department")
-    })
     public ResponseEntity<ApiResponseDto<DepartmentResponseDto>> getDepartmentById(@PathVariable UUID id) {
         try {
             return service.getDepartmentById(id)
@@ -82,12 +67,6 @@ public class DepartmentController {
 
     @PatchMapping("/{id}")
     @Operation(summary = "Update department", description = "Update department details by ID")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Department updated successfully"),
-            @ApiResponse(responseCode = "400", description = "Invalid request"),
-            @ApiResponse(responseCode = "404", description = "Department not found"),
-            @ApiResponse(responseCode = "500", description = "Failed to update department")
-    })
     public ResponseEntity<ApiResponseDto<DepartmentResponseDto>> updateDepartment(
             @PathVariable UUID id,
             @Valid @RequestBody UpdateDepartmentDto updateDto,
@@ -106,11 +85,6 @@ public class DepartmentController {
 
     @DeleteMapping("/{id}")
     @Operation(summary = "Delete department", description = "Delete a department by ID")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Department deleted successfully"),
-            @ApiResponse(responseCode = "404", description = "Department not found"),
-            @ApiResponse(responseCode = "500", description = "Failed to delete department")
-    })
     public ResponseEntity<ApiResponseDto<Object>> deleteDepartment(@PathVariable UUID id) {
         try {
             boolean deleted = service.deleteDepartment(id);
@@ -124,5 +98,48 @@ public class DepartmentController {
         }
     }
 
+    @PostMapping("/{departmentId}/users")
+    @Operation(summary = "Add user to department", description = "Add a user to a specific department")
+    public ResponseEntity<ApiResponseDto<DepartmentUserDto>> addUserToDepartment(
+            @PathVariable UUID departmentId,
+            @Valid @RequestBody AddUserToDepartmentDto addUserDto,
+            @RequestHeader("X-User-Id") UUID currentUserId) {
+        try {
+            DepartmentUserDto responseDto = service.addUserToDepartment(departmentId, addUserDto, currentUserId);
+            return ResponseEntity.ok(new ApiResponseDto<>("success", "User added to department successfully", responseDto));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(new ApiResponseDto<>("error", e.getMessage(), null));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(new ApiResponseDto<>("error", "Error: Missing required fields or invalid data", null));
+        }
+    }
 
+    @DeleteMapping("/{departmentId}/users/{userId}")
+    @Operation(summary = "Remove user from department", description = "Remove a user from a specific department")
+    public ResponseEntity<ApiResponseDto<Object>> removeUserFromDepartment(
+            @PathVariable UUID departmentId,
+            @PathVariable UUID userId,
+            @RequestHeader("X-User-Id") UUID currentUserId) {
+        try {
+            boolean removed = service.removeUserFromDepartment(departmentId, userId, currentUserId);
+            if (removed) {
+                return ResponseEntity.ok(new ApiResponseDto<>("success", "User removed from department successfully", null));
+            }
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(new ApiResponseDto<>("error", "User not found in department", null));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(new ApiResponseDto<>("error", "Failed to remove user from department", null));
+        }
+    }
+
+    @GetMapping("/users/{userId}/departments")
+    @Operation(summary = "Get departments of user", description = "Get list of departments that a user belongs to")
+    public ResponseEntity<ApiResponseDto<List<DepartmentUserDto>>> getDepartmentsOfUser(@PathVariable UUID userId) {
+        try {
+            List<DepartmentUserDto> departments = service.getDepartmentsOfUser(userId);
+            return ResponseEntity.ok(new ApiResponseDto<>("success", "User departments retrieved successfully", departments));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(new ApiResponseDto<>("error", "Failed to retrieve user departments", Collections.emptyList()));
+        }
+    }
 }

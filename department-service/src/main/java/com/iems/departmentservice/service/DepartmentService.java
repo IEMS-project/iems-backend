@@ -1,25 +1,35 @@
 package com.iems.departmentservice.service;
 
-import com.iems.departmentservice.dto.CreateDepartmentDto;
-import com.iems.departmentservice.dto.DepartmentResponseDto;
-import com.iems.departmentservice.dto.UpdateDepartmentDto;
+import com.iems.departmentservice.dto.request.AddUserToDepartmentDto;
+import com.iems.departmentservice.dto.request.CreateDepartmentDto;
+import com.iems.departmentservice.dto.response.DepartmentResponseDto;
+import com.iems.departmentservice.dto.response.DepartmentUserDto;
+import com.iems.departmentservice.dto.request.UpdateDepartmentDto;
 import com.iems.departmentservice.entity.Department;
+import com.iems.departmentservice.entity.DepartmentUser;
 import com.iems.departmentservice.repository.DepartmentRepository;
+import com.iems.departmentservice.repository.DepartmentUserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
+@Transactional
 public class DepartmentService {
     @Autowired
-    private DepartmentRepository repository;
+    private DepartmentRepository departmentRepository;
+    
+    @Autowired
+    private DepartmentUserRepository departmentUserRepository;
 
     public DepartmentResponseDto saveDepartment(CreateDepartmentDto createDto, UUID userId) {
-        if (repository.existsByDepartmentName(createDto.getDepartmentName())) {
+        if (departmentRepository.existsByDepartmentName(createDto.getDepartmentName())) {
             throw new IllegalArgumentException("Department name already exists");
         }
         Department department = new Department();
@@ -28,24 +38,24 @@ public class DepartmentService {
         department.setManagerId(createDto.getManagerId());
         department.setCreatedBy(userId);
         department.setUpdatedBy(userId);
-        Department savedDept = repository.save(department);
+        Department savedDept = departmentRepository.save(department);
         return convertToResponseDto(savedDept);
     }
 
     public List<DepartmentResponseDto> getAllDepartments() {
-        return repository.findAll().stream()
+        return departmentRepository.findAll().stream()
                 .map(this::convertToResponseDto)
                 .collect(Collectors.toList());
     }
 
     public Optional<DepartmentResponseDto> getDepartmentById(UUID id) {
-        return repository.findById(id).map(this::convertToResponseDto);
+        return departmentRepository.findById(id).map(this::convertToResponseDto);
     }
 
     public Optional<DepartmentResponseDto> updateDepartment(UUID id, UpdateDepartmentDto updateDto, UUID userId) {
-        return repository.findById(id).map(existing -> {
+        return departmentRepository.findById(id).map(existing -> {
             if (updateDto.getDepartmentName() != null && !updateDto.getDepartmentName().isBlank()) {
-                if (repository.existsByDepartmentNameAndIdNot(updateDto.getDepartmentName(), id)) {
+                if (departmentRepository.existsByDepartmentNameAndIdNot(updateDto.getDepartmentName(), id)) {
                     throw new IllegalArgumentException("Department name already exists");
                 }
                 existing.setDepartmentName(updateDto.getDepartmentName());
@@ -57,25 +67,88 @@ public class DepartmentService {
                 existing.setManagerId(updateDto.getManagerId());
             }
             existing.setUpdatedBy(userId);
-            Department saved = repository.save(existing);
+            Department saved = departmentRepository.save(existing);
             return convertToResponseDto(saved);
         });
     }
 
     public boolean deleteDepartment(UUID id) {
-        if (!repository.existsById(id)) {
+        if (!departmentRepository.existsById(id)) {
             return false;
         }
-        repository.deleteById(id);
+        departmentRepository.deleteById(id);
         return true;
     }
 
+    public DepartmentUserDto addUserToDepartment(UUID departmentId, AddUserToDepartmentDto addUserDto, UUID currentUserId) {
+        if (!departmentRepository.existsById(departmentId)) {
+            throw new IllegalArgumentException("Department not found");
+        }
+        
+        if (departmentUserRepository.existsByDepartmentIdAndUserIdAndIsActiveTrue(departmentId, addUserDto.getUserId())) {
+            throw new IllegalArgumentException("User is already in this department");
+        }
+        
+        DepartmentUser departmentUser = new DepartmentUser();
+        departmentUser.setDepartmentId(departmentId);
+        departmentUser.setUserId(addUserDto.getUserId());
+        departmentUser.setIsActive(true);
+        departmentUser.setCreatedBy(currentUserId);
+        departmentUser.setUpdatedBy(currentUserId);
+        
+        DepartmentUser saved = departmentUserRepository.save(departmentUser);
+        return convertToDepartmentUserDto(saved);
+    }
+    
+    public boolean removeUserFromDepartment(UUID departmentId, UUID userId, UUID currentUserId) {
+        Optional<DepartmentUser> departmentUserOpt = departmentUserRepository
+                .findByDepartmentIdAndUserIdAndIsActiveTrue(departmentId, userId);
+        
+        if (departmentUserOpt.isPresent()) {
+            DepartmentUser departmentUser = departmentUserOpt.get();
+            departmentUser.setIsActive(false);
+            departmentUser.setLeftAt(LocalDateTime.now());
+            departmentUser.setUpdatedBy(currentUserId);
+            departmentUserRepository.save(departmentUser);
+            return true;
+        }
+        return false;
+    }
+    
+    public List<DepartmentUserDto> getDepartmentsOfUser(UUID userId) {
+        List<DepartmentUser> departmentUsers = departmentUserRepository.findActiveDepartmentsByUserId(userId);
+        return departmentUsers.stream()
+                .map(this::convertToDepartmentUserDto)
+                .collect(Collectors.toList());
+    }
+
     private DepartmentResponseDto convertToResponseDto(Department department) {
+        List<DepartmentUser> allUsers = departmentUserRepository.findByDepartmentId(department.getId());
+        List<DepartmentUser> activeUsers = departmentUserRepository.findActiveUsersByDepartmentId(department.getId());
+        
+        List<DepartmentUserDto> userDtos = allUsers.stream()
+                .map(this::convertToDepartmentUserDto)
+                .collect(Collectors.toList());
+        
         return new DepartmentResponseDto(
                 department.getId(),
                 department.getDepartmentName(),
                 department.getDescription(),
-                department.getManagerId()
+                department.getManagerId(),
+                userDtos,
+                allUsers.size(),
+                activeUsers.size()
+        );
+    }
+    
+    private DepartmentUserDto convertToDepartmentUserDto(DepartmentUser departmentUser) {
+        return new DepartmentUserDto(
+                departmentUser.getId(),
+                departmentUser.getDepartmentId(),
+                departmentUser.getUserId(),
+                departmentUser.getJoinedAt(),
+                departmentUser.getLeftAt(),
+                departmentUser.getIsActive()
         );
     }
 }
