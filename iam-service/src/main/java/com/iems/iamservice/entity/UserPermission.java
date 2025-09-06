@@ -9,36 +9,33 @@ import lombok.Setter;
 import org.hibernate.annotations.UuidGenerator;
 
 import java.time.Instant;
-import java.util.HashSet;
-import java.util.Set;
 import java.util.UUID;
 
 /**
- * Entity representing permission in the system
- * Each permission can be assigned to roles or users directly
+ * Entity representing user-permission assignment
+ * Links user_id with permission_id for direct permission assignment
  */
 @Entity
-@Table(name = "iam_permissions")
+@Table(name = "iam_user_permissions", 
+       uniqueConstraints = @UniqueConstraint(columnNames = {"user_id", "permission_id"}))
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Permission {
+public class UserPermission {
 
     @Id
     @UuidGenerator(style = UuidGenerator.Style.RANDOM)
     @Column(name = "id", updatable = false, nullable = false)
     private UUID id;
 
-    @Column(nullable = false, unique = true, length = 150)
-    private String code;
+    @Column(name = "user_id", nullable = false)
+    private UUID userId;
 
-    @Column(nullable = false, length = 255)
-    private String name;
-
-    @Column(length = 500)
-    private String description;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "permission_id", nullable = false)
+    private Permission permission;
 
     @Column(nullable = false)
     @Builder.Default
@@ -51,15 +48,8 @@ public class Permission {
     @Column
     private Instant updatedAt;
 
-    @ManyToMany(mappedBy = "permissions", fetch = FetchType.LAZY)
-    @Builder.Default
-    private Set<Role> roles = new HashSet<>();
-
-
     @PreUpdate
     public void preUpdate() {
         this.updatedAt = Instant.now();
     }
 }
-
-
