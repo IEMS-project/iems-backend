@@ -3,6 +3,7 @@ package com.iems.userservice.controller;
 import com.iems.userservice.dto.request.UserRequestDto;
 import com.iems.userservice.dto.response.ApiResponseDto;
 import com.iems.userservice.dto.response.UserResponseDto;
+import com.iems.userservice.security.JwtUserDetails;
 import com.iems.userservice.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -10,6 +11,9 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -93,11 +97,6 @@ public class UserController {
     }
 
     @Operation(summary = "Update user by ID", description = "Update a user's information by ID")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "User updated successfully"),
-            @ApiResponse(responseCode = "404", description = "User not found"),
-            @ApiResponse(responseCode = "500", description = "Failed to update user")
-    })
     @PutMapping("/{id}")
     public ResponseEntity<ApiResponseDto<UserResponseDto>> updateUser(
             @PathVariable UUID id,
@@ -114,26 +113,30 @@ public class UserController {
         }
     }
 
-    @Operation(summary = "Update my profile", description = "Update the profile of the authenticated user. Temporary: identify user by X-User-Id header")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Profile updated successfully"),
-            @ApiResponse(responseCode = "401", description = "Unauthorized"),
-            @ApiResponse(responseCode = "500", description = "Failed to update profile")
-    })
+
+
+    @Operation(summary = "Update my profile", description = "Update the profile of the authenticated user")
     @PutMapping("/me")
     public ResponseEntity<ApiResponseDto<UserResponseDto>> updateMyProfile(
-            @RequestHeader(value = "X-User-Id") UUID userId,
             @RequestBody UserRequestDto userRequest
     ) {
         try {
+            // Lấy userId từ SecurityContext (được set trong JwtAuthenticationFilter)
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            JwtUserDetails userDetails = (JwtUserDetails) authentication.getPrincipal();
+            UUID userId = userDetails.getUserId();
+
             return service.updateMyProfile(userId, userRequest)
-                    .map(updated -> ResponseEntity.ok(new ApiResponseDto<>(HttpStatus.OK.value(), "Profile updated successfully", updated)))
+                    .map(updated -> ResponseEntity.ok(
+                            new ApiResponseDto<>(HttpStatus.OK.value(), "Profile updated successfully", updated)))
                     .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND)
                             .body(new ApiResponseDto<>(HttpStatus.NOT_FOUND.value(), "User not found", null)));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(new ApiResponseDto<>(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Failed to update profile: " + e.getMessage(), null));
+                    .body(new ApiResponseDto<>(HttpStatus.INTERNAL_SERVER_ERROR.value(),
+                            "Failed to update profile: " + e.getMessage(), null));
         }
     }
+
 
 }
