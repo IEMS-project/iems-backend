@@ -1,6 +1,6 @@
-package com.iems.iamservice.security;
+package com.iems.userservice.security;
 
-import com.iems.iamservice.service.JwtService;
+import com.iems.userservice.service.JwtService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -20,6 +20,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * JWT Authentication Filter
@@ -42,6 +43,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         final String authHeader = request.getHeader("Authorization");
         final String jwt;
         final String username;
+        final UUID userId;
 
         // Check Authorization header
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
@@ -55,6 +57,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
             // Get username from token
             username = jwtService.extractUsername(jwt);
+
+            userId = jwtService.extractUserId(jwt);
 
             // Check if user is already authenticated
             if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
@@ -71,7 +75,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         authorities.add(new SimpleGrantedAuthority(perm))
                 );
 
-                UserDetails userDetails = new JwtUserDetails(username, authorities);
+                UserDetails userDetails = new JwtUserDetails(userId,username, authorities);
 
 
                 // Validate token
@@ -86,7 +90,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
                     // Set authentication to SecurityContext
                     SecurityContextHolder.getContext().setAuthentication(authToken);
-                    
+
                     log.debug("User {} authenticated successfully", username);
                 } else {
                     log.warn("Invalid JWT token for user: {}", username);

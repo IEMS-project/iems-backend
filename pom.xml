@@ -42,6 +42,7 @@
         <module>department-service</module>
         <module>iam-service</module>
         <module>document-service</module>
+		<module>project-service</module>
 	</modules>
 
 	<build>

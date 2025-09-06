@@ -44,7 +44,6 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/**").permitAll()
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
                         .requestMatchers("/swagger-ui.html", "/webjars/**").permitAll()
-                        .requestMatchers("/**").permitAll()
                         // Admin endpoints
                         .anyRequest().permitAll()
                 )

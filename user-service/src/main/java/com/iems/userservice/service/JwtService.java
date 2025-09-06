@@ -1,4 +1,4 @@
-package com.iems.iamservice.service;
+package com.iems.userservice.service;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
