@@ -5,12 +5,14 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.UUID;
+import com.iems.documentservice.entity.Permission;
 
-public interface StoredFileRepository extends JpaRepository<StoredFile, Long> {
-    List<StoredFile> findByFolderId(Long folderId);
-    List<StoredFile> findByOwnerId(Long ownerId);
-    List<StoredFile> findByPermission(StoredFile.Permission permission);
-    List<StoredFile> findByIdIn(Collection<Long> ids);
+public interface StoredFileRepository extends JpaRepository<StoredFile, UUID> {
+    List<StoredFile> findByFolderId(UUID folderId);
+    List<StoredFile> findByOwnerId(UUID ownerId);
+    List<StoredFile> findByPermission(Permission permission);
+    List<StoredFile> findByIdIn(Collection<UUID> ids);
 }
 
 
