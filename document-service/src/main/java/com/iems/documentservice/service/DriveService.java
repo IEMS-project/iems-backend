@@ -7,10 +7,14 @@ import com.iems.documentservice.dto.response.FileResponse;
 import com.iems.documentservice.dto.response.FolderResponse;
 import com.iems.documentservice.entity.Folder;
 import com.iems.documentservice.entity.StoredFile;
+import com.iems.documentservice.entity.Permission;
 import com.iems.documentservice.entity.FileShare;
 import com.iems.documentservice.repository.FolderRepository;
 import com.iems.documentservice.repository.StoredFileRepository;
 import com.iems.documentservice.repository.FileShareRepository;
+import com.iems.documentservice.security.JwtUserDetails;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -18,6 +22,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.InputStream;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.Set;
 import java.util.HashSet;
@@ -44,6 +49,7 @@ public class DriveService {
 
     @Transactional
     public FolderResponse createFolder(CreateFolderRequest request) {
+        UUID currentUserId = getCurrentUserId();
         Folder parent = null;
         if (request.getParentId() != null) {
             parent = folderRepository.findById(request.getParentId())
@@ -52,7 +58,7 @@ public class DriveService {
         Folder folder = Folder.builder()
                 .name(request.getName())
                 .parent(parent)
-                .ownerId(request.getOwnerId())
+                .ownerId(currentUserId)
                 .createdAt(OffsetDateTime.now())
                 .build();
         folder = folderRepository.save(folder);
@@ -66,7 +72,8 @@ public class DriveService {
     }
 
     @Transactional
-    public FileResponse uploadFile(Long folderId, Long ownerId, MultipartFile file) throws Exception {
+    public FileResponse uploadFile(UUID folderId, MultipartFile file) throws Exception {
+        UUID ownerId = getCurrentUserId();
         if (file.getSize() > MAX_UPLOAD_SIZE) {
             throw new IllegalArgumentException("File size exceeds 50MB limit");
         }
@@ -86,14 +93,15 @@ public class DriveService {
                 .path(objectKey)
                 .size(file.getSize())
                 .type(file.getContentType())
-                .permission(StoredFile.Permission.PRIVATE)
+                .permission(Permission.PRIVATE)
                 .createdAt(OffsetDateTime.now())
                 .build();
         stored = storedFileRepository.save(stored);
         return toResponse(stored, null);
     }
 
-    public FileResponse downloadInfo(Long fileId, Long requesterId) throws Exception {
+    public FileResponse downloadInfo(UUID fileId) throws Exception {
+        UUID requesterId = getCurrentUserId();
         StoredFile file = storedFileRepository.findById(fileId)
                 .orElseThrow(() -> new IllegalArgumentException("File not found"));
         enforceReadPermission(file, requesterId);
@@ -101,7 +109,8 @@ public class DriveService {
         return toResponse(file, presigned);
     }
 
-    public InputStream downloadStream(Long fileId, Long requesterId) throws Exception {
+    public InputStream downloadStream(UUID fileId) throws Exception {
+        UUID requesterId = getCurrentUserId();
         StoredFile file = storedFileRepository.findById(fileId)
                 .orElseThrow(() -> new IllegalArgumentException("File not found"));
         enforceReadPermission(file, requesterId);
@@ -109,16 +118,18 @@ public class DriveService {
     }
 
     @Transactional
-    public void updatePermission(Long fileId, UpdatePermissionRequest request) {
+    public void updatePermission(UUID fileId, UpdatePermissionRequest request) {
+        UUID requesterId = getCurrentUserId();
         StoredFile file = storedFileRepository.findById(fileId)
                 .orElseThrow(() -> new IllegalArgumentException("File not found"));
-        enforceOwner(file, request.getOwnerId());
+        enforceOwner(file, requesterId);
         file.setPermission(request.getPermission());
         storedFileRepository.save(file);
     }
 
     @Transactional
-    public void deleteFile(Long fileId, Long requesterId) throws Exception {
+    public void deleteFile(UUID fileId) throws Exception {
+        UUID requesterId = getCurrentUserId();
         StoredFile file = storedFileRepository.findById(fileId)
                 .orElseThrow(() -> new IllegalArgumentException("File not found"));
         enforceOwner(file, requesterId);
@@ -127,7 +138,8 @@ public class DriveService {
     }
 
     @Transactional
-    public void deleteFolderRecursive(Long folderId, Long requesterId) throws Exception {
+    public void deleteFolderRecursive(UUID folderId) throws Exception {
+        UUID requesterId = getCurrentUserId();
         Folder folder = folderRepository.findById(folderId)
                 .orElseThrow(() -> new IllegalArgumentException("Folder not found"));
         if (!folder.getOwnerId().equals(requesterId)) {
@@ -142,22 +154,22 @@ public class DriveService {
         // recurse children
         List<Folder> children = folderRepository.findByParentId(folder.getId());
         for (Folder child : children) {
-            deleteFolderRecursive(child.getId(), requesterId);
+            deleteFolderRecursive(child.getId());
         }
         folderRepository.delete(folder);
     }
 
-    private void enforceOwner(StoredFile file, Long requesterId) {
+    private void enforceOwner(StoredFile file, UUID requesterId) {
         if (!file.getOwnerId().equals(requesterId)) {
             throw new IllegalStateException("Not allowed");
         }
     }
 
-    private void enforceReadPermission(StoredFile file, Long requesterId) {
-        if (file.getPermission() == StoredFile.Permission.PUBLIC) {
+    private void enforceReadPermission(StoredFile file, UUID requesterId) {
+        if (file.getPermission() == Permission.PUBLIC) {
             return;
         }
-        if (file.getPermission() == StoredFile.Permission.SHARED) {
+        if (file.getPermission() == Permission.SHARED) {
             if (requesterId != null && fileShareRepository.existsByFileIdAndSharedWithUserId(file.getId(), requesterId)) {
                 return;
             }
@@ -167,7 +179,7 @@ public class DriveService {
         }
     }
 
-    private String generateObjectKey(Long folderId, Long ownerId, String fileName) {
+    private String generateObjectKey(UUID folderId, UUID ownerId, String fileName) {
         String folderPart = folderId != null ? String.valueOf(folderId) : "root";
         long ts = System.currentTimeMillis();
         return "owners/" + ownerId + "/" + folderPart + "/" + ts + "-" + fileName;
@@ -188,7 +200,8 @@ public class DriveService {
                 .build();
     }
 
-    public List<FolderResponse> listFolders(Long ownerId) {
+    public List<FolderResponse> listFolders() {
+        UUID ownerId = getCurrentUserId();
         return folderRepository.findByOwnerId(ownerId).stream()
                 .map(f -> FolderResponse.builder()
                         .id(f.getId())
@@ -200,13 +213,15 @@ public class DriveService {
                 .collect(Collectors.toList());
     }
 
-    public List<FileResponse> listFiles(Long ownerId) {
+    public List<FileResponse> listFiles() {
+        UUID ownerId = getCurrentUserId();
         return storedFileRepository.findByOwnerId(ownerId).stream()
                 .map(f -> toResponse(f, null))
                 .collect(Collectors.toList());
     }
 
-    public List<FileResponse> listFilesInFolder(Long folderId, Long ownerId) {
+    public List<FileResponse> listFilesInFolder(UUID folderId) {
+        UUID ownerId = getCurrentUserId();
         Folder folder = folderRepository.findById(folderId)
                 .orElseThrow(() -> new IllegalArgumentException("Folder not found"));
         if (!folder.getOwnerId().equals(ownerId)) {
@@ -218,16 +233,17 @@ public class DriveService {
     }
 
     @Transactional
-    public void shareFile(Long fileId, ShareRequest request) {
+    public void shareFile(UUID fileId, ShareRequest request) {
+        UUID ownerId = getCurrentUserId();
         StoredFile file = storedFileRepository.findById(fileId)
                 .orElseThrow(() -> new IllegalArgumentException("File not found"));
-        enforceOwner(file, request.getOwnerId());
+        enforceOwner(file, ownerId);
         // Ensure permission is SHARED
-        if (file.getPermission() == StoredFile.Permission.PRIVATE) {
-            file.setPermission(StoredFile.Permission.SHARED);
+        if (file.getPermission() == Permission.PRIVATE) {
+            file.setPermission(Permission.SHARED);
             storedFileRepository.save(file);
         }
-        for (Long userId : request.getUserIds()) {
+        for (UUID userId : request.getUserIds()) {
             if (!fileShareRepository.existsByFileIdAndSharedWithUserId(fileId, userId)) {
                 FileShare share = FileShare.builder()
                         .file(file)
@@ -240,32 +256,40 @@ public class DriveService {
     }
 
     @Transactional
-    public void unshareFile(Long fileId, ShareRequest request) {
+    public void unshareFile(UUID fileId, ShareRequest request) {
+        UUID ownerId = getCurrentUserId();
         StoredFile file = storedFileRepository.findById(fileId)
                 .orElseThrow(() -> new IllegalArgumentException("File not found"));
-        enforceOwner(file, request.getOwnerId());
-        for (Long userId : request.getUserIds()) {
+        enforceOwner(file, ownerId);
+        for (UUID userId : request.getUserIds()) {
             fileShareRepository.deleteByFileIdAndSharedWithUserId(fileId, userId);
         }
     }
 
-    public List<FileResponse> listAccessibleFiles(Long requesterId) {
+    public List<FileResponse> listAccessibleFiles() {
+        UUID requesterId = getCurrentUserId();
         // owned
         List<StoredFile> owned = storedFileRepository.findByOwnerId(requesterId);
         // public
-        List<StoredFile> publicFiles = storedFileRepository.findByPermission(StoredFile.Permission.PUBLIC);
+        List<StoredFile> publicFiles = storedFileRepository.findByPermission(Permission.PUBLIC);
         // shared
         List<FileShare> shares = fileShareRepository.findBySharedWithUserId(requesterId);
-        Set<Long> sharedIds = shares.stream().map(s -> s.getFile().getId()).collect(Collectors.toSet());
+        Set<UUID> sharedIds = shares.stream().map(s -> s.getFile().getId()).collect(Collectors.toSet());
         List<StoredFile> sharedFiles = sharedIds.isEmpty() ? List.of() : storedFileRepository.findByIdIn(sharedIds);
 
         // merge unique by id
-        Set<Long> seen = new HashSet<>();
+        Set<UUID> seen = new HashSet<>();
         return List.of(owned, publicFiles, sharedFiles).stream()
                 .flatMap(List::stream)
                 .filter(f -> seen.add(f.getId()))
                 .map(f -> toResponse(f, null))
                 .collect(Collectors.toList());
+    }
+
+    private UUID getCurrentUserId() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        JwtUserDetails userDetails = (JwtUserDetails) authentication.getPrincipal();
+        return userDetails.getUserId();
     }
 }
 

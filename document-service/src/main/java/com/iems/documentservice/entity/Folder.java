@@ -2,10 +2,12 @@ package com.iems.documentservice.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.UuidGenerator;
 
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 @Getter
 @Setter
@@ -17,8 +19,8 @@ import java.util.List;
 public class Folder {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @UuidGenerator(style = UuidGenerator.Style.RANDOM)
+    private UUID id;
 
     @Column(nullable = false)
     private String name;
@@ -28,7 +30,7 @@ public class Folder {
     private Folder parent;
 
     @Column(name = "owner_id", nullable = false)
-    private Long ownerId;
+    private UUID ownerId;
 
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
