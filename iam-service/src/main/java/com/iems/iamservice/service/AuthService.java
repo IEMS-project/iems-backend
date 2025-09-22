@@ -4,6 +4,8 @@ import com.iems.iamservice.dto.request.LoginRequestDto;
 import com.iems.iamservice.dto.request.RefreshTokenRequestDto;
 import com.iems.iamservice.dto.response.LoginResponseDto;
 import com.iems.iamservice.entity.Account;
+import com.iems.iamservice.exception.AppException;
+import com.iems.iamservice.exception.ErrorCode;
 
 import com.iems.iamservice.entity.Permission;
 import com.iems.iamservice.entity.Role;
@@ -12,8 +14,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,7 +33,6 @@ public class AuthService {
     private final AccountService accountService;
     private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
-    private final PasswordEncoder passwordEncoder;
 
     @Autowired
     private UserRolePermissionService userRolePermissionService;
@@ -47,7 +46,7 @@ public class AuthService {
 
         try {
             // Authenticate user
-            Authentication authentication = authenticationManager.authenticate(
+            authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(
                             loginRequest.getUsernameOrEmail(),
                             loginRequest.getPassword()
@@ -56,12 +55,12 @@ public class AuthService {
 
             // Get user information
             Account user = accountService.findByUsernameOrEmail(loginRequest.getUsernameOrEmail())
-                    .orElseThrow(() -> new RuntimeException("User not found"));
+                    .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND_BY_EMAIL));
 
             // Check if account is locked
             if (!user.getEnabled()) {
                 log.warn("Login attempt for locked account: {}", loginRequest.getUsernameOrEmail());
-                throw new RuntimeException("Account is locked");
+                throw new AppException(ErrorCode.ACCOUNT_LOCKED);
             }
 
             // Update last login time
@@ -103,9 +102,9 @@ public class AuthService {
                             .build())
                     .build();
 
-        } catch (RuntimeException e) {
+        } catch (Exception e) {
             log.warn("Authentication failed for user: {}", loginRequest.getUsernameOrEmail());
-            throw new RuntimeException("Invalid username or password");
+            throw new AppException(ErrorCode.LOGIN_FAILED);
         }
     }
 
@@ -119,23 +118,22 @@ public class AuthService {
         try {
             // Validate refresh token
             if (!jwtService.isRefreshToken(refreshRequest.getRefreshToken())) {
-                throw new RuntimeException("Invalid refresh token");
+                throw new AppException(ErrorCode.INVALID_TOKEN);
             }
 
             if (jwtService.isTokenExpired(refreshRequest.getRefreshToken())) {
-                throw new RuntimeException("Refresh token has expired");
+                throw new AppException(ErrorCode.REFRESH_TOKEN_EXPIRED);
             }
 
             // Get information from refresh token
             String username = jwtService.extractUsername(refreshRequest.getRefreshToken());
-            UUID userId = jwtService.extractUserId(refreshRequest.getRefreshToken());
 
             // Check if user still exists and is active
             Account user = accountService.findByUsernameOrEmail(username)
-                    .orElseThrow(() -> new RuntimeException("User not found"));
+                    .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND_BY_EMAIL));
 
             if (!user.getEnabled()) {
-                throw new RuntimeException("Account is locked");
+                throw new AppException(ErrorCode.ACCOUNT_LOCKED);
             }
 
             // Get roles and permissions information
@@ -174,9 +172,12 @@ public class AuthService {
                             .build())
                     .build();
 
+        } catch (AppException e) {
+            log.warn("Token refresh failed: {}", e.getMessage());
+            throw e;
         } catch (Exception e) {
             log.warn("Token refresh failed: {}", e.getMessage());
-            throw new RuntimeException("Cannot refresh token: " + e.getMessage());
+            throw new AppException(ErrorCode.REFRESH_TOKEN_NOT_FOUND);
         }
     }
 
@@ -208,10 +209,13 @@ public class AuthService {
         try {
             String username = jwtService.extractUsername(token);
             return accountService.findByUsernameOrEmail(username)
-                    .orElseThrow(() -> new RuntimeException("User not found"));
+                    .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND_IN_TOKEN));
+        } catch (AppException e) {
+            log.warn("Failed to get user from token: {}", e.getMessage());
+            throw e;
         } catch (Exception e) {
             log.warn("Failed to get user from token: {}", e.getMessage());
-            throw new RuntimeException("Invalid token");
+            throw new AppException(ErrorCode.TOKEN_VALIDATION_FAILED);
         }
     }
 
@@ -227,7 +231,7 @@ public class AuthService {
             Set<String> permissions = jwtService.extractPermissions(token);
 
             Account user = accountService.findByUsernameOrEmail(username)
-                    .orElseThrow(() -> new RuntimeException("User not found"));
+                    .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND_IN_TOKEN));
 
             return LoginResponseDto.UserInfoDto.builder()
                     .userId(userId)
@@ -238,9 +242,12 @@ public class AuthService {
                     .enabled(user.getEnabled())
                     .lastLoginAt(user.getLastLoginAt())
                     .build();
+        } catch (AppException e) {
+            log.warn("Failed to get user info from token: {}", e.getMessage());
+            throw e;
         } catch (Exception e) {
             log.warn("Failed to get user info from token: {}", e.getMessage());
-            throw new RuntimeException("Invalid token");
+            throw new AppException(ErrorCode.TOKEN_VALIDATION_FAILED);
         }
     }
 }

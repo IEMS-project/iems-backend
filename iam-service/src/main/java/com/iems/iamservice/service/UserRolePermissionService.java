@@ -5,6 +5,8 @@ import com.iems.iamservice.entity.Permission;
 import com.iems.iamservice.entity.Role;
 import com.iems.iamservice.entity.UserPermission;
 import com.iems.iamservice.entity.UserRole;
+import com.iems.iamservice.exception.AppException;
+import com.iems.iamservice.exception.ErrorCode;
 import com.iems.iamservice.repository.PermissionRepository;
 import com.iems.iamservice.repository.RoleRepository;
 import com.iems.iamservice.repository.UserPermissionRepository;
@@ -42,7 +44,7 @@ public class UserRolePermissionService {
         // Add new role assignments (skip if already exists)
         for (String roleCode : roleCodes) {
             Role role = roleRepository.findByCode(roleCode)
-                    .orElseThrow(() -> new RuntimeException("Role not found with code: " + roleCode));
+                    .orElseThrow(() -> new AppException(ErrorCode.ROLE_NOT_FOUND_BY_CODE));
 
             // Check if user-role assignment already exists (any status)
             boolean alreadyExists = userRoleRepository.existsByUserIdAndRoleId(userId, role.getId());
@@ -89,7 +91,7 @@ public class UserRolePermissionService {
         // Add new role assignments
         for (String roleCode : roleCodes) {
             Role role = roleRepository.findByCode(roleCode)
-                    .orElseThrow(() -> new RuntimeException("Role not found with code: " + roleCode));
+                    .orElseThrow(() -> new AppException(ErrorCode.ROLE_NOT_FOUND_BY_CODE));
 
             UserRole userRole = UserRole.builder()
                     .userId(userId)
@@ -113,7 +115,7 @@ public class UserRolePermissionService {
         // Add new permission assignments (skip if already exists)
         for (String permissionCode : permissionCodes) {
             Permission permission = permissionRepository.findByCode(permissionCode)
-                    .orElseThrow(() -> new RuntimeException("Permission not found with code: " + permissionCode));
+                    .orElseThrow(() -> new AppException(ErrorCode.PERMISSION_NOT_FOUND_BY_CODE));
 
             // Check if user-permission assignment already exists (any status)
             boolean alreadyExists = userPermissionRepository.existsByUserIdAndPermissionId(userId, permission.getId());
@@ -160,7 +162,7 @@ public class UserRolePermissionService {
         // Add new permission assignments
         for (String permissionCode : permissionCodes) {
             Permission permission = permissionRepository.findByCode(permissionCode)
-                    .orElseThrow(() -> new RuntimeException("Permission not found with code: " + permissionCode));
+                    .orElseThrow(() -> new AppException(ErrorCode.PERMISSION_NOT_FOUND_BY_CODE));
 
             UserPermission userPermission = UserPermission.builder()
                     .userId(userId)
@@ -256,7 +258,7 @@ public class UserRolePermissionService {
         log.info("Removing role {} from user ID: {}", roleCode, userId);
 
         Role role = roleRepository.findByCode(roleCode)
-                .orElseThrow(() -> new RuntimeException("Role not found with code: " + roleCode));
+                .orElseThrow(() -> new AppException(ErrorCode.ROLE_NOT_FOUND_BY_CODE));
 
         userRoleRepository.deactivateUserRole(userId, role.getId());
         log.info("Role removed successfully from user ID: {}", userId);
@@ -270,7 +272,7 @@ public class UserRolePermissionService {
         log.info("Removing permission {} from user ID: {}", permissionCode, userId);
 
         Permission permission = permissionRepository.findByCode(permissionCode)
-                .orElseThrow(() -> new RuntimeException("Permission not found with code: " + permissionCode));
+                .orElseThrow(() -> new AppException(ErrorCode.PERMISSION_NOT_FOUND_BY_CODE));
 
         userPermissionRepository.deactivateUserPermission(userId, permission.getId());
         log.info("Permission removed successfully from user ID: {}", userId);
@@ -281,7 +283,7 @@ public class UserRolePermissionService {
      */
     public List<UUID> getUsersByRole(String roleCode) {
         Role role = roleRepository.findByCode(roleCode)
-                .orElseThrow(() -> new RuntimeException("Role not found with code: " + roleCode));
+                .orElseThrow(() -> new AppException(ErrorCode.ROLE_NOT_FOUND_BY_CODE));
 
         return userRoleRepository.findUserIdsByRoleId(role.getId());
     }
@@ -291,7 +293,7 @@ public class UserRolePermissionService {
      */
     public List<UUID> getUsersByPermission(String permissionCode) {
         Permission permission = permissionRepository.findByCode(permissionCode)
-                .orElseThrow(() -> new RuntimeException("Permission not found with code: " + permissionCode));
+                .orElseThrow(() -> new AppException(ErrorCode.PERMISSION_NOT_FOUND_BY_CODE));
 
         return userPermissionRepository.findUserIdsByPermissionId(permission.getId());
     }
