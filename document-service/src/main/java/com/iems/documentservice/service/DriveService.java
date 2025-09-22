@@ -26,6 +26,8 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.Set;
 import java.util.HashSet;
+import com.iems.documentservice.exception.AppException;
+import com.iems.documentservice.exception.DocumentErrorCode;
 
 @Service
 public class DriveService {
@@ -53,7 +55,7 @@ public class DriveService {
         Folder parent = null;
         if (request.getParentId() != null) {
             parent = folderRepository.findById(request.getParentId())
-                    .orElseThrow(() -> new IllegalArgumentException("Parent folder not found"));
+                    .orElseThrow(() -> new AppException(DocumentErrorCode.FOLDER_NOT_FOUND));
         }
         Folder folder = Folder.builder()
                 .name(request.getName())
@@ -75,12 +77,12 @@ public class DriveService {
     public FileResponse uploadFile(UUID folderId, MultipartFile file) throws Exception {
         UUID ownerId = getCurrentUserId();
         if (file.getSize() > MAX_UPLOAD_SIZE) {
-            throw new IllegalArgumentException("File size exceeds 50MB limit");
+            throw new AppException(DocumentErrorCode.INVALID_REQUEST);
         }
         Folder folder = null;
         if (folderId != null) {
             folder = folderRepository.findById(folderId)
-                    .orElseThrow(() -> new IllegalArgumentException("Folder not found"));
+                    .orElseThrow(() -> new AppException(DocumentErrorCode.FOLDER_NOT_FOUND));
         }
         String objectKey = generateObjectKey(folderId, ownerId, file.getOriginalFilename());
         try (InputStream in = file.getInputStream()) {
@@ -103,7 +105,7 @@ public class DriveService {
     public FileResponse downloadInfo(UUID fileId) throws Exception {
         UUID requesterId = getCurrentUserId();
         StoredFile file = storedFileRepository.findById(fileId)
-                .orElseThrow(() -> new IllegalArgumentException("File not found"));
+                .orElseThrow(() -> new AppException(DocumentErrorCode.FILE_NOT_FOUND));
         enforceReadPermission(file, requesterId);
         String presigned = storageService.presignGetUrl(file.getPath());
         return toResponse(file, presigned);
@@ -112,7 +114,7 @@ public class DriveService {
     public InputStream downloadStream(UUID fileId) throws Exception {
         UUID requesterId = getCurrentUserId();
         StoredFile file = storedFileRepository.findById(fileId)
-                .orElseThrow(() -> new IllegalArgumentException("File not found"));
+                .orElseThrow(() -> new AppException(DocumentErrorCode.FILE_NOT_FOUND));
         enforceReadPermission(file, requesterId);
         return storageService.download(file.getPath());
     }
@@ -121,7 +123,7 @@ public class DriveService {
     public void updatePermission(UUID fileId, UpdatePermissionRequest request) {
         UUID requesterId = getCurrentUserId();
         StoredFile file = storedFileRepository.findById(fileId)
-                .orElseThrow(() -> new IllegalArgumentException("File not found"));
+                .orElseThrow(() -> new AppException(DocumentErrorCode.FILE_NOT_FOUND));
         enforceOwner(file, requesterId);
         file.setPermission(request.getPermission());
         storedFileRepository.save(file);
@@ -131,7 +133,7 @@ public class DriveService {
     public void deleteFile(UUID fileId) throws Exception {
         UUID requesterId = getCurrentUserId();
         StoredFile file = storedFileRepository.findById(fileId)
-                .orElseThrow(() -> new IllegalArgumentException("File not found"));
+                .orElseThrow(() -> new AppException(DocumentErrorCode.FILE_NOT_FOUND));
         enforceOwner(file, requesterId);
         storageService.delete(file.getPath());
         storedFileRepository.delete(file);
@@ -141,9 +143,9 @@ public class DriveService {
     public void deleteFolderRecursive(UUID folderId) throws Exception {
         UUID requesterId = getCurrentUserId();
         Folder folder = folderRepository.findById(folderId)
-                .orElseThrow(() -> new IllegalArgumentException("Folder not found"));
+                .orElseThrow(() -> new AppException(DocumentErrorCode.FOLDER_NOT_FOUND));
         if (!folder.getOwnerId().equals(requesterId)) {
-            throw new IllegalStateException("Not allowed");
+            throw new AppException(DocumentErrorCode.PERMISSION_DENIED);
         }
         // delete files in this folder
         List<StoredFile> files = storedFileRepository.findByFolderId(folder.getId());
@@ -161,7 +163,7 @@ public class DriveService {
 
     private void enforceOwner(StoredFile file, UUID requesterId) {
         if (!file.getOwnerId().equals(requesterId)) {
-            throw new IllegalStateException("Not allowed");
+            throw new AppException(DocumentErrorCode.PERMISSION_DENIED);
         }
     }
 
@@ -175,7 +177,7 @@ public class DriveService {
             }
         }
         if (!file.getOwnerId().equals(requesterId)) {
-            throw new IllegalStateException("Not allowed");
+            throw new AppException(DocumentErrorCode.PERMISSION_DENIED);
         }
     }
 
@@ -223,9 +225,9 @@ public class DriveService {
     public List<FileResponse> listFilesInFolder(UUID folderId) {
         UUID ownerId = getCurrentUserId();
         Folder folder = folderRepository.findById(folderId)
-                .orElseThrow(() -> new IllegalArgumentException("Folder not found"));
+                .orElseThrow(() -> new AppException(DocumentErrorCode.FOLDER_NOT_FOUND));
         if (!folder.getOwnerId().equals(ownerId)) {
-            throw new IllegalStateException("Not allowed");
+            throw new AppException(DocumentErrorCode.PERMISSION_DENIED);
         }
         return storedFileRepository.findByFolderId(folderId).stream()
                 .map(f -> toResponse(f, null))
@@ -236,7 +238,7 @@ public class DriveService {
     public void shareFile(UUID fileId, ShareRequest request) {
         UUID ownerId = getCurrentUserId();
         StoredFile file = storedFileRepository.findById(fileId)
-                .orElseThrow(() -> new IllegalArgumentException("File not found"));
+                .orElseThrow(() -> new AppException(DocumentErrorCode.FILE_NOT_FOUND));
         enforceOwner(file, ownerId);
         // Ensure permission is SHARED
         if (file.getPermission() == Permission.PRIVATE) {
@@ -259,7 +261,7 @@ public class DriveService {
     public void unshareFile(UUID fileId, ShareRequest request) {
         UUID ownerId = getCurrentUserId();
         StoredFile file = storedFileRepository.findById(fileId)
-                .orElseThrow(() -> new IllegalArgumentException("File not found"));
+                .orElseThrow(() -> new AppException(DocumentErrorCode.FILE_NOT_FOUND));
         enforceOwner(file, ownerId);
         for (UUID userId : request.getUserIds()) {
             fileShareRepository.deleteByFileIdAndSharedWithUserId(fileId, userId);

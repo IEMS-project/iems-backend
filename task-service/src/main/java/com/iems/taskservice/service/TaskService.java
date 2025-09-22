@@ -18,6 +18,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import com.iems.taskservice.exception.AppException;
+import com.iems.taskservice.exception.TaskErrorCode;
 
 @Service
 @Transactional
@@ -33,12 +35,12 @@ public class TaskService {
         // Validate dates
         if (createDto.getStartDate() != null && createDto.getDueDate() != null) {
             if (createDto.getStartDate().isAfter(createDto.getDueDate())) {
-                throw new IllegalArgumentException("Start date cannot be after due date");
+                throw new AppException(TaskErrorCode.INVALID_REQUEST);
             }
         }
         
         if (createDto.getDueDate() != null && createDto.getDueDate().isBefore(LocalDate.now())) {
-            throw new IllegalArgumentException("Due date cannot be in the past");
+            throw new AppException(TaskErrorCode.INVALID_REQUEST);
         }
 
         Task task = new Task();
@@ -65,12 +67,12 @@ public class TaskService {
     // UC24: Gán Nhiệm vụ
     public TaskResponseDto assignTask(UUID taskId, UUID newAssigneeId, UUID userId) {
         Task task = taskRepository.findById(taskId)
-                .orElseThrow(() -> new IllegalArgumentException("Task not found"));
+                .orElseThrow(() -> new AppException(TaskErrorCode.TASK_NOT_FOUND));
         
         // Check if user has permission to reassign (project manager or task creator)
         if (!task.getCreatedBy().equals(userId)) {
             // TODO: Add project role check here
-            throw new IllegalArgumentException("Insufficient permissions to reassign task");
+            throw new AppException(TaskErrorCode.PERMISSION_DENIED);
         }
         
         UUID oldAssignee = task.getAssignedTo();
@@ -97,12 +99,12 @@ public class TaskService {
     // UC26: Cập nhật Trạng thái Nhiệm vụ
     public TaskResponseDto updateTaskStatus(UUID taskId, String newStatusStr, String comment, UUID userId) {
         Task task = taskRepository.findById(taskId)
-                .orElseThrow(() -> new IllegalArgumentException("Task not found"));
+                .orElseThrow(() -> new AppException(TaskErrorCode.TASK_NOT_FOUND));
         
         // Check if user is assigned to this task or has permission
         if (!task.getAssignedTo().equals(userId)) {
             // TODO: Add project role check here
-            throw new IllegalArgumentException("Insufficient permissions to update task status");
+            throw new AppException(TaskErrorCode.PERMISSION_DENIED);
         }
         
         // Convert string to enum
@@ -110,12 +112,12 @@ public class TaskService {
         try {
             newStatus = TaskStatus.valueOf(newStatusStr);
         } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("Invalid status: " + newStatusStr);
+            throw new AppException(TaskErrorCode.INVALID_REQUEST);
         }
         
         // Validate status transition
         if (!isValidStatusTransition(task.getStatus(), newStatus)) {
-            throw new IllegalArgumentException("Invalid status transition from " + task.getStatus().getDisplayName() + " to " + newStatus.getDisplayName());
+            throw new AppException(TaskErrorCode.INVALID_REQUEST);
         }
         
         TaskStatus oldStatus = task.getStatus();
@@ -133,23 +135,23 @@ public class TaskService {
     // UC27: Thiết lập Ngày và Mức ưu tiên Nhiệm vụ
     public TaskResponseDto updateTaskPriorityAndDates(UUID taskId, UpdateTaskDto updateDto, UUID userId) {
         Task task = taskRepository.findById(taskId)
-                .orElseThrow(() -> new IllegalArgumentException("Task not found"));
+                .orElseThrow(() -> new AppException(TaskErrorCode.TASK_NOT_FOUND));
         
         // Check permissions
         if (!task.getCreatedBy().equals(userId) && !task.getAssignedTo().equals(userId)) {
             // TODO: Add project role check here
-            throw new IllegalArgumentException("Insufficient permissions to update task");
+            throw new AppException(TaskErrorCode.PERMISSION_DENIED);
         }
         
         // Validate dates
         if (updateDto.getStartDate() != null && updateDto.getDueDate() != null) {
             if (updateDto.getStartDate().isAfter(updateDto.getDueDate())) {
-                throw new IllegalArgumentException("Start date cannot be after due date");
+                throw new AppException(TaskErrorCode.INVALID_REQUEST);
             }
         }
         
         if (updateDto.getDueDate() != null && updateDto.getDueDate().isBefore(LocalDate.now())) {
-            throw new IllegalArgumentException("Due date cannot be in the past");
+            throw new AppException(TaskErrorCode.INVALID_REQUEST);
         }
         
         boolean hasChanges = false;

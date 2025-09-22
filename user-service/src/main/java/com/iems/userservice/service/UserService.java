@@ -2,6 +2,8 @@ package com.iems.userservice.service;
 
 import com.iems.userservice.dto.request.UserRequestDto;
 import com.iems.userservice.dto.response.UserResponseDto;
+import com.iems.userservice.exception.AppException;
+import com.iems.userservice.exception.UserErrorCode;
 import com.iems.userservice.entity.User;
 import com.iems.userservice.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,41 +19,88 @@ public class UserService {
     private UserRepository repository;
 
     public UserResponseDto saveUser(UserRequestDto userRequest) {
-        return convertToUserResponse(repository.save(convertToUser(userRequest)));
+        try {
+            return convertToUserResponse(repository.save(convertToUser(userRequest)));
+        } catch (Exception ex) {
+            throw new AppException(UserErrorCode.INTERNAL_SERVER_ERROR);
+        }
     }
 
     public Optional<UserResponseDto> updateUser(UUID id, UserRequestDto userRequest) {
-        return repository.findById(id).map(existing -> {
-            applyUpdates(existing, userRequest);
-            return convertToUserResponse(repository.save(existing));
-        });
+        try {
+            return repository.findById(id)
+                    .map(existing -> {
+                        applyUpdates(existing, userRequest);
+                        return convertToUserResponse(repository.save(existing));
+                    })
+                    .or(() -> {
+                        throw new AppException(UserErrorCode.USER_NOT_FOUND);
+                    });
+        } catch (AppException e) {
+            throw e; // giữ nguyên exception custom
+        } catch (Exception ex) {
+            throw new AppException(UserErrorCode.INTERNAL_SERVER_ERROR);
+        }
     }
 
     public Optional<UserResponseDto> updateMyProfile(UUID id, UserRequestDto userRequest) {
-        return repository.findById(id).map(existing -> {
-            applySelfProfileUpdates(existing, userRequest);
-            return convertToUserResponse(repository.save(existing));
-        });
+        try {
+            return repository.findById(id)
+                    .map(existing -> {
+                        applySelfProfileUpdates(existing, userRequest);
+                        return convertToUserResponse(repository.save(existing));
+                    })
+                    .or(() -> {
+                        throw new AppException(UserErrorCode.USER_NOT_FOUND);
+                    });
+        } catch (AppException e) {
+            throw e;
+        } catch (Exception ex) {
+            throw new AppException(UserErrorCode.INTERNAL_SERVER_ERROR);
+        }
     }
 
     public List<UserResponseDto> getAllUsers() {
-        return repository.findAll()
-                .stream()
-                .map(this::convertToUserResponse)
-                .toList();
+        try {
+            return repository.findAll()
+                    .stream()
+                    .map(this::convertToUserResponse)
+                    .toList();
+        } catch (Exception ex) {
+            throw new AppException(UserErrorCode.INTERNAL_SERVER_ERROR);
+        }
     }
 
     public Optional<UserResponseDto> getUserById(UUID id) {
-        return repository.findById(id)
-                .map(this::convertToUserResponse);
-    }
-    public void deleteUser(UUID id) {repository.deleteById(id);}
-
-    public User convertToUser(UserRequestDto userRequest) {
-        if (userRequest == null) {
-            return null;
+        try {
+            return repository.findById(id)
+                    .map(this::convertToUserResponse)
+                    .or(() -> {
+                        throw new AppException(UserErrorCode.USER_NOT_FOUND);
+                    });
+        } catch (AppException e) {
+            throw e;
+        } catch (Exception ex) {
+            throw new AppException(UserErrorCode.INTERNAL_SERVER_ERROR);
         }
+    }
 
+    public void deleteUser(UUID id) {
+        try {
+            if (!repository.existsById(id)) {
+                throw new AppException(UserErrorCode.USER_NOT_FOUND);
+            }
+            repository.deleteById(id);
+        } catch (AppException e) {
+            throw e;
+        } catch (Exception ex) {
+            throw new AppException(UserErrorCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    // ----- convert & apply methods giữ nguyên -----
+    public User convertToUser(UserRequestDto userRequest) {
+        if (userRequest == null) return null;
         User user = new User();
         user.setFirstName(userRequest.getFirstName());
         user.setLastName(userRequest.getLastName());
@@ -66,13 +115,11 @@ public class UserService {
         user.setBankName(userRequest.getBankName());
         user.setContractType(userRequest.getContractType());
         user.setStartDate(userRequest.getStartDate());
-
         return user;
     }
+
     public UserResponseDto convertToUserResponse(User user) {
-        if (user == null) {
-            return null;
-        }
+        if (user == null) return null;
         return new UserResponseDto(
                 user.getId(),
                 user.getFirstName(),
@@ -115,7 +162,5 @@ public class UserService {
         if (userRequest.getImage() != null) user.setImage(userRequest.getImage());
         if (userRequest.getBankAccountNumber() != null) user.setBankAccountNumber(userRequest.getBankAccountNumber());
         if (userRequest.getBankName() != null) user.setBankName(userRequest.getBankName());
-        // Intentionally ignore: firstName, lastName, email, dob, gender, personalID, contractType, startDate
     }
-
 }

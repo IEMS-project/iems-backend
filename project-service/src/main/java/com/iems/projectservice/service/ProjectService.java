@@ -9,6 +9,8 @@ import com.iems.projectservice.entity.Project;
 import com.iems.projectservice.entity.enums.ProjectRole;
 import com.iems.projectservice.entity.enums.ProjectStatus;
 import com.iems.projectservice.entity.ProjectMember;
+import com.iems.projectservice.exception.AppException;
+import com.iems.projectservice.exception.ProjectErrorCode;
 import com.iems.projectservice.repository.ProjectRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -33,7 +35,7 @@ public class ProjectService {
         
         // Validate project name uniqueness
         if (projectRepository.existsByName(createProjectDto.getName())) {
-            throw new RuntimeException("Project name already exists");
+            throw new AppException( ProjectErrorCode.PROJECT_NAME_EXISTS);
         }
         
         // Create project
@@ -62,18 +64,18 @@ public class ProjectService {
         log.info("Updating project: {}", projectId);
         
         Project project = projectRepository.findById(projectId)
-                .orElseThrow(() -> new RuntimeException("Project not found"));
+                .orElseThrow(() -> new  AppException( ProjectErrorCode.PROJECT_NOT_FOUND));
         
         // Check if user has permission to update
         if (!hasPermissionToUpdateProject(project, currentUserId)) {
-            throw new RuntimeException("Insufficient permissions to update project");
+            throw new AppException(ProjectErrorCode.PERMISSION_DENIED);
         }
         
         // Update project fields
         if (updateProjectDto.getName() != null) {
             if (!updateProjectDto.getName().equals(project.getName()) && 
                 projectRepository.existsByName(updateProjectDto.getName())) {
-                throw new RuntimeException("Project name already exists");
+                throw new AppException( ProjectErrorCode.PROJECT_NAME_EXISTS);
             }
             project.setName(updateProjectDto.getName());
         }
@@ -111,11 +113,11 @@ public class ProjectService {
         log.info("Getting project: {}", projectId);
         
         Project project = projectRepository.findById(projectId)
-                .orElseThrow(() -> new RuntimeException("Project not found"));
+                .orElseThrow(() -> new AppException( ProjectErrorCode.PROJECT_NOT_FOUND));
         
         // Check if user has access to project
         if (!hasAccessToProject(project, currentUserId)) {
-            throw new RuntimeException("Access denied to project");
+            throw new  AppException( ProjectErrorCode.PERMISSION_DENIED);
         }
         
         return mapToProjectResponseDto(project);
@@ -139,10 +141,10 @@ public class ProjectService {
         log.info("Getting project progress: {}", projectId);
         
         Project project = projectRepository.findById(projectId)
-                .orElseThrow(() -> new RuntimeException("Project not found"));
+                .orElseThrow(() -> new  AppException( ProjectErrorCode.PROJECT_NOT_FOUND));
         
         if (!hasAccessToProject(project, currentUserId)) {
-            throw new RuntimeException("Access denied to project");
+            throw new  AppException( ProjectErrorCode.PERMISSION_DENIED);
         }
         
         // This would typically integrate with task service to get actual task statistics
@@ -155,11 +157,11 @@ public class ProjectService {
         log.info("Assigning project manager: projectId={}, newManagerId={}", projectId, newManagerId);
         
         Project project = projectRepository.findById(projectId)
-                .orElseThrow(() -> new RuntimeException("Project not found"));
+                .orElseThrow(() -> new AppException( ProjectErrorCode.PROJECT_NOT_FOUND));
         
         // Check if current user is admin or current project manager
         if (!isAdmin(currentUserId) && !project.getManagerId().equals(currentUserId)) {
-            throw new RuntimeException("Insufficient permissions to assign project manager");
+            throw new AppException( ProjectErrorCode.PERMISSION_DENIED);
         }
         
         project.setManagerId(newManagerId);

@@ -8,6 +8,8 @@ import com.iems.departmentservice.dto.request.UpdateDepartmentDto;
 import com.iems.departmentservice.entity.Department;
 import com.iems.departmentservice.entity.DepartmentUser;
 import com.iems.departmentservice.repository.DepartmentRepository;
+import com.iems.departmentservice.exception.AppException;
+import com.iems.departmentservice.exception.DepartmentErrorCode;
 import com.iems.departmentservice.repository.DepartmentUserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -30,7 +32,7 @@ public class DepartmentService {
 
     public DepartmentResponseDto saveDepartment(CreateDepartmentDto createDto, UUID userId) {
         if (departmentRepository.existsByDepartmentName(createDto.getDepartmentName())) {
-            throw new IllegalArgumentException("Department name already exists");
+            throw new AppException(DepartmentErrorCode.DEPARTMENT_NAME_EXISTS);
         }
         Department department = new Department();
         department.setDepartmentName(createDto.getDepartmentName());
@@ -56,7 +58,7 @@ public class DepartmentService {
         return departmentRepository.findById(id).map(existing -> {
             if (updateDto.getDepartmentName() != null && !updateDto.getDepartmentName().isBlank()) {
                 if (departmentRepository.existsByDepartmentNameAndIdNot(updateDto.getDepartmentName(), id)) {
-                    throw new IllegalArgumentException("Department name already exists");
+                    throw new AppException(DepartmentErrorCode.DEPARTMENT_NAME_EXISTS);
                 }
                 existing.setDepartmentName(updateDto.getDepartmentName());
             }
@@ -82,11 +84,11 @@ public class DepartmentService {
 
     public DepartmentUserDto addUserToDepartment(UUID departmentId, AddUserToDepartmentDto addUserDto, UUID currentUserId) {
         if (!departmentRepository.existsById(departmentId)) {
-            throw new IllegalArgumentException("Department not found");
+            throw new AppException(DepartmentErrorCode.DEPARTMENT_NOT_FOUND);
         }
         
         if (departmentUserRepository.existsByDepartmentIdAndUserIdAndIsActiveTrue(departmentId, addUserDto.getUserId())) {
-            throw new IllegalArgumentException("User is already in this department");
+            throw new AppException(DepartmentErrorCode.USER_ALREADY_IN_DEPARTMENT);
         }
         
         DepartmentUser departmentUser = new DepartmentUser();
