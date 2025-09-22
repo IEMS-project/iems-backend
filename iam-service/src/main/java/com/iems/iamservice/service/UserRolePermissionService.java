@@ -182,6 +182,13 @@ public class UserRolePermissionService {
     }
 
     /**
+     * Get all roles with permissions assigned to user
+     */
+    public Set<Role> getUserRolesWithPermissions(UUID userId) {
+        return new HashSet<>(userRoleRepository.findRolesWithPermissionsByUserId(userId));
+    }
+
+    /**
      * Get all permissions assigned directly to user
      */
     public Set<Permission> getUserDirectPermissions(UUID userId) {
@@ -192,8 +199,8 @@ public class UserRolePermissionService {
      * Get all permissions for user (from roles + direct assignments)
      */
     public Set<Permission> getAllUserPermissions(UUID userId) {
-        // Get permissions from active roles only
-        Set<Role> userRoles = getUserRoles(userId);
+        // Get permissions from active roles only (with permissions loaded)
+        Set<Role> userRoles = getUserRolesWithPermissions(userId);
         Set<Permission> rolePermissions = userRoles.stream()
                 .filter(role -> role.getActive()) // Only active roles
                 .flatMap(role -> role.getPermissions().stream())
@@ -240,7 +247,7 @@ public class UserRolePermissionService {
         }
 
         // Check permission through active roles only
-        Set<Role> userRoles = getUserRoles(userId);
+        Set<Role> userRoles = getUserRolesWithPermissions(userId);
         return userRoles.stream()
                 .filter(role -> role.getActive()) // Only active roles
                 .flatMap(role -> role.getPermissions().stream())

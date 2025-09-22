@@ -103,8 +103,8 @@ public class AuthService {
                             .build())
                     .build();
 
-        } catch (RuntimeException e) {
-            log.warn("Authentication failed for user: {}", loginRequest.getUsernameOrEmail());
+        } catch (Exception e) {
+            log.error("Authentication failed for user: {} - Error: {}", loginRequest.getUsernameOrEmail(), e.getMessage(), e);
             throw new RuntimeException("Invalid username or password");
         }
     }

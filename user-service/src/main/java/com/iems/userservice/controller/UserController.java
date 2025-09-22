@@ -3,6 +3,7 @@ package com.iems.userservice.controller;
 import com.iems.userservice.dto.request.UserRequestDto;
 import com.iems.userservice.dto.response.ApiResponseDto;
 import com.iems.userservice.dto.response.UserResponseDto;
+import com.iems.userservice.dto.external.UserInfoDto;
 import com.iems.userservice.security.JwtUserDetails;
 import com.iems.userservice.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -142,5 +143,25 @@ public class UserController {
         }
     }
 
+    // External API for other services
+    @Operation(summary = "Get user info for external services", description = "Get basic user info for service-to-service communication")
+    @GetMapping("/external/{id}")
+    public ResponseEntity<UserInfoDto> getUserInfoForExternal(@PathVariable UUID id) {
+        try {
+            return service.getUserById(id)
+                    .map(user -> {
+                        UserInfoDto userInfo = new UserInfoDto();
+                        userInfo.setId(user.getId());
+                        userInfo.setFirstName(user.getFirstName());
+                        userInfo.setLastName(user.getLastName());
+                        userInfo.setEmail(user.getEmail());
+                        userInfo.setStatus("ACTIVE"); // Default status
+                        return ResponseEntity.ok(userInfo);
+                    })
+                    .orElseGet(() -> ResponseEntity.notFound().build());
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().build();
+        }
+    }
 
 }

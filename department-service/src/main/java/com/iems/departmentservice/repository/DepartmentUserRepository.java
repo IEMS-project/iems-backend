@@ -30,3 +30,4 @@ public interface DepartmentUserRepository extends JpaRepository<DepartmentUser, 
     
     List<DepartmentUser> findByUserId(UUID userId);
 }
+

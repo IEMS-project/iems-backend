@@ -1,6 +1,7 @@
 package com.iems.projectservice.service;
 
 import com.iems.projectservice.dto.response.ProjectMemberResponseDto;
+import com.iems.projectservice.dto.external.UserInfoDto;
 import com.iems.projectservice.entity.Project;
 import com.iems.projectservice.entity.ProjectMember;
 import com.iems.projectservice.entity.enums.ProjectRole;
@@ -135,8 +136,8 @@ public class ProjectMemberService {
         
         // Get user information from user service
         try {
-            UserService.UserDto userInfo = userService.getUserById(projectMember.getUserId());
-            dto.setUserName(userInfo.getName());
+            UserInfoDto userInfo = userService.getUserById(projectMember.getUserId());
+            dto.setUserName(userInfo.getFirstName() + " " + userInfo.getLastName());
             dto.setUserEmail(userInfo.getEmail());
         } catch (Exception e) {
             log.warn("Could not fetch user info for userId: {}", projectMember.getUserId());
@@ -146,8 +147,8 @@ public class ProjectMemberService {
         
         // Get assigned by user information
         try {
-            UserService.UserDto assignedByUser = userService.getUserById(projectMember.getAssignedBy());
-            dto.setAssignedByName(assignedByUser.getName());
+            UserInfoDto assignedByUser = userService.getUserById(projectMember.getAssignedBy());
+            dto.setAssignedByName(assignedByUser.getFirstName() + " " + assignedByUser.getLastName());
         } catch (Exception e) {
             log.warn("Could not fetch assigned by user info for userId: {}", projectMember.getAssignedBy());
             dto.setAssignedByName("Unknown User");

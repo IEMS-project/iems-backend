@@ -1,5 +1,6 @@
 package com.iems.departmentservice.service;
 
+import com.iems.departmentservice.client.UserServiceClient;
 import com.iems.departmentservice.dto.request.AddUserToDepartmentDto;
 import com.iems.departmentservice.dto.request.CreateDepartmentDto;
 import com.iems.departmentservice.dto.response.DepartmentResponseDto;
@@ -9,7 +10,8 @@ import com.iems.departmentservice.entity.Department;
 import com.iems.departmentservice.entity.DepartmentUser;
 import com.iems.departmentservice.repository.DepartmentRepository;
 import com.iems.departmentservice.repository.DepartmentUserRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,17 +23,23 @@ import java.util.stream.Collectors;
 
 @Service
 @Transactional
+@RequiredArgsConstructor
+@Slf4j
 public class DepartmentService {
-    @Autowired
-    private DepartmentRepository departmentRepository;
-    
-    @Autowired
-    private DepartmentUserRepository departmentUserRepository;
+    private final DepartmentRepository departmentRepository;
+    private final DepartmentUserRepository departmentUserRepository;
+    private final UserServiceClient userServiceClient;
 
     public DepartmentResponseDto saveDepartment(CreateDepartmentDto createDto, UUID userId) {
         if (departmentRepository.existsByDepartmentName(createDto.getDepartmentName())) {
             throw new IllegalArgumentException("Department name already exists");
         }
+        
+        // Validate manager exists and is active
+        if (createDto.getManagerId() != null && !userServiceClient.isUserActive(createDto.getManagerId())) {
+            throw new IllegalArgumentException("Manager not found or inactive");
+        }
+        
         Department department = new Department();
         department.setDepartmentName(createDto.getDepartmentName());
         department.setDescription(createDto.getDescription());

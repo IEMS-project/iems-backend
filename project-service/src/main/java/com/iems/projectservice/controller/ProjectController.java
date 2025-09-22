@@ -5,6 +5,7 @@ import com.iems.projectservice.dto.request.ProjectProgressDto;
 import com.iems.projectservice.dto.request.UpdateProjectDto;
 import com.iems.projectservice.dto.response.ApiResponseDto;
 import com.iems.projectservice.dto.response.ProjectResponseDto;
+import com.iems.projectservice.dto.external.ProjectInfoDto;
 import com.iems.projectservice.service.ProjectService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -144,6 +145,31 @@ public class ProjectController {
             log.error("Error assigning project manager", e);
             return ResponseEntity.badRequest()
                     .body(new ApiResponseDto<>("error", e.getMessage(), null));
+        }
+    }
+    
+    // External API for other services
+    @GetMapping("/external/{projectId}")
+    @Operation(summary = "Get project info for external services", description = "Get basic project info for service-to-service communication")
+    public ResponseEntity<ProjectInfoDto> getProjectInfoForExternal(@PathVariable UUID projectId) {
+        try {
+            ProjectResponseDto project = projectService.getProjectById(projectId, projectId); // Using projectId as currentUserId for external calls
+            if (project != null) {
+                ProjectInfoDto projectInfo = new ProjectInfoDto();
+                projectInfo.setId(project.getId());
+                projectInfo.setName(project.getName());
+                projectInfo.setDescription(project.getDescription());
+                projectInfo.setStatus(project.getStatus().toString());
+                projectInfo.setManagerId(project.getManagerId());
+                projectInfo.setStartDate(project.getStartDate());
+                projectInfo.setEndDate(project.getEndDate());
+                return ResponseEntity.ok(projectInfo);
+            } else {
+                return ResponseEntity.notFound().build();
+            }
+        } catch (Exception e) {
+            log.error("Error getting project info for external service", e);
+            return ResponseEntity.internalServerError().build();
         }
     }
 }

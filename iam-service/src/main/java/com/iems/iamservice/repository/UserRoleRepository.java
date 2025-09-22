@@ -21,6 +21,12 @@ public interface UserRoleRepository extends JpaRepository<UserRole, UUID> {
     List<Role> findRolesByUserId(@Param("userId") UUID userId);
 
     /**
+     * Find all roles with permissions assigned to a specific user
+     */
+    @Query("SELECT DISTINCT ur.role FROM UserRole ur JOIN FETCH ur.role.permissions WHERE ur.userId = :userId AND ur.active = true")
+    List<Role> findRolesWithPermissionsByUserId(@Param("userId") UUID userId);
+
+    /**
      * Find all user-role assignments for a specific user
      */
     List<UserRole> findByUserIdAndActiveTrue(UUID userId);

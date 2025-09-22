@@ -1,5 +1,7 @@
 package com.iems.taskservice.service;
 
+import com.iems.taskservice.client.ProjectServiceClient;
+import com.iems.taskservice.client.UserServiceClient;
 import com.iems.taskservice.dto.CreateTaskDto;
 import com.iems.taskservice.dto.TaskResponseDto;
 import com.iems.taskservice.dto.UpdateTaskDto;
@@ -9,7 +11,8 @@ import com.iems.taskservice.entity.enums.TaskPriority;
 import com.iems.taskservice.entity.enums.TaskStatus;
 import com.iems.taskservice.repository.TaskRepository;
 import com.iems.taskservice.repository.TaskStatusHistoryRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,15 +24,26 @@ import java.util.stream.Collectors;
 
 @Service
 @Transactional
+@RequiredArgsConstructor
+@Slf4j
 public class TaskService {
-    @Autowired
-    private TaskRepository taskRepository;
-    
-    @Autowired
-    private TaskStatusHistoryRepository statusHistoryRepository;
+    private final TaskRepository taskRepository;
+    private final TaskStatusHistoryRepository statusHistoryRepository;
+    private final UserServiceClient userServiceClient;
+    private final ProjectServiceClient projectServiceClient;
 
     // UC23: Tạo Nhiệm vụ
     public TaskResponseDto createTask(CreateTaskDto createDto, UUID userId) {
+        // Validate project exists
+        if (!projectServiceClient.isProjectActive(createDto.getProjectId())) {
+            throw new IllegalArgumentException("Project not found or inactive");
+        }
+        
+        // Validate assigned user exists and is active
+        if (!userServiceClient.isUserActive(createDto.getAssignedTo())) {
+            throw new IllegalArgumentException("Assigned user not found or inactive");
+        }
+        
         // Validate dates
         if (createDto.getStartDate() != null && createDto.getDueDate() != null) {
             if (createDto.getStartDate().isAfter(createDto.getDueDate())) {
@@ -66,6 +80,11 @@ public class TaskService {
     public TaskResponseDto assignTask(UUID taskId, UUID newAssigneeId, UUID userId) {
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new IllegalArgumentException("Task not found"));
+        
+        // Validate new assignee exists and is active
+        if (!userServiceClient.isUserActive(newAssigneeId)) {
+            throw new IllegalArgumentException("New assignee not found or inactive");
+        }
         
         // Check if user has permission to reassign (project manager or task creator)
         if (!task.getCreatedBy().equals(userId)) {
