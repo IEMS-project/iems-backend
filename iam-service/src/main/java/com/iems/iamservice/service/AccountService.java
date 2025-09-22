@@ -4,6 +4,8 @@ import com.iems.iamservice.dto.request.CreateUserDto;
 import com.iems.iamservice.dto.request.UpdateUserDto;
 import com.iems.iamservice.dto.response.UserResponseDto;
 import com.iems.iamservice.entity.Account;
+import com.iems.iamservice.exception.AppException;
+import com.iems.iamservice.exception.ErrorCode;
 
 import com.iems.iamservice.entity.Permission;
 import com.iems.iamservice.entity.Role;
@@ -32,8 +34,6 @@ public class AccountService {
     @Autowired
     private UserRolePermissionService userRolePermissionService;
 
-    @Autowired
-    private PermissionService permissionService;
 
 
     /**
@@ -44,14 +44,14 @@ public class AccountService {
         log.info("Creating new user: {}", dto.getUsername());
 
         if (accountRepository.existsByUsername(dto.getUsername())) {
-            throw new RuntimeException("Username already exists");
+            throw new AppException(ErrorCode.USERNAME_ALREADY_EXISTS);
         }
         if (accountRepository.existsByEmail(dto.getEmail())) {
-            throw new RuntimeException("Email already exists");
+            throw new AppException(ErrorCode.EMAIL_ALREADY_EXISTS);
         }
 
         Account user = Account.builder()
-                .userId(dto.getUserId()) // ID from user-service
+                .userId(dto.getUserId())
                 .username(dto.getUsername())
                 .email(dto.getEmail())
                 .passwordHash(passwordEncoder.encode(dto.getPassword()))
@@ -77,7 +77,7 @@ public class AccountService {
      */
     public Account findById(UUID id) {
         return accountRepository.findByUserId(id)
-                .orElseThrow(() -> new RuntimeException("User not found with ID: " + id));
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND_BY_ID));
     }
 
     /**
@@ -105,7 +105,7 @@ public class AccountService {
         
         if (dto.getEmail() != null && !dto.getEmail().equals(user.getEmail())) {
             if (accountRepository.existsByEmail(dto.getEmail())) {
-                throw new RuntimeException("Email already exists");
+                throw new AppException(ErrorCode.EMAIL_ALREADY_EXISTS);
             }
             user.setEmail(dto.getEmail());
         }
@@ -127,12 +127,17 @@ public class AccountService {
     public Account lockUser(UUID id, boolean locked, String reason) {
         log.info("{} user with ID: {}, reason: {}", locked ? "Locking" : "Unlocking", id, reason);
 
-        Optional<Account> user = Optional.of(findByUserId(id).get());
-        user.get().setEnabled(!locked);
-        
-        Account updatedUser = accountRepository.save(user.get());
-        log.info("User {} successfully: {}", locked ? "locked" : "unlocked", updatedUser.getUsername());
-        return updatedUser;
+        try {
+            Optional<Account> user = Optional.of(findByUserId(id).get());
+            user.get().setEnabled(!locked);
+            
+            Account updatedUser = accountRepository.save(user.get());
+            log.info("User {} successfully: {}", locked ? "locked" : "unlocked", updatedUser.getUsername());
+            return updatedUser;
+        } catch (Exception e) {
+            log.error("Failed to {} user with ID: {}", locked ? "lock" : "unlock", id, e);
+            throw new AppException(ErrorCode.USER_LOCK_FAILED);
+        }
     }
 
 
@@ -143,10 +148,15 @@ public class AccountService {
     public void delete(UUID id) {
         log.info("Deleting user with ID: {}", id);
 
-        Account user = findById(id);
-        accountRepository.delete(user);
-        
-        log.info("User deleted successfully: {}", user.getUsername());
+        try {
+            Account user = findById(id);
+            accountRepository.delete(user);
+            
+            log.info("User deleted successfully: {}", user.getUsername());
+        } catch (Exception e) {
+            log.error("Failed to delete user with ID: {}", id, e);
+            throw new AppException(ErrorCode.USER_DELETE_FAILED);
+        }
     }
 
     /**

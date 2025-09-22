@@ -4,6 +4,8 @@ import com.iems.iamservice.dto.request.CreatePermissionDto;
 import com.iems.iamservice.dto.request.UpdatePermissionDto;
 import com.iems.iamservice.dto.response.PermissionResponseDto;
 import com.iems.iamservice.entity.Permission;
+import com.iems.iamservice.exception.AppException;
+import com.iems.iamservice.exception.ErrorCode;
 import com.iems.iamservice.repository.PermissionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,7 +31,7 @@ public class PermissionService {
         log.info("Creating new permission: {}", dto.getCode());
 
         if (permissionRepository.existsByCode(dto.getCode())) {
-            throw new RuntimeException("Permission code already exists");
+            throw new AppException(ErrorCode.PERMISSION_CODE_ALREADY_EXISTS);
         }
 
         Permission permission = Permission.builder()
@@ -55,7 +57,7 @@ public class PermissionService {
      */
     public Permission findById(UUID id) {
         return permissionRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Permission not found with ID: " + id));
+                .orElseThrow(() -> new AppException(ErrorCode.PERMISSION_NOT_FOUND_BY_ID));
     }
 
     /**
@@ -72,19 +74,26 @@ public class PermissionService {
     public Permission update(UUID id, UpdatePermissionDto dto) {
         log.info("Updating permission with ID: {}", id);
 
-        Permission permission = findById(id);
-        
-        if (dto.getName() != null) {
-            permission.setName(dto.getName());
-        }
-        
-        if (dto.getDescription() != null) {
-            permission.setDescription(dto.getDescription());
-        }
+        try {
+            Permission permission = findById(id);
+            
+            if (dto.getName() != null) {
+                permission.setName(dto.getName());
+            }
+            
+            if (dto.getDescription() != null) {
+                permission.setDescription(dto.getDescription());
+            }
 
-        Permission updatedPermission = permissionRepository.save(permission);
-        log.info("Permission updated successfully: {}", updatedPermission.getCode());
-        return updatedPermission;
+            Permission updatedPermission = permissionRepository.save(permission);
+            log.info("Permission updated successfully: {}", updatedPermission.getCode());
+            return updatedPermission;
+        } catch (AppException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Failed to update permission with ID: {}", id, e);
+            throw new AppException(ErrorCode.PERMISSION_UPDATE_FAILED);
+        }
     }
 
     /**
@@ -94,16 +103,26 @@ public class PermissionService {
     public void delete(UUID id) {
         log.info("Deleting permission with ID: {}", id);
 
-        Permission permission = findById(id);
-        
-        // Clear all role relationships before deletion
-        permission.getRoles().forEach(role -> role.getPermissions().remove(permission));
-        permission.getRoles().clear();
-        
-        // Note: Permission usage check should be done through UserRolePermissionService
+        try {
+            Permission permission = findById(id);
+            
+            // Check if permission is in use
+            if (!permission.getRoles().isEmpty()) {
+                throw new AppException(ErrorCode.PERMISSION_IN_USE);
+            }
+            
+            // Clear all role relationships before deletion
+            permission.getRoles().forEach(role -> role.getPermissions().remove(permission));
+            permission.getRoles().clear();
 
-        permissionRepository.delete(permission);
-        log.info("Permission deleted successfully: {}", permission.getCode());
+            permissionRepository.delete(permission);
+            log.info("Permission deleted successfully: {}", permission.getCode());
+        } catch (AppException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Failed to delete permission with ID: {}", id, e);
+            throw new AppException(ErrorCode.PERMISSION_DELETE_FAILED);
+        }
     }
 
     /**
