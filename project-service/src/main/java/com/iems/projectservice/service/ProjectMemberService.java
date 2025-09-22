@@ -4,6 +4,8 @@ import com.iems.projectservice.dto.response.ProjectMemberResponseDto;
 import com.iems.projectservice.entity.Project;
 import com.iems.projectservice.entity.ProjectMember;
 import com.iems.projectservice.entity.enums.ProjectRole;
+import com.iems.projectservice.exception.AppException;
+import com.iems.projectservice.exception.ProjectErrorCode;
 import com.iems.projectservice.repository.ProjectMemberRepository;
 import com.iems.projectservice.repository.ProjectRepository;
 import lombok.RequiredArgsConstructor;
@@ -31,11 +33,11 @@ public class ProjectMemberService {
         
         // Validate project exists
         Project project = projectRepository.findById(projectId)
-                .orElseThrow(() -> new RuntimeException("Project not found"));
+                .orElseThrow(() -> new AppException(ProjectErrorCode.PROJECT_NOT_FOUND));
         
         // Check if user is already a member
         if (projectMemberRepository.existsByProjectIdAndUserId(projectId, userId)) {
-            throw new RuntimeException("User is already a member of this project");
+            throw new AppException(ProjectErrorCode.PROJECT_MEMBER_ALREADY_EXISTS);
         }
         
         // Create project member
@@ -65,7 +67,7 @@ public class ProjectMemberService {
         log.info("Updating member role: projectId={}, userId={}, newRole={}", projectId, userId, newRole);
         
         ProjectMember projectMember = projectMemberRepository.findMemberByProjectAndUser(projectId, userId)
-                .orElseThrow(() -> new RuntimeException("Project member not found"));
+                .orElseThrow(() -> new AppException(ProjectErrorCode.MEMBER_NOT_FOUND));
         
         projectMember.setRole(newRole);
         ProjectMember updatedMember = projectMemberRepository.save(projectMember);
@@ -79,15 +81,15 @@ public class ProjectMemberService {
         
         // Check if member exists
         if (!projectMemberRepository.existsByProjectIdAndUserId(projectId, userId)) {
-            throw new RuntimeException("Project member not found");
+            throw new AppException(ProjectErrorCode.MEMBER_NOT_FOUND);
         }
         
         // Check if user is project manager (cannot remove project manager)
         Project project = projectRepository.findById(projectId)
-                .orElseThrow(() -> new RuntimeException("Project not found"));
+                .orElseThrow(() -> new AppException(ProjectErrorCode.PROJECT_NOT_FOUND));
         
         if (project.getManagerId().equals(userId)) {
-            throw new RuntimeException("Cannot remove project manager from project");
+            throw new AppException(ProjectErrorCode.PROJECT_MANAGER_CANNOT_BE_REMOVED);
         }
         
         // Check if member has active tasks (this would integrate with task service)
@@ -103,7 +105,7 @@ public class ProjectMemberService {
     
     public boolean isProjectManager(UUID projectId, UUID userId) {
         Project project = projectRepository.findById(projectId)
-                .orElseThrow(() -> new RuntimeException("Project not found"));
+                .orElseThrow(() -> new AppException(ProjectErrorCode.PROJECT_NOT_FOUND));
         return project.getManagerId().equals(userId);
     }
     
