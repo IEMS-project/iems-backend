@@ -21,7 +21,6 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/tasks")
-@CrossOrigin(origins = "*")
 @Tag(name = "Task API", description = "Manage tasks")
 public class TaskController {
     @Autowired

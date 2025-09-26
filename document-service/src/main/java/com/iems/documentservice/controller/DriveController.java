@@ -21,7 +21,6 @@ import java.util.UUID;
 
 @RestController
 @Tag(name = "Drive API", description = "Google Drive-like file management")
-@CrossOrigin(origins = "*")
 public class DriveController {
 
     private final DriveService driveService;

@@ -24,7 +24,6 @@ import java.util.UUID;
 @RequiredArgsConstructor
 @Slf4j
 @Tag(name = "Project")
-@CrossOrigin(origins = "*")
 public class ProjectController {
     
     private final ProjectService projectService;

@@ -2,8 +2,7 @@ package com.iems.departmentservice.service;
 
 import com.iems.departmentservice.dto.request.AddUserToDepartmentDto;
 import com.iems.departmentservice.dto.request.CreateDepartmentDto;
-import com.iems.departmentservice.dto.response.DepartmentResponseDto;
-import com.iems.departmentservice.dto.response.DepartmentUserDto;
+import com.iems.departmentservice.dto.response.*;
 import com.iems.departmentservice.dto.request.UpdateDepartmentDto;
 import com.iems.departmentservice.entity.Department;
 import com.iems.departmentservice.entity.DepartmentUser;
@@ -29,6 +28,9 @@ public class DepartmentService {
     
     @Autowired
     private DepartmentUserRepository departmentUserRepository;
+
+    @Autowired
+    private UserServiceClient userServiceClient;
 
     public DepartmentResponseDto saveDepartment(CreateDepartmentDto createDto, UUID userId) {
         if (departmentRepository.existsByDepartmentName(createDto.getDepartmentName())) {
@@ -152,5 +154,55 @@ public class DepartmentService {
                 departmentUser.getLeftAt(),
                 departmentUser.getIsActive()
         );
+    }
+
+    public Optional<DepartmentWithUsersDto> getDepartmentWithUsersById(UUID id) {
+        return departmentRepository.findById(id).map(department -> {
+            List<DepartmentUser> allUsers = departmentUserRepository.findByDepartmentId(department.getId());
+            List<DepartmentUser> activeUsers = departmentUserRepository.findActiveUsersByDepartmentId(department.getId());
+            
+            // Get user IDs
+            List<UUID> userIds = allUsers.stream()
+                    .map(DepartmentUser::getUserId)
+                    .collect(Collectors.toList());
+            
+            // Fetch user details from User Service
+            List<UserDetailDto> userDetails = userServiceClient.getUsersByIds(userIds);
+            
+            // Create enriched department users
+            List<DepartmentUserWithDetailsDto> enrichedUsers = allUsers.stream()
+                    .map(deptUser -> {
+                        UserDetailDto userDetail = userDetails.stream()
+                                .filter(user -> user.getId().equals(deptUser.getUserId()))
+                                .findFirst()
+                                .orElse(null);
+                        
+                        return new DepartmentUserWithDetailsDto(
+                                deptUser.getId(),
+                                deptUser.getDepartmentId(),
+                                deptUser.getUserId(),
+                                //deptUser.getRole(),
+                                deptUser.getJoinedAt(),
+                                deptUser.getLeftAt(),
+                                deptUser.getIsActive(),
+                                userDetail
+                        );
+                    })
+                    .collect(Collectors.toList());
+            
+            return new DepartmentWithUsersDto(
+                    department.getId(),
+                    department.getDepartmentName(),
+                    department.getDescription(),
+                    department.getManagerId(),
+                    department.getCreatedAt(),
+                    department.getCreatedBy(),
+                    department.getUpdatedAt(),
+                    department.getUpdatedBy(),
+                    enrichedUsers,
+                    allUsers.size(),
+                    activeUsers.size()
+            );
+        });
     }
 }
