@@ -23,7 +23,6 @@ import java.util.UUID;
 @RequiredArgsConstructor
 @Slf4j
 @Tag(name = "Project Member")
-@CrossOrigin(origins = "*")
 public class ProjectMemberController {
     
     private final ProjectMemberService projectMemberService;

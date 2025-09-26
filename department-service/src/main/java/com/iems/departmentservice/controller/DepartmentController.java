@@ -5,6 +5,7 @@ import com.iems.departmentservice.dto.response.ApiResponseDto;
 import com.iems.departmentservice.dto.request.CreateDepartmentDto;
 import com.iems.departmentservice.dto.response.DepartmentResponseDto;
 import com.iems.departmentservice.dto.response.DepartmentUserDto;
+import com.iems.departmentservice.dto.response.DepartmentWithUsersDto;
 import com.iems.departmentservice.service.DepartmentService;
 import com.iems.departmentservice.dto.request.UpdateDepartmentDto;
 import io.swagger.v3.oas.annotations.Operation;
@@ -21,7 +22,6 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/departments")
-@CrossOrigin(origins = "*")
 @Tag(name = "Department API", description = "Manage departments")
 public class DepartmentController {
     @Autowired
@@ -140,6 +140,19 @@ public class DepartmentController {
             return ResponseEntity.ok(new ApiResponseDto<>("success", "User departments retrieved successfully", departments));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(new ApiResponseDto<>("error", "Failed to retrieve user departments", Collections.emptyList()));
+        }
+    }
+
+    @GetMapping("/{id}/users")
+    @Operation(summary = "Get department with users", description = "Retrieve department details with enriched user information")
+    public ResponseEntity<ApiResponseDto<DepartmentWithUsersDto>> getDepartmentWithUsers(@PathVariable UUID id) {
+        try {
+            return service.getDepartmentWithUsersById(id)
+                    .map(dept -> ResponseEntity.ok(new ApiResponseDto<>("success", "Department with users retrieved successfully", dept)))
+                    .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND)
+                            .body(new ApiResponseDto<DepartmentWithUsersDto>("error", "Department not found", null)));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(new ApiResponseDto<>("error", "Failed to retrieve department with users", null));
         }
     }
 }
