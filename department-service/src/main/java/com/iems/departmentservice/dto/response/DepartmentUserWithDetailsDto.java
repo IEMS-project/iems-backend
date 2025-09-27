@@ -14,7 +14,6 @@ public class DepartmentUserWithDetailsDto {
     private UUID id;
     private UUID departmentId;
     private UUID userId;
-    //private String role;
     private LocalDateTime joinedAt;
     private LocalDateTime leftAt;
     private boolean isActive;

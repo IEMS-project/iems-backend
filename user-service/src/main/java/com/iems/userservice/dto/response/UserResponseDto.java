@@ -27,6 +27,7 @@ public class UserResponseDto {
     private String bankName;
     private ContractType contractType;
     private Date startDate;
+    private String role;
     private Date createdAt;
     private Date updatedAt;
 }
