@@ -25,4 +25,5 @@ public class UserRequestDto {
     private String bankName;
     private ContractType contractType;
     private Date startDate;
+    private String role;
 }

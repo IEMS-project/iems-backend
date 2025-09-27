@@ -181,7 +181,6 @@ public class DepartmentService {
                                 deptUser.getId(),
                                 deptUser.getDepartmentId(),
                                 deptUser.getUserId(),
-                                //deptUser.getRole(),
                                 deptUser.getJoinedAt(),
                                 deptUser.getLeftAt(),
                                 deptUser.getIsActive(),

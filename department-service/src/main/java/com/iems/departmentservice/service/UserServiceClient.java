@@ -96,6 +96,7 @@ public class UserServiceClient {
         dto.setBankName((String) userData.get("bankName"));
         dto.setContractType((String) userData.get("contractType"));
         dto.setStartDate((String) userData.get("startDate"));
+        dto.setRole((String) userData.get("role")); // Add role mapping
         return dto;
     }
     

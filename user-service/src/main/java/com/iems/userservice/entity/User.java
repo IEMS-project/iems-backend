@@ -59,6 +59,9 @@ public class User {
     @Column(name = "start_date")
     private Date startDate;
 
+    @Column(name = "role", length = 100)
+    private String role;
+
     @Temporal(TemporalType.TIMESTAMP)
     @Column(name = "created_at", updatable = false)
     private Date createdAt = new Date();

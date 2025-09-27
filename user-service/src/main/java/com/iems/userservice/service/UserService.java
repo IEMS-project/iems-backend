@@ -115,6 +115,7 @@ public class UserService {
         user.setBankName(userRequest.getBankName());
         user.setContractType(userRequest.getContractType());
         user.setStartDate(userRequest.getStartDate());
+        user.setRole(userRequest.getRole());
         return user;
     }
 
@@ -135,6 +136,7 @@ public class UserService {
                 user.getBankName(),
                 user.getContractType(),
                 user.getStartDate(),
+                user.getRole(),
                 user.getCreatedAt(),
                 user.getUpdatedAt()
         );
@@ -154,6 +156,7 @@ public class UserService {
         if (userRequest.getBankName() != null) user.setBankName(userRequest.getBankName());
         if (userRequest.getContractType() != null) user.setContractType(userRequest.getContractType());
         if (userRequest.getStartDate() != null) user.setStartDate(userRequest.getStartDate());
+        if (userRequest.getRole() != null) user.setRole(userRequest.getRole());
     }
 
     private void applySelfProfileUpdates(User user, UserRequestDto userRequest) {

@@ -24,5 +24,6 @@ public class UserDetailDto {
     private String bankName;
     private String contractType;
     private String startDate;
+    private String role;
 }
 
