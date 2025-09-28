@@ -26,4 +26,9 @@ public class UserRequestDto {
     private ContractType contractType;
     private Date startDate;
     private String role;
+    
+    // Thêm các trường cho việc tạo account
+    private String username;
+    private String password;
+    private java.util.Set<String> roleCodes;
 }

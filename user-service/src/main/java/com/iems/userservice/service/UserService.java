@@ -1,5 +1,7 @@
 package com.iems.userservice.service;
 
+import com.iems.userservice.client.IamServiceFeignClient;
+import com.iems.userservice.dto.request.CreateAccountRequestDto;
 import com.iems.userservice.dto.request.UserRequestDto;
 import com.iems.userservice.dto.response.UserResponseDto;
 import com.iems.userservice.exception.AppException;
@@ -17,10 +19,33 @@ import java.util.UUID;
 public class UserService {
     @Autowired
     private UserRepository repository;
+    
+    @Autowired
+    private IamServiceFeignClient iamServiceFeignClient;
 
     public UserResponseDto saveUser(UserRequestDto userRequest) {
         try {
-            return convertToUserResponse(repository.save(convertToUser(userRequest)));
+            // Lưu user vào database trước
+            User savedUser = repository.save(convertToUser(userRequest));
+            
+            // Nếu có thông tin tạo account, gọi IAM service
+            if (userRequest.getUsername() != null && userRequest.getPassword() != null) {
+                try {
+                    CreateAccountRequestDto accountRequest = new CreateAccountRequestDto();
+                    accountRequest.setUserId(savedUser.getId());
+                    accountRequest.setUsername(userRequest.getUsername());
+                    accountRequest.setEmail(userRequest.getEmail());
+                    accountRequest.setPassword(userRequest.getPassword());
+                    accountRequest.setRoleCodes(userRequest.getRoleCodes());
+                    
+                    iamServiceFeignClient.createAccount(accountRequest);
+                } catch (Exception e) {
+                    // Log lỗi nhưng không rollback user đã tạo
+                    System.err.println("Failed to create account for user: " + e.getMessage());
+                }
+            }
+            
+            return convertToUserResponse(savedUser);
         } catch (Exception ex) {
             throw new AppException(UserErrorCode.INTERNAL_SERVER_ERROR);
         }

@@ -26,7 +26,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 @RestController
-@RequestMapping("/api/users")
+@RequestMapping("/api/accounts")
 @RequiredArgsConstructor
 @Slf4j
 @Tag(name = "User Management", description = "APIs for managing user accounts and permissions")
@@ -52,7 +52,6 @@ public class AccountController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAuthority('ADMIN_1') or hasRole('USER')")
     @Operation(summary = "List users", description = "Get list of all users")
     public ResponseEntity<ApiResponseDto<List<UserResponseDto>>> list() {
         log.info("Getting all users");
