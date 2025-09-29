@@ -1,17 +1,15 @@
 package com.iems.userservice.controller;
 
-import com.iems.userservice.dto.request.UserRequestDto;
+import com.iems.userservice.dto.request.CreateUserDto;
+import com.iems.userservice.dto.request.UpdateUserDto;
 import com.iems.userservice.dto.response.ApiResponseDto;
 import com.iems.userservice.dto.response.UserResponseDto;
 import com.iems.userservice.security.JwtUserDetails;
 import com.iems.userservice.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
@@ -27,9 +25,9 @@ public class UserController {
 
     @Operation(summary = "Create user", description = "Create a new user in the system")
     @PostMapping
-    public ResponseEntity<ApiResponseDto<UserResponseDto>> saveUser(@RequestBody UserRequestDto userRequest) {
+    public ResponseEntity<ApiResponseDto<UserResponseDto>> saveUser(@RequestBody CreateUserDto userRequest) {
         try {
-            UserResponseDto savedUser = service.saveUser(userRequest);
+            UserResponseDto savedUser = service.createUser(userRequest);
             return ResponseEntity.ok(new ApiResponseDto<>(HttpStatus.OK.value(), "User saved successfully", savedUser));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -82,7 +80,7 @@ public class UserController {
     @PutMapping("/{id}")
     public ResponseEntity<ApiResponseDto<UserResponseDto>> updateUser(
             @PathVariable UUID id,
-            @RequestBody UserRequestDto userRequest
+            @RequestBody UpdateUserDto userRequest
     ) {
         try {
             return service.updateUser(id, userRequest)
@@ -100,7 +98,7 @@ public class UserController {
     @Operation(summary = "Update my profile", description = "Update the profile of the authenticated user")
     @PutMapping("/me")
     public ResponseEntity<ApiResponseDto<UserResponseDto>> updateMyProfile(
-            @RequestBody UserRequestDto userRequest
+            @RequestBody CreateUserDto userRequest
     ) {
         try {
             // Lấy userId từ SecurityContext (được set trong JwtAuthenticationFilter)

@@ -1,17 +1,19 @@
 package com.iems.userservice.dto.request;
 
-import com.iems.userservice.entity.enums.Gender;
 import com.iems.userservice.entity.enums.ContractType;
+import com.iems.userservice.entity.enums.Gender;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.util.Date;
 
 @Data
-@AllArgsConstructor
 @NoArgsConstructor
-public class UserRequestDto {
+@AllArgsConstructor
+@Builder
+public class UpdateUserDto {
     private String firstName;
     private String lastName;
     private String email;
@@ -26,9 +28,4 @@ public class UserRequestDto {
     private ContractType contractType;
     private Date startDate;
     private String role;
-    
-    // Thêm các trường cho việc tạo account
-    private String username;
-    private String password;
-    private java.util.Set<String> roleCodes;
 }

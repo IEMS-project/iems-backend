@@ -11,8 +11,12 @@ import com.iems.departmentservice.repository.DepartmentRepository;
 import com.iems.departmentservice.exception.AppException;
 import com.iems.departmentservice.exception.DepartmentErrorCode;
 import com.iems.departmentservice.repository.DepartmentUserRepository;
+import com.iems.departmentservice.security.JwtUserDetails;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,10 +39,11 @@ public class DepartmentService {
     @Autowired
     private UserServiceFeignClient userServiceFeignClient;
 
-    public DepartmentResponseDto saveDepartment(CreateDepartmentDto createDto, UUID userId) {
+    public DepartmentResponseDto saveDepartment(CreateDepartmentDto createDto) {
         if (departmentRepository.existsByDepartmentName(createDto.getDepartmentName())) {
             throw new AppException(DepartmentErrorCode.DEPARTMENT_NAME_EXISTS);
         }
+        UUID userId = this.getUserIdFromRequest();
         Department department = new Department();
         department.setDepartmentName(createDto.getDepartmentName());
         department.setDescription(createDto.getDescription());
@@ -59,8 +64,9 @@ public class DepartmentService {
         return departmentRepository.findById(id).map(this::convertToResponseDto);
     }
 
-    public Optional<DepartmentResponseDto> updateDepartment(UUID id, UpdateDepartmentDto updateDto, UUID userId) {
+    public Optional<DepartmentResponseDto> updateDepartment(UUID id, UpdateDepartmentDto updateDto) {
         return departmentRepository.findById(id).map(existing -> {
+            UUID userId = this.getUserIdFromRequest();
             if (updateDto.getDepartmentName() != null && !updateDto.getDepartmentName().isBlank()) {
                 if (departmentRepository.existsByDepartmentNameAndIdNot(updateDto.getDepartmentName(), id)) {
                     throw new AppException(DepartmentErrorCode.DEPARTMENT_NAME_EXISTS);
@@ -87,7 +93,7 @@ public class DepartmentService {
         return true;
     }
 
-    public DepartmentUserDto addUserToDepartment(UUID departmentId, AddUserToDepartmentDto addUserDto, UUID currentUserId) {
+    public DepartmentUserDto addUserToDepartment(UUID departmentId, AddUserToDepartmentDto addUserDto) {
         if (!departmentRepository.existsById(departmentId)) {
             throw new AppException(DepartmentErrorCode.DEPARTMENT_NOT_FOUND);
         }
@@ -95,7 +101,7 @@ public class DepartmentService {
         if (departmentUserRepository.existsByDepartmentIdAndUserIdAndIsActiveTrue(departmentId, addUserDto.getUserId())) {
             throw new AppException(DepartmentErrorCode.USER_ALREADY_IN_DEPARTMENT);
         }
-
+        UUID currentUserId = this.getUserIdFromRequest();
         DepartmentUser departmentUser = new DepartmentUser();
         departmentUser.setDepartmentId(departmentId);
         departmentUser.setUserId(addUserDto.getUserId());
@@ -107,10 +113,10 @@ public class DepartmentService {
         return convertToDepartmentUserDto(saved);
     }
 
-    public boolean removeUserFromDepartment(UUID departmentId, UUID userId, UUID currentUserId) {
+    public boolean removeUserFromDepartment(UUID departmentId, UUID userId) {
         Optional<DepartmentUser> departmentUserOpt = departmentUserRepository
                 .findByDepartmentIdAndUserIdAndIsActiveTrue(departmentId, userId);
-
+        UUID currentUserId = this.getUserIdFromRequest();
         if (departmentUserOpt.isPresent()) {
             DepartmentUser departmentUser = departmentUserOpt.get();
             departmentUser.setIsActive(false);
@@ -270,5 +276,12 @@ public class DepartmentService {
 
         dto.setRole((String) userData.get("role"));
         return dto;
+    }
+
+    public UUID getUserIdFromRequest() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        JwtUserDetails userDetails = (JwtUserDetails) authentication.getPrincipal();
+        UUID userId = userDetails.getUserId();
+        return userId;
     }
 }

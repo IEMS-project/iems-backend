@@ -2,6 +2,7 @@ package com.iems.userservice.config;
 
 import feign.RequestInterceptor;
 import feign.RequestTemplate;
+import feign.Logger;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.context.request.RequestContextHolder;
@@ -32,5 +33,10 @@ public class FeignClientConfig {
                 }
             }
         };
+    }
+
+    @Bean
+    public Logger.Level feignLoggerLevel() {
+        return Logger.Level.FULL;
     }
 }

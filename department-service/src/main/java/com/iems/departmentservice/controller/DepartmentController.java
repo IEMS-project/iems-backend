@@ -30,9 +30,9 @@ public class DepartmentController {
     @PostMapping
     @Operation(summary = "Create a new department", description = "Add a new department with provided details")
     public ResponseEntity<ApiResponseDto<DepartmentResponseDto>> saveDepartment(
-            @Valid @RequestBody CreateDepartmentDto createDto, @RequestHeader("X-User-Id") UUID userId) {
+            @Valid @RequestBody CreateDepartmentDto createDto) {
         try {
-            DepartmentResponseDto responseDto = service.saveDepartment(createDto, userId);
+            DepartmentResponseDto responseDto = service.saveDepartment(createDto);
             return ResponseEntity.ok(new ApiResponseDto<>("success", "Department created successfully", responseDto));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(new ApiResponseDto<>("error", e.getMessage(), null));
@@ -69,10 +69,10 @@ public class DepartmentController {
     @Operation(summary = "Update department", description = "Update department details by ID")
     public ResponseEntity<ApiResponseDto<DepartmentResponseDto>> updateDepartment(
             @PathVariable UUID id,
-            @Valid @RequestBody UpdateDepartmentDto updateDto,
-            @RequestHeader("X-User-Id") UUID userId) {
+            @Valid @RequestBody UpdateDepartmentDto updateDto
+            ) {
         try {
-            return service.updateDepartment(id, updateDto, userId)
+            return service.updateDepartment(id, updateDto)
                     .map(updated -> ResponseEntity.ok(new ApiResponseDto<DepartmentResponseDto>("success", "Department updated successfully", updated)))
                     .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND)
                             .body(new ApiResponseDto<DepartmentResponseDto>("error", "Department not found", null)));
@@ -102,10 +102,9 @@ public class DepartmentController {
     @Operation(summary = "Add user to department", description = "Add a user to a specific department")
     public ResponseEntity<ApiResponseDto<DepartmentUserDto>> addUserToDepartment(
             @PathVariable UUID departmentId,
-            @Valid @RequestBody AddUserToDepartmentDto addUserDto,
-            @RequestHeader("X-User-Id") UUID currentUserId) {
+            @Valid @RequestBody AddUserToDepartmentDto addUserDto) {
         try {
-            DepartmentUserDto responseDto = service.addUserToDepartment(departmentId, addUserDto, currentUserId);
+            DepartmentUserDto responseDto = service.addUserToDepartment(departmentId, addUserDto);
             return ResponseEntity.ok(new ApiResponseDto<>("success", "User added to department successfully", responseDto));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(new ApiResponseDto<>("error", e.getMessage(), null));
@@ -118,10 +117,9 @@ public class DepartmentController {
     @Operation(summary = "Remove user from department", description = "Remove a user from a specific department")
     public ResponseEntity<ApiResponseDto<Object>> removeUserFromDepartment(
             @PathVariable UUID departmentId,
-            @PathVariable UUID userId,
-            @RequestHeader("X-User-Id") UUID currentUserId) {
+            @PathVariable UUID userId) {
         try {
-            boolean removed = service.removeUserFromDepartment(departmentId, userId, currentUserId);
+            boolean removed = service.removeUserFromDepartment(departmentId, userId);
             if (removed) {
                 return ResponseEntity.ok(new ApiResponseDto<>("success", "User removed from department successfully", null));
             }
