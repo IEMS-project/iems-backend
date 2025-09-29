@@ -1,7 +1,8 @@
 package com.iems.departmentservice.service;
 
 import com.iems.departmentservice.client.UserServiceFeignClient;
-import com.iems.departmentservice.dto.request.AddUserToDepartmentDto;
+// removed unused import
+import com.iems.departmentservice.dto.request.AddUsersToDepartmentDto;
 import com.iems.departmentservice.dto.request.CreateDepartmentDto;
 import com.iems.departmentservice.dto.response.*;
 import com.iems.departmentservice.dto.request.UpdateDepartmentDto;
@@ -12,7 +13,7 @@ import com.iems.departmentservice.exception.AppException;
 import com.iems.departmentservice.exception.DepartmentErrorCode;
 import com.iems.departmentservice.repository.DepartmentUserRepository;
 import com.iems.departmentservice.security.JwtUserDetails;
-import jakarta.servlet.http.HttpServletRequest;
+// removed unused import
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -20,7 +21,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
+// removed unused import
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -93,43 +94,50 @@ public class DepartmentService {
         return true;
     }
 
-    public DepartmentUserDto addUserToDepartment(UUID departmentId, AddUserToDepartmentDto addUserDto) {
+    public List<DepartmentUserDto> addUsersToDepartment(UUID departmentId, AddUsersToDepartmentDto addUserDto) {
         if (!departmentRepository.existsById(departmentId)) {
             throw new AppException(DepartmentErrorCode.DEPARTMENT_NOT_FOUND);
         }
 
-        if (departmentUserRepository.existsByDepartmentIdAndUserIdAndIsActiveTrue(departmentId, addUserDto.getUserId())) {
-            throw new AppException(DepartmentErrorCode.USER_ALREADY_IN_DEPARTMENT);
-        }
         UUID currentUserId = this.getUserIdFromRequest();
-        DepartmentUser departmentUser = new DepartmentUser();
-        departmentUser.setDepartmentId(departmentId);
-        departmentUser.setUserId(addUserDto.getUserId());
-        departmentUser.setIsActive(true);
-        departmentUser.setCreatedBy(currentUserId);
-        departmentUser.setUpdatedBy(currentUserId);
+        List<DepartmentUser> toSave = addUserDto.getUserIds().stream()
+                .filter(userId -> !departmentUserRepository.existsByDepartmentIdAndUserId(departmentId, userId))
+                .map(userId -> {
+                    DepartmentUser du = new DepartmentUser();
+                    du.setDepartmentId(departmentId);
+                    du.setUserId(userId);
+                    du.setCreatedBy(currentUserId);
+                    du.setUpdatedBy(currentUserId);
+                    return du;
+                })
+                .collect(Collectors.toList());
 
-        DepartmentUser saved = departmentUserRepository.save(departmentUser);
-        return convertToDepartmentUserDto(saved);
+        List<DepartmentUser> saved = departmentUserRepository.saveAll(toSave);
+        return saved.stream().map(this::convertToDepartmentUserDto).collect(Collectors.toList());
     }
 
     public boolean removeUserFromDepartment(UUID departmentId, UUID userId) {
         Optional<DepartmentUser> departmentUserOpt = departmentUserRepository
-                .findByDepartmentIdAndUserIdAndIsActiveTrue(departmentId, userId);
-        UUID currentUserId = this.getUserIdFromRequest();
+                .findByDepartmentIdAndUserId(departmentId, userId);
         if (departmentUserOpt.isPresent()) {
-            DepartmentUser departmentUser = departmentUserOpt.get();
-            departmentUser.setIsActive(false);
-            departmentUser.setLeftAt(LocalDateTime.now());
-            departmentUser.setUpdatedBy(currentUserId);
-            departmentUserRepository.save(departmentUser);
+            departmentUserRepository.deleteByDepartmentIdAndUserId(departmentId, userId);
             return true;
         }
         return false;
     }
 
+    public List<DepartmentMemberCountDto> getDepartmentsWithMemberCounts() {
+        return departmentRepository.findAll().stream()
+                .map(dept -> new DepartmentMemberCountDto(
+                        dept.getId(),
+                        dept.getDepartmentName(),
+                        departmentUserRepository.countUsersByDepartmentId(dept.getId())
+                ))
+                .collect(Collectors.toList());
+    }
+
     public List<DepartmentUserDto> getDepartmentsOfUser(UUID userId) {
-        List<DepartmentUser> departmentUsers = departmentUserRepository.findActiveDepartmentsByUserId(userId);
+        List<DepartmentUser> departmentUsers = departmentUserRepository.findDepartmentsByUserId(userId);
         return departmentUsers.stream()
                 .map(this::convertToDepartmentUserDto)
                 .collect(Collectors.toList());
@@ -137,7 +145,6 @@ public class DepartmentService {
 
     private DepartmentResponseDto convertToResponseDto(Department department) {
         List<DepartmentUser> allUsers = departmentUserRepository.findByDepartmentId(department.getId());
-        List<DepartmentUser> activeUsers = departmentUserRepository.findActiveUsersByDepartmentId(department.getId());
 
         List<DepartmentUserDto> userDtos = allUsers.stream()
                 .map(this::convertToDepartmentUserDto)
@@ -149,8 +156,7 @@ public class DepartmentService {
                 department.getDescription(),
                 department.getManagerId(),
                 userDtos,
-                allUsers.size(),
-                activeUsers.size()
+                allUsers.size()
         );
     }
 
@@ -158,17 +164,13 @@ public class DepartmentService {
         return new DepartmentUserDto(
                 departmentUser.getId(),
                 departmentUser.getDepartmentId(),
-                departmentUser.getUserId(),
-                departmentUser.getJoinedAt(),
-                departmentUser.getLeftAt(),
-                departmentUser.getIsActive()
+                departmentUser.getUserId()
         );
     }
 
     public Optional<DepartmentWithUsersDto> getDepartmentWithUsersById(UUID id) {
         return departmentRepository.findById(id).map(department -> {
             List<DepartmentUser> allUsers = departmentUserRepository.findByDepartmentId(department.getId());
-            List<DepartmentUser> activeUsers = departmentUserRepository.findActiveUsersByDepartmentId(department.getId());
 
             // Get user IDs
             List<UUID> userIds = allUsers.stream()
@@ -190,9 +192,6 @@ public class DepartmentService {
                                 deptUser.getId(),
                                 deptUser.getDepartmentId(),
                                 deptUser.getUserId(),
-                                deptUser.getJoinedAt(),
-                                deptUser.getLeftAt(),
-                                deptUser.getIsActive(),
                                 userDetail
                         );
                     })
@@ -208,8 +207,7 @@ public class DepartmentService {
                     department.getUpdatedAt(),
                     department.getUpdatedBy(),
                     enrichedUsers,
-                    allUsers.size(),
-                    activeUsers.size()
+                    allUsers.size()
             );
         });
     }

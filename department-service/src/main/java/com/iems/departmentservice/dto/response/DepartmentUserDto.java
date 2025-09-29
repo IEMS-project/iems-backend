@@ -4,7 +4,7 @@ import lombok.Data;
 import lombok.AllArgsConstructor;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
+// removed joinedAt/leftAt/isActive fields per new design
 import java.util.UUID;
 
 @Data
@@ -14,7 +14,5 @@ public class DepartmentUserDto {
     private UUID id;
     private UUID departmentId;
     private UUID userId;
-    private LocalDateTime joinedAt;
-    private LocalDateTime leftAt;
-    private Boolean isActive;
+    
 }

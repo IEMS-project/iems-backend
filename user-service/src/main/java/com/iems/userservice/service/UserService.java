@@ -6,6 +6,7 @@ import com.iems.userservice.dto.request.AddUserToDepartmentDto;
 import com.iems.userservice.dto.request.CreateAccountRequestDto;
 import com.iems.userservice.dto.request.CreateUserDto;
 import com.iems.userservice.dto.request.UpdateUserDto;
+import com.iems.userservice.dto.response.UserBasicInfoDto;
 import com.iems.userservice.dto.response.UserResponseDto;
 import com.iems.userservice.exception.AppException;
 import com.iems.userservice.exception.UserErrorCode;
@@ -120,6 +121,23 @@ public class UserService {
             throw new AppException(UserErrorCode.INTERNAL_SERVER_ERROR);
         }
     }
+
+    public List<UserBasicInfoDto> getAllUserBasicInfos() {
+        try {
+            return repository.findAll()
+                    .stream()
+                    .map(user -> new UserBasicInfoDto(
+                            user.getId(),
+                            user.getFirstName() + " " + user.getLastName(),
+                            user.getEmail(),
+                            user.getImage()
+                    ))
+                    .toList();
+        } catch (Exception ex) {
+            throw new AppException(UserErrorCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+
 
     public Optional<UserResponseDto> getUserById(UUID id) {
         try {
