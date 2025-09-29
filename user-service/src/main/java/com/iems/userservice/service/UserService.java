@@ -1,6 +1,11 @@
 package com.iems.userservice.service;
 
-import com.iems.userservice.dto.request.UserRequestDto;
+import com.iems.userservice.client.DepartmentServiceFeignClient;
+import com.iems.userservice.client.IamServiceFeignClient;
+import com.iems.userservice.dto.request.AddUserToDepartmentDto;
+import com.iems.userservice.dto.request.CreateAccountRequestDto;
+import com.iems.userservice.dto.request.CreateUserDto;
+import com.iems.userservice.dto.request.UpdateUserDto;
 import com.iems.userservice.dto.response.UserResponseDto;
 import com.iems.userservice.exception.AppException;
 import com.iems.userservice.exception.UserErrorCode;
@@ -17,16 +22,61 @@ import java.util.UUID;
 public class UserService {
     @Autowired
     private UserRepository repository;
+    
+    @Autowired
+    private IamServiceFeignClient iamServiceFeignClient;
+    @Autowired
+    private DepartmentServiceFeignClient departmentServiceFeignClient;
 
-    public UserResponseDto saveUser(UserRequestDto userRequest) {
+    public UserResponseDto createUser(CreateUserDto userRequest) {
         try {
-            return convertToUserResponse(repository.save(convertToUser(userRequest)));
+            // Lưu user vào database trước
+            User savedUser = repository.save(convertToUser(userRequest));
+            
+            // Nếu có thông tin tạo account, gọi IAM service
+            if (userRequest.getUsername() != null && userRequest.getPassword() != null) {
+                try {
+                    CreateAccountRequestDto accountRequest = new CreateAccountRequestDto();
+                    accountRequest.setUserId(savedUser.getId());
+                    accountRequest.setUsername(userRequest.getUsername());
+                    accountRequest.setEmail(userRequest.getEmail());
+                    accountRequest.setPassword(userRequest.getPassword());
+                    accountRequest.setRoleCodes(userRequest.getRoleCodes());
+                    
+                    iamServiceFeignClient.createAccount(accountRequest);
+                } catch (Exception e) {
+                    // Log lỗi nhưng không rollback user đã tạo
+                    System.err.println("Failed to create account for user: " + e.getMessage());
+                }
+            }
+            if (userRequest.getDepartmentId() != null) {
+                try {
+                    System.out.println("🔄 Adding user " + savedUser.getId() + " to department " + userRequest.getDepartmentId());
+                    AddUserToDepartmentDto addUserDto = new AddUserToDepartmentDto();
+                    addUserDto.setUserId(savedUser.getId());
+                    
+                    if (departmentServiceFeignClient == null) {
+                        System.err.println("❌ DepartmentServiceFeignClient is NULL!");
+                        throw new RuntimeException("DepartmentServiceFeignClient is not properly initialized");
+                    }
+                    
+                    var response = departmentServiceFeignClient.addUserToDepartment(userRequest.getDepartmentId(), addUserDto);
+                    System.out.println("✅ Successfully added user to department. Response: " + response);
+                } catch (Exception e) {
+                    // Log lỗi nhưng không rollback user đã tạo
+                    System.err.println("⚠️ Failed to add user to department: " + e.getMessage());
+                    e.printStackTrace();
+                }
+            }
+
+
+            return convertToUserResponse(savedUser);
         } catch (Exception ex) {
             throw new AppException(UserErrorCode.INTERNAL_SERVER_ERROR);
         }
     }
 
-    public Optional<UserResponseDto> updateUser(UUID id, UserRequestDto userRequest) {
+    public Optional<UserResponseDto> updateUser(UUID id, UpdateUserDto userRequest) {
         try {
             return repository.findById(id)
                     .map(existing -> {
@@ -43,7 +93,7 @@ public class UserService {
         }
     }
 
-    public Optional<UserResponseDto> updateMyProfile(UUID id, UserRequestDto userRequest) {
+    public Optional<UserResponseDto> updateMyProfile(UUID id, CreateUserDto userRequest) {
         try {
             return repository.findById(id)
                     .map(existing -> {
@@ -99,7 +149,7 @@ public class UserService {
     }
 
     // ----- convert & apply methods giữ nguyên -----
-    public User convertToUser(UserRequestDto userRequest) {
+    public User convertToUser(CreateUserDto userRequest) {
         if (userRequest == null) return null;
         User user = new User();
         user.setFirstName(userRequest.getFirstName());
@@ -142,7 +192,7 @@ public class UserService {
         );
     }
 
-    private void applyUpdates(User user, UserRequestDto userRequest) {
+    private void applyUpdates(User user, UpdateUserDto userRequest) {
         if (userRequest.getFirstName() != null) user.setFirstName(userRequest.getFirstName());
         if (userRequest.getLastName() != null) user.setLastName(userRequest.getLastName());
         if (userRequest.getEmail() != null) user.setEmail(userRequest.getEmail());
@@ -159,7 +209,7 @@ public class UserService {
         if (userRequest.getRole() != null) user.setRole(userRequest.getRole());
     }
 
-    private void applySelfProfileUpdates(User user, UserRequestDto userRequest) {
+    private void applySelfProfileUpdates(User user, CreateUserDto userRequest) {
         if (userRequest.getAddress() != null) user.setAddress(userRequest.getAddress());
         if (userRequest.getPhone() != null) user.setPhone(userRequest.getPhone());
         if (userRequest.getImage() != null) user.setImage(userRequest.getImage());

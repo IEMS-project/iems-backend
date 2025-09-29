@@ -91,13 +91,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     // Set authentication to SecurityContext
                     SecurityContextHolder.getContext().setAuthentication(authToken);
 
-                    log.debug("User {} authenticated successfully", username);
-                } else {
-                    log.warn("Invalid JWT token for user: {}", username);
                 }
             }
         } catch (Exception e) {
-            log.warn("JWT authentication failed: {}", e.getMessage());
+
             // Don't throw exception to avoid breaking filter chain
         }
 
