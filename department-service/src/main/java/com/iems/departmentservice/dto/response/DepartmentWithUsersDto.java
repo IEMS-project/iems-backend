@@ -22,6 +22,5 @@ public class DepartmentWithUsersDto {
     private UUID updatedBy;
     private List<DepartmentUserWithDetailsDto> users;
     private int totalUsers;
-    private int activeUsers;
 }
 

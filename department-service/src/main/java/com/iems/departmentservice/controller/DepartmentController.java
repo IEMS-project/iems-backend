@@ -1,10 +1,12 @@
 package com.iems.departmentservice.controller;
 
-import com.iems.departmentservice.dto.request.AddUserToDepartmentDto;
+// removed unused import
+import com.iems.departmentservice.dto.request.AddUsersToDepartmentDto;
 import com.iems.departmentservice.dto.response.ApiResponseDto;
 import com.iems.departmentservice.dto.request.CreateDepartmentDto;
 import com.iems.departmentservice.dto.response.DepartmentResponseDto;
 import com.iems.departmentservice.dto.response.DepartmentUserDto;
+import com.iems.departmentservice.dto.response.DepartmentMemberCountDto;
 import com.iems.departmentservice.dto.response.DepartmentWithUsersDto;
 import com.iems.departmentservice.service.DepartmentService;
 import com.iems.departmentservice.dto.request.UpdateDepartmentDto;
@@ -99,13 +101,13 @@ public class DepartmentController {
     }
 
     @PostMapping("/{departmentId}/users")
-    @Operation(summary = "Add user to department", description = "Add a user to a specific department")
-    public ResponseEntity<ApiResponseDto<DepartmentUserDto>> addUserToDepartment(
+    @Operation(summary = "Add users to department", description = "Add multiple users to a specific department")
+    public ResponseEntity<ApiResponseDto<List<DepartmentUserDto>>> addUsersToDepartment(
             @PathVariable UUID departmentId,
-            @Valid @RequestBody AddUserToDepartmentDto addUserDto) {
+            @Valid @RequestBody AddUsersToDepartmentDto addUserDto) {
         try {
-            DepartmentUserDto responseDto = service.addUserToDepartment(departmentId, addUserDto);
-            return ResponseEntity.ok(new ApiResponseDto<>("success", "User added to department successfully", responseDto));
+            List<DepartmentUserDto> responseDto = service.addUsersToDepartment(departmentId, addUserDto);
+            return ResponseEntity.ok(new ApiResponseDto<>("success", "Users added to department successfully", responseDto));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(new ApiResponseDto<>("error", e.getMessage(), null));
         } catch (Exception e) {
@@ -151,6 +153,17 @@ public class DepartmentController {
                             .body(new ApiResponseDto<DepartmentWithUsersDto>("error", "Department not found", null)));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(new ApiResponseDto<>("error", "Failed to retrieve department with users", null));
+        }
+    }
+
+    @GetMapping("/member-counts")
+    @Operation(summary = "Get departments with member counts", description = "Retrieve list of departments and their active member counts")
+    public ResponseEntity<ApiResponseDto<List<DepartmentMemberCountDto>>> getDepartmentsWithMemberCounts() {
+        try {
+            List<DepartmentMemberCountDto> result = service.getDepartmentsWithMemberCounts();
+            return ResponseEntity.ok(new ApiResponseDto<>("success", "Departments with member counts retrieved successfully", result));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(new ApiResponseDto<>("error", "Failed to retrieve departments with member counts", Collections.emptyList()));
         }
     }
 }

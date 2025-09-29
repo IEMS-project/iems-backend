@@ -3,6 +3,7 @@ package com.iems.userservice.controller;
 import com.iems.userservice.dto.request.CreateUserDto;
 import com.iems.userservice.dto.request.UpdateUserDto;
 import com.iems.userservice.dto.response.ApiResponseDto;
+import com.iems.userservice.dto.response.UserBasicInfoDto;
 import com.iems.userservice.dto.response.UserResponseDto;
 import com.iems.userservice.security.JwtUserDetails;
 import com.iems.userservice.service.UserService;
@@ -40,6 +41,18 @@ public class UserController {
     public ResponseEntity<ApiResponseDto<List<UserResponseDto>>> getAllUsers() {
         try {
             List<UserResponseDto> users = service.getAllUsers();
+            return ResponseEntity.ok(new ApiResponseDto<>(HttpStatus.OK.value(), "Users retrieved successfully", users));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ApiResponseDto<>(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Failed to fetch users: " + e.getMessage(), null));
+        }
+    }
+
+    @Operation(summary = "Get all users basic info", description = "Retrieve a list of all users")
+    @GetMapping("/basic-infos")
+    public ResponseEntity<ApiResponseDto<List<UserBasicInfoDto>>> getAllUserBasicInfos() {
+        try {
+            List<UserBasicInfoDto> users = service.getAllUserBasicInfos();
             return ResponseEntity.ok(new ApiResponseDto<>(HttpStatus.OK.value(), "Users retrieved successfully", users));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)

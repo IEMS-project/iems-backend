@@ -13,20 +13,22 @@ import java.util.UUID;
 @Repository
 public interface DepartmentUserRepository extends JpaRepository<DepartmentUser, UUID> {
     
-    @Query("SELECT du FROM DepartmentUser du WHERE du.departmentId = :departmentId AND du.isActive = true")
-    List<DepartmentUser> findActiveUsersByDepartmentId(@Param("departmentId") UUID departmentId);
+    @Query("SELECT du FROM DepartmentUser du WHERE du.departmentId = :departmentId")
+    List<DepartmentUser> findUsersByDepartmentId(@Param("departmentId") UUID departmentId);
     
-    @Query("SELECT du FROM DepartmentUser du WHERE du.userId = :userId AND du.isActive = true")
-    List<DepartmentUser> findActiveDepartmentsByUserId(@Param("userId") UUID userId);
+    @Query("SELECT du FROM DepartmentUser du WHERE du.userId = :userId")
+    List<DepartmentUser> findDepartmentsByUserId(@Param("userId") UUID userId);
     
-    boolean existsByDepartmentIdAndUserIdAndIsActiveTrue(UUID departmentId, UUID userId);
+    boolean existsByDepartmentIdAndUserId(UUID departmentId, UUID userId);
     
-    Optional<DepartmentUser> findByDepartmentIdAndUserIdAndIsActiveTrue(UUID departmentId, UUID userId);
+    Optional<DepartmentUser> findByDepartmentIdAndUserId(UUID departmentId, UUID userId);
     
-    @Query("SELECT COUNT(du) FROM DepartmentUser du WHERE du.departmentId = :departmentId AND du.isActive = true")
-    long countActiveUsersByDepartmentId(@Param("departmentId") UUID departmentId);
+    @Query("SELECT COUNT(du) FROM DepartmentUser du WHERE du.departmentId = :departmentId")
+    long countUsersByDepartmentId(@Param("departmentId") UUID departmentId);
     
     List<DepartmentUser> findByDepartmentId(UUID departmentId);
     
     List<DepartmentUser> findByUserId(UUID userId);
+
+    void deleteByDepartmentIdAndUserId(UUID departmentId, UUID userId);
 }

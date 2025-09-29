@@ -23,14 +23,7 @@ public class DepartmentUser {
     @Column(name = "user_id", nullable = false)
     private UUID userId;
 
-    @Column(name = "joined_at")
-    private LocalDateTime joinedAt;
-
-    @Column(name = "left_at")
-    private LocalDateTime leftAt;
-
-    @Column(name = "is_active")
-    private Boolean isActive = true;
+    // removed joinedAt/leftAt/isActive per new design
 
     @Column(name = "created_at")
     private LocalDateTime createdAt;
@@ -48,9 +41,6 @@ public class DepartmentUser {
     protected void onCreate() {
         createdAt = LocalDateTime.now();
         updatedAt = LocalDateTime.now();
-        if (joinedAt == null) {
-            joinedAt = LocalDateTime.now();
-        }
     }
 
     @PreUpdate
