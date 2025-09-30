@@ -32,12 +32,10 @@ public class ProjectMemberController {
     public ResponseEntity<ApiResponseDto<ProjectMemberResponseDto>> addMember(
             @Parameter(description = "Project ID", required = true)
             @PathVariable UUID projectId,
-            @Valid @RequestBody ProjectMemberDto memberDto,
-            @Parameter(description = "Current user ID", required = true)
-            @RequestHeader("X-User-ID") UUID currentUserId) {
+            @Valid @RequestBody ProjectMemberDto memberDto) {
         try {
             ProjectMemberResponseDto member = projectMemberService.addMemberToProject(
-                    projectId, memberDto.getUserId(), memberDto.getRole(), currentUserId);
+                    projectId, memberDto.getUserId(), memberDto.getRole());
             return ResponseEntity.status(HttpStatus.CREATED)
                     .body(new ApiResponseDto<>("success", "Member added to project successfully", member));
         } catch (Exception e) {
@@ -51,9 +49,7 @@ public class ProjectMemberController {
     @Operation(summary = "Get project members", description = "Get all members of the project")
     public ResponseEntity<ApiResponseDto<List<ProjectMemberResponseDto>>> getProjectMembers(
             @Parameter(description = "Project ID", required = true)
-            @PathVariable UUID projectId,
-            @Parameter(description = "Current user ID", required = true)
-            @RequestHeader("X-User-ID") UUID currentUserId) {
+            @PathVariable UUID projectId) {
         try {
             List<ProjectMemberResponseDto> members = projectMemberService.getProjectMembers(projectId);
             return ResponseEntity.ok(new ApiResponseDto<>("success", "Project members retrieved successfully", members));
@@ -70,9 +66,7 @@ public class ProjectMemberController {
             @Parameter(description = "Project ID", required = true)
             @PathVariable UUID projectId,
             @Parameter(description = "Project role to filter by", required = true)
-            @PathVariable ProjectRole role,
-            @Parameter(description = "Current user ID", required = true)
-            @RequestHeader("X-User-ID") UUID currentUserId) {
+            @PathVariable ProjectRole role) {
         try {
             List<ProjectMemberResponseDto> members = projectMemberService.getMembersByRole(projectId, role);
             return ResponseEntity.ok(new ApiResponseDto<>("success", "Members by role retrieved successfully", members));
@@ -91,12 +85,10 @@ public class ProjectMemberController {
             @Parameter(description = "User ID to update role for", required = true)
             @PathVariable UUID userId,
             @Parameter(description = "New role for the member", required = true)
-            @RequestParam ProjectRole newRole,
-            @Parameter(description = "Current user ID", required = true)
-            @RequestHeader("X-User-ID") UUID currentUserId) {
+            @RequestParam ProjectRole newRole) {
         try {
             ProjectMemberResponseDto member = projectMemberService.updateMemberRole(
-                    projectId, userId, newRole, currentUserId);
+                    projectId, userId, newRole);
             return ResponseEntity.ok(new ApiResponseDto<>("success", "Member role updated successfully", member));
         } catch (Exception e) {
             log.error("Error updating member role", e);
@@ -111,11 +103,9 @@ public class ProjectMemberController {
             @Parameter(description = "Project ID", required = true)
             @PathVariable UUID projectId,
             @Parameter(description = "User ID to remove from project", required = true)
-            @PathVariable UUID userId,
-            @Parameter(description = "Current user ID", required = true)
-            @RequestHeader("X-User-ID") UUID currentUserId) {
+            @PathVariable UUID userId) {
         try {
-            projectMemberService.removeMemberFromProject(projectId, userId, currentUserId);
+            projectMemberService.removeMemberFromProject(projectId, userId);
             return ResponseEntity.ok(new ApiResponseDto<>("success", "Member removed from project successfully", null));
         } catch (Exception e) {
             log.error("Error removing member from project", e);
