@@ -16,6 +16,7 @@ public class ProjectMemberResponseDto {
     private UUID userId;
     private String userName;
     private String userEmail;
+    private String userImage;
     private ProjectRole role;
     private LocalDateTime joinedAt;
     private UUID assignedBy;

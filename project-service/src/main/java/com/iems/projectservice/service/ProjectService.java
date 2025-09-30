@@ -38,7 +38,6 @@ public class ProjectService {
     
     private final ProjectRepository projectRepository;
     private final ProjectMemberService projectMemberService;
-    private final UserService userService;
 
     @Autowired
     private UserServiceFeignClient userServiceFeignClient;
@@ -280,14 +279,21 @@ public class ProjectService {
     }
     
     private boolean hasAccessToProject(Project project, UUID userId) {
-        return project.getManagerId().equals(userId) || 
+        return project.getManagerId().equals(userId) ||
                projectMemberService.isProjectMember(project.getId(), userId) ||
                isAdmin(userId);
     }
-    
-    private boolean isAdmin(UUID userId) {
-        // This would typically check user roles from IAM service
-        return userService.isAdmin(userId);
+
+    public boolean isAdmin(UUID userId) {
+        try {
+            // This would check user roles from IAM service
+            // For now, returning mock data
+            log.info("Checking admin status for userId: {}", userId);
+            return userId.toString().equals("00000000-0000-0000-0000-000000000001"); // Mock: specific UUID is admin
+        } catch (Exception e) {
+            log.error("Error checking admin status for userId: {}", userId, e);
+            return false;
+        }
     }
     
     private ProjectResponseDto mapToProjectResponseDto(Project project) {
@@ -299,6 +305,17 @@ public class ProjectService {
         dto.setEndDate(project.getEndDate());
         dto.setStatus(project.getStatus());
         dto.setManagerId(project.getManagerId());
+        Optional<UserDetailDto> userOpt = this.getUserById(dto.getManagerId());
+        if (userOpt.isPresent()) {
+            UserDetailDto userDetailDto = userOpt.get();
+            dto.setManagerName(userDetailDto.getFirstName() + " " + userDetailDto.getLastName());
+            dto.setManagerEmail(userDetailDto.getEmail());
+            dto.setManagerImage(userDetailDto.getImage());
+        } else {
+            dto.setManagerName("-");
+            dto.setManagerEmail("-");
+            dto.setManagerImage(null);
+        }
         dto.setCreatedBy(project.getCreatedBy());
         dto.setCreatedAt(project.getCreatedAt());
         dto.setUpdatedAt(project.getUpdatedAt());

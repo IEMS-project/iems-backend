@@ -1,6 +1,8 @@
 package com.iems.projectservice.service;
 
+import com.iems.projectservice.client.UserServiceFeignClient;
 import com.iems.projectservice.dto.response.ProjectMemberResponseDto;
+import com.iems.projectservice.dto.response.UserDetailDto;
 import com.iems.projectservice.entity.Project;
 import com.iems.projectservice.entity.ProjectMember;
 import com.iems.projectservice.entity.enums.ProjectRole;
@@ -11,6 +13,8 @@ import com.iems.projectservice.repository.ProjectRepository;
 import com.iems.projectservice.security.JwtUserDetails;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -18,6 +22,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -28,7 +34,9 @@ public class ProjectMemberService {
     
     private final ProjectMemberRepository projectMemberRepository;
     private final ProjectRepository projectRepository;
-    private final UserService userService;
+
+    @Autowired
+    private UserServiceFeignClient userServiceFeignClient;
 
     public UUID getUserIdFromRequest() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
@@ -36,6 +44,58 @@ public class ProjectMemberService {
         UUID userId = userDetails.getUserId();
         return userId;
     }
+
+    private Optional<UserDetailDto> getUserById(UUID userId) {
+        try {
+            ResponseEntity<Map<String, Object>> response = userServiceFeignClient.getUserById(userId);
+
+            if (response.getBody() != null && response.getBody().containsKey("data")) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> userData = (Map<String, Object>) response.getBody().get("data");
+                return Optional.of(convertToUserDetailDto(userData));
+            }
+
+            return Optional.empty();
+        } catch (Exception e) {
+            // Log error and return empty
+            System.err.println("Error fetching user " + userId + " from User Service: " + e.getMessage());
+            return Optional.empty();
+        }
+    }
+    private UserDetailDto convertToUserDetailDto(Map<String, Object> userData) {
+        UserDetailDto dto = new UserDetailDto();
+        dto.setId(UUID.fromString(userData.get("id").toString()));
+        dto.setFirstName((String) userData.get("firstName"));
+        dto.setLastName((String) userData.get("lastName"));
+        dto.setEmail((String) userData.get("email"));
+        dto.setAddress((String) userData.get("address"));
+        dto.setPhone((String) userData.get("phone"));
+
+        // Handle Date objects - convert to string
+        Object dob = userData.get("dob");
+        dto.setDob(dob != null ? dob.toString() : null);
+
+        // Handle enum objects - convert to string
+        Object gender = userData.get("gender");
+        dto.setGender(gender != null ? gender.toString() : null);
+
+        dto.setPersonalID((String) userData.get("personalID"));
+        dto.setImage((String) userData.get("image"));
+        dto.setBankAccountNumber((String) userData.get("bankAccountNumber"));
+        dto.setBankName((String) userData.get("bankName"));
+
+        // Handle enum objects - convert to string
+        Object contractType = userData.get("contractType");
+        dto.setContractType(contractType != null ? contractType.toString() : null);
+
+        // Handle Date objects - convert to string
+        Object startDate = userData.get("startDate");
+        dto.setStartDate(startDate != null ? startDate.toString() : null);
+
+        dto.setRole((String) userData.get("role"));
+        return dto;
+    }
+
 
     @Transactional
     public ProjectMemberResponseDto addMemberToProject(UUID projectId, UUID userId, ProjectRole role) {
@@ -136,7 +196,7 @@ public class ProjectMemberService {
                 .map(member -> member.getProject().getId())
                 .collect(Collectors.toList());
     }
-    
+
     private ProjectMemberResponseDto mapToProjectMemberResponseDto(ProjectMember projectMember) {
         ProjectMemberResponseDto dto = new ProjectMemberResponseDto();
         dto.setId(projectMember.getId());
@@ -144,27 +204,33 @@ public class ProjectMemberService {
         dto.setRole(projectMember.getRole());
         dto.setJoinedAt(projectMember.getJoinedAt());
         dto.setAssignedBy(projectMember.getAssignedBy());
-        
-        // Get user information from user service
-        try {
-            UserService.UserDto userInfo = userService.getUserById(projectMember.getUserId());
-            dto.setUserName(userInfo.getName());
-            dto.setUserEmail(userInfo.getEmail());
-        } catch (Exception e) {
-            log.warn("Could not fetch user info for userId: {}", projectMember.getUserId());
+
+        // Lấy thông tin user từ UserService
+        Optional<UserDetailDto> userOpt = getUserById(projectMember.getUserId());
+        if (userOpt.isPresent()) {
+            UserDetailDto user = userOpt.get();
+            dto.setUserName(user.getFirstName() + " " + user.getLastName());
+            dto.setUserEmail(user.getEmail());
+            dto.setUserImage(user.getImage());
+        } else {
             dto.setUserName("Unknown User");
             dto.setUserEmail("unknown@example.com");
+            dto.setUserImage(null);
         }
-        
-        // Get assigned by user information
-        try {
-            UserService.UserDto assignedByUser = userService.getUserById(projectMember.getAssignedBy());
-            dto.setAssignedByName(assignedByUser.getName());
-        } catch (Exception e) {
-            log.warn("Could not fetch assigned by user info for userId: {}", projectMember.getAssignedBy());
-            dto.setAssignedByName("Unknown User");
+
+        // Lấy thông tin assignedBy
+        if (projectMember.getAssignedBy() != null) {
+            Optional<UserDetailDto> assignedByOpt = getUserById(projectMember.getAssignedBy());
+            if (assignedByOpt.isPresent()) {
+                UserDetailDto assignedByUser = assignedByOpt.get();
+                dto.setAssignedByName(assignedByUser.getFirstName() + " " + assignedByUser.getLastName());
+            } else {
+                dto.setAssignedByName("Unknown User");
+            }
+        } else {
+            dto.setAssignedByName(null);
         }
-        
         return dto;
     }
+
 }
