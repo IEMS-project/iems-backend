@@ -8,8 +8,11 @@ import com.iems.projectservice.exception.AppException;
 import com.iems.projectservice.exception.ProjectErrorCode;
 import com.iems.projectservice.repository.ProjectMemberRepository;
 import com.iems.projectservice.repository.ProjectRepository;
+import com.iems.projectservice.security.JwtUserDetails;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,11 +29,18 @@ public class ProjectMemberService {
     private final ProjectMemberRepository projectMemberRepository;
     private final ProjectRepository projectRepository;
     private final UserService userService;
-    
+
+    public UUID getUserIdFromRequest() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        JwtUserDetails userDetails = (JwtUserDetails) authentication.getPrincipal();
+        UUID userId = userDetails.getUserId();
+        return userId;
+    }
+
     @Transactional
-    public ProjectMemberResponseDto addMemberToProject(UUID projectId, UUID userId, ProjectRole role, UUID assignedBy) {
+    public ProjectMemberResponseDto addMemberToProject(UUID projectId, UUID userId, ProjectRole role) {
         log.info("Adding member to project: projectId={}, userId={}, role={}", projectId, userId, role);
-        
+        UUID assignedBy = getUserIdFromRequest();
         // Validate project exists
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new AppException(ProjectErrorCode.PROJECT_NOT_FOUND));
@@ -63,7 +73,7 @@ public class ProjectMemberService {
     }
     
     @Transactional
-    public ProjectMemberResponseDto updateMemberRole(UUID projectId, UUID userId, ProjectRole newRole, UUID updatedBy) {
+    public ProjectMemberResponseDto updateMemberRole(UUID projectId, UUID userId, ProjectRole newRole) {
         log.info("Updating member role: projectId={}, userId={}, newRole={}", projectId, userId, newRole);
         
         ProjectMember projectMember = projectMemberRepository.findMemberByProjectAndUser(projectId, userId)
@@ -76,7 +86,7 @@ public class ProjectMemberService {
     }
     
     @Transactional
-    public void removeMemberFromProject(UUID projectId, UUID userId, UUID removedBy) {
+    public void removeMemberFromProject(UUID projectId, UUID userId) {
         log.info("Removing member from project: projectId={}, userId={}", projectId, userId);
         
         // Check if member exists

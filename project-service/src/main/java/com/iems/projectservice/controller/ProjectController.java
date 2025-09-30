@@ -5,6 +5,7 @@ import com.iems.projectservice.dto.request.ProjectProgressDto;
 import com.iems.projectservice.dto.request.UpdateProjectDto;
 import com.iems.projectservice.dto.response.ApiResponseDto;
 import com.iems.projectservice.dto.response.ProjectResponseDto;
+import com.iems.projectservice.dto.response.ProjectTableDto;
 import com.iems.projectservice.service.ProjectService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -20,7 +21,7 @@ import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/projects")
+@RequestMapping("/projects")
 @RequiredArgsConstructor
 @Slf4j
 @Tag(name = "Project")
@@ -31,11 +32,9 @@ public class ProjectController {
     @PostMapping
     @Operation(summary = "Create a new project", description = "Create a new project with the provided details")
     public ResponseEntity<ApiResponseDto<ProjectResponseDto>> createProject(
-            @Valid @RequestBody CreateProjectDto createProjectDto,
-            @Parameter(description = "Current user ID", required = true)
-            @RequestHeader("X-User-ID") UUID currentUserId) {
+            @Valid @RequestBody CreateProjectDto createProjectDto) {
         try {
-            ProjectResponseDto project = projectService.createProject(createProjectDto, currentUserId);
+            ProjectResponseDto project = projectService.createProject(createProjectDto);
             return ResponseEntity.status(HttpStatus.CREATED)
                     .body(new ApiResponseDto<>("success", "Project created successfully", project));
         } catch (Exception e) {
@@ -50,11 +49,9 @@ public class ProjectController {
     public ResponseEntity<ApiResponseDto<ProjectResponseDto>> updateProject(
             @Parameter(description = "Project ID", required = true)
             @PathVariable UUID projectId,
-            @Valid @RequestBody UpdateProjectDto updateProjectDto,
-            @Parameter(description = "Current user ID", required = true)
-            @RequestHeader("X-User-ID") UUID currentUserId) {
+            @Valid @RequestBody UpdateProjectDto updateProjectDto){
         try {
-            ProjectResponseDto project = projectService.updateProject(projectId, updateProjectDto, currentUserId);
+            ProjectResponseDto project = projectService.updateProject(projectId, updateProjectDto);
             return ResponseEntity.ok(new ApiResponseDto<>("success", "Project updated successfully", project));
         } catch (Exception e) {
             log.error("Error updating project", e);
@@ -62,16 +59,29 @@ public class ProjectController {
                     .body(new ApiResponseDto<>("error", e.getMessage(), null));
         }
     }
-    
+
+    @GetMapping("/table")
+    @Operation(summary = "Get projects for table", description = "Get basic project info for table display")
+    public ResponseEntity<ApiResponseDto<List<ProjectTableDto>>> getProjectsForTable() {
+        try {
+            List<ProjectTableDto> projects = projectService.getProjectsForTable();
+            return ResponseEntity.ok(new ApiResponseDto<>("success", "Projects retrieved successfully", projects));
+        } catch (Exception e) {
+            log.error("Error getting projects for table", e);
+            return ResponseEntity.badRequest()
+                    .body(new ApiResponseDto<>("error", e.getMessage(), null));
+        }
+    }
+
+
     @GetMapping("/{projectId}")
     @Operation(summary = "Get project by ID", description = "Retrieve project details by project ID")
     public ResponseEntity<ApiResponseDto<ProjectResponseDto>> getProject(
             @Parameter(description = "Project ID", required = true)
-            @PathVariable UUID projectId,
-            @Parameter(description = "Current user ID", required = true)
-            @RequestHeader("X-User-ID") UUID currentUserId) {
+            @PathVariable UUID projectId
+) {
         try {
-            ProjectResponseDto project = projectService.getProjectById(projectId, currentUserId);
+            ProjectResponseDto project = projectService.getProjectById(projectId);
             return ResponseEntity.ok(new ApiResponseDto<>("success", "Project retrieved successfully", project));
         } catch (Exception e) {
             log.error("Error getting project", e);
@@ -82,11 +92,9 @@ public class ProjectController {
     
     @GetMapping("/my-projects")
     @Operation(summary = "Get user's projects", description = "Get all projects where the current user is a member")
-    public ResponseEntity<ApiResponseDto<List<ProjectResponseDto>>> getMyProjects(
-            @Parameter(description = "Current user ID", required = true)
-            @RequestHeader("X-User-ID") UUID currentUserId) {
+    public ResponseEntity<ApiResponseDto<List<ProjectResponseDto>>> getMyProjects() {
         try {
-            List<ProjectResponseDto> projects = projectService.getProjectsByMember(currentUserId);
+            List<ProjectResponseDto> projects = projectService.getMyProjects();
             return ResponseEntity.ok(new ApiResponseDto<>("success", "User projects retrieved successfully", projects));
         } catch (Exception e) {
             log.error("Error getting user projects", e);
@@ -98,10 +106,9 @@ public class ProjectController {
     @GetMapping("/all")
     @Operation(summary = "Get all projects", description = "Get all projects in the system")
     public ResponseEntity<ApiResponseDto<List<ProjectResponseDto>>> getAllProjects(
-            @Parameter(description = "Current user ID", required = true)
-            @RequestHeader("X-User-ID") UUID currentUserId) {
+    ) {
         try {
-            List<ProjectResponseDto> projects = projectService.findAllProjects(currentUserId);
+            List<ProjectResponseDto> projects = projectService.findAllProjects();
             return ResponseEntity.ok(new ApiResponseDto<>("success", "All projects retrieved successfully", projects));
         } catch (Exception e) {
             log.error("Error getting all projects", e);
@@ -114,11 +121,9 @@ public class ProjectController {
     @Operation(summary = "Get project progress", description = "Get project progress and task statistics")
     public ResponseEntity<ApiResponseDto<ProjectProgressDto>> getProjectProgress(
             @Parameter(description = "Project ID", required = true)
-            @PathVariable UUID projectId,
-            @Parameter(description = "Current user ID", required = true)
-            @RequestHeader("X-User-ID") UUID currentUserId) {
+            @PathVariable UUID projectId){
         try {
-            ProjectProgressDto progress = projectService.getProjectProgress(projectId, currentUserId);
+            ProjectProgressDto progress = projectService.getProjectProgress(projectId);
             return ResponseEntity.ok(new ApiResponseDto<>("success", "Project progress retrieved successfully", progress));
         } catch (Exception e) {
             log.error("Error getting project progress", e);
@@ -133,11 +138,9 @@ public class ProjectController {
             @Parameter(description = "Project ID", required = true)
             @PathVariable UUID projectId,
             @Parameter(description = "New manager user ID", required = true)
-            @RequestParam UUID newManagerId,
-            @Parameter(description = "Current user ID", required = true)
-            @RequestHeader("X-User-ID") UUID currentUserId) {
+            @RequestParam UUID newManagerId){
         try {
-            projectService.assignProjectManager(projectId, newManagerId, currentUserId);
+            projectService.assignProjectManager(projectId, newManagerId);
             return ResponseEntity.ok(new ApiResponseDto<>("success", "Project manager assigned successfully", null));
         } catch (Exception e) {
             log.error("Error assigning project manager", e);
