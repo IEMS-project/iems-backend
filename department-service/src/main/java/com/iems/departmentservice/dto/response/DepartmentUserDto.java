@@ -14,7 +14,4 @@ public class DepartmentUserDto {
     private UUID id;
     private UUID departmentId;
     private UUID userId;
-    private LocalDateTime joinedAt;
-    private LocalDateTime leftAt;
-    private Boolean isActive;
 }

@@ -286,10 +286,19 @@ public class ProjectService {
 
     public boolean isAdmin(UUID userId) {
         try {
-            // This would check user roles from IAM service
-            // For now, returning mock data
-            log.info("Checking admin status for userId: {}", userId);
-            return userId.toString().equals("00000000-0000-0000-0000-000000000001"); // Mock: specific UUID is admin
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            if (authentication == null || !(authentication.getPrincipal() instanceof JwtUserDetails)) {
+                return false;
+            }
+            
+            JwtUserDetails userDetails = (JwtUserDetails) authentication.getPrincipal();
+            
+            // Check if user has ADMIN role
+            boolean isAdmin = userDetails.getAuthorities().stream()
+                    .anyMatch(authority -> authority.getAuthority().equals("ROLE_ADMIN"));
+            
+            log.info("Checking admin status for userId: {} - isAdmin: {}", userId, isAdmin);
+            return isAdmin;
         } catch (Exception e) {
             log.error("Error checking admin status for userId: {}", userId, e);
             return false;
