@@ -1,6 +1,5 @@
 package com.iems.projectservice.dto.response;
 
-import com.iems.projectservice.entity.enums.ProjectRole;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -17,7 +16,8 @@ public class ProjectMemberResponseDto {
     private String userName;
     private String userEmail;
     private String userImage;
-    private ProjectRole role;
+    private UUID roleId;
+    private String roleName; // For display purposes
     private LocalDateTime joinedAt;
     private UUID assignedBy;
     private String assignedByName;

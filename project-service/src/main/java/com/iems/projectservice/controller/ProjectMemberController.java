@@ -3,7 +3,6 @@ package com.iems.projectservice.controller;
 import com.iems.projectservice.dto.request.ProjectMemberDto;
 import com.iems.projectservice.dto.response.ApiResponseDto;
 import com.iems.projectservice.dto.response.ProjectMemberResponseDto;
-import com.iems.projectservice.entity.enums.ProjectRole;
 import com.iems.projectservice.service.ProjectMemberService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -35,7 +34,7 @@ public class ProjectMemberController {
             @Valid @RequestBody ProjectMemberDto memberDto) {
         try {
             ProjectMemberResponseDto member = projectMemberService.addMemberToProject(
-                    projectId, memberDto.getUserId(), memberDto.getRole());
+                    projectId, memberDto.getUserId(), memberDto.getRoleId());
             return ResponseEntity.status(HttpStatus.CREATED)
                     .body(new ApiResponseDto<>("success", "Member added to project successfully", member));
         } catch (Exception e) {
@@ -60,15 +59,15 @@ public class ProjectMemberController {
         }
     }
     
-    @GetMapping("/role/{role}")
+    @GetMapping("/role/{roleId}")
     @Operation(summary = "Get members by role", description = "Get project members filtered by specific role")
     public ResponseEntity<ApiResponseDto<List<ProjectMemberResponseDto>>> getMembersByRole(
             @Parameter(description = "Project ID", required = true)
             @PathVariable UUID projectId,
-            @Parameter(description = "Project role to filter by", required = true)
-            @PathVariable ProjectRole role) {
+            @Parameter(description = "Role ID to filter by", required = true)
+            @PathVariable UUID roleId) {
         try {
-            List<ProjectMemberResponseDto> members = projectMemberService.getMembersByRole(projectId, role);
+            List<ProjectMemberResponseDto> members = projectMemberService.getMembersByRole(projectId, roleId);
             return ResponseEntity.ok(new ApiResponseDto<>("success", "Members by role retrieved successfully", members));
         } catch (Exception e) {
             log.error("Error getting project members by role", e);
@@ -84,11 +83,11 @@ public class ProjectMemberController {
             @PathVariable UUID projectId,
             @Parameter(description = "User ID to update role for", required = true)
             @PathVariable UUID userId,
-            @Parameter(description = "New role for the member", required = true)
-            @RequestParam ProjectRole newRole) {
+            @Parameter(description = "New role ID for the member", required = true)
+            @RequestParam UUID newRoleId) {
         try {
             ProjectMemberResponseDto member = projectMemberService.updateMemberRole(
-                    projectId, userId, newRole);
+                    projectId, userId, newRoleId);
             return ResponseEntity.ok(new ApiResponseDto<>("success", "Member role updated successfully", member));
         } catch (Exception e) {
             log.error("Error updating member role", e);
