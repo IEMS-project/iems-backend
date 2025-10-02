@@ -1,6 +1,5 @@
 package com.iems.projectservice.entity;
 
-import com.iems.projectservice.entity.enums.ProjectRole;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -29,9 +28,8 @@ public class ProjectMember {
     @Column(name = "user_id", nullable = false)
     private UUID userId;
     
-    @Enumerated(EnumType.STRING)
-    @Column(name = "role", nullable = false)
-    private ProjectRole role;
+    @Column(name = "role_id", nullable = false)
+    private UUID roleId;
     
     @Column(name = "joined_at", nullable = false)
     private LocalDateTime joinedAt;

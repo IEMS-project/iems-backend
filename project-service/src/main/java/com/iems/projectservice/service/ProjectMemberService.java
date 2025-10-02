@@ -4,8 +4,8 @@ import com.iems.projectservice.client.UserServiceFeignClient;
 import com.iems.projectservice.dto.response.ProjectMemberResponseDto;
 import com.iems.projectservice.dto.response.UserDetailDto;
 import com.iems.projectservice.entity.Project;
+import com.iems.projectservice.entity.ProjectAllowedRole;
 import com.iems.projectservice.entity.ProjectMember;
-import com.iems.projectservice.entity.enums.ProjectRole;
 import com.iems.projectservice.exception.AppException;
 import com.iems.projectservice.exception.ProjectErrorCode;
 import com.iems.projectservice.repository.ProjectMemberRepository;
@@ -34,6 +34,7 @@ public class ProjectMemberService {
     
     private final ProjectMemberRepository projectMemberRepository;
     private final ProjectRepository projectRepository;
+    private final ProjectAllowedRoleService projectAllowedRoleService;
 
     @Autowired
     private UserServiceFeignClient userServiceFeignClient;
@@ -98,8 +99,8 @@ public class ProjectMemberService {
 
 
     @Transactional
-    public ProjectMemberResponseDto addMemberToProject(UUID projectId, UUID userId, ProjectRole role) {
-        log.info("Adding member to project: projectId={}, userId={}, role={}", projectId, userId, role);
+    public ProjectMemberResponseDto addMemberToProject(UUID projectId, UUID userId, UUID roleId) {
+        log.info("Adding member to project: projectId={}, userId={}, roleId={}", projectId, userId, roleId);
         UUID assignedBy = getUserIdFromRequest();
         // Validate project exists
         Project project = projectRepository.findById(projectId)
@@ -114,7 +115,7 @@ public class ProjectMemberService {
         ProjectMember projectMember = new ProjectMember();
         projectMember.setProject(project);
         projectMember.setUserId(userId);
-        projectMember.setRole(role);
+        projectMember.setRoleId(roleId);
         projectMember.setJoinedAt(LocalDateTime.now());
         projectMember.setAssignedBy(assignedBy);
         
@@ -133,13 +134,13 @@ public class ProjectMemberService {
     }
     
     @Transactional
-    public ProjectMemberResponseDto updateMemberRole(UUID projectId, UUID userId, ProjectRole newRole) {
-        log.info("Updating member role: projectId={}, userId={}, newRole={}", projectId, userId, newRole);
+    public ProjectMemberResponseDto updateMemberRole(UUID projectId, UUID userId, UUID newRoleId) {
+        log.info("Updating member role: projectId={}, userId={}, newRoleId={}", projectId, userId, newRoleId);
         
         ProjectMember projectMember = projectMemberRepository.findMemberByProjectAndUser(projectId, userId)
                 .orElseThrow(() -> new AppException(ProjectErrorCode.MEMBER_NOT_FOUND));
         
-        projectMember.setRole(newRole);
+        projectMember.setRoleId(newRoleId);
         ProjectMember updatedMember = projectMemberRepository.save(projectMember);
         
         return mapToProjectMemberResponseDto(updatedMember);
@@ -179,10 +180,10 @@ public class ProjectMemberService {
         return project.getManagerId().equals(userId);
     }
     
-    public List<ProjectMemberResponseDto> getMembersByRole(UUID projectId, ProjectRole role) {
-        log.info("Getting project members by role: projectId={}, role={}", projectId, role);
+    public List<ProjectMemberResponseDto> getMembersByRole(UUID projectId, UUID roleId) {
+        log.info("Getting project members by role: projectId={}, roleId={}", projectId, roleId);
         
-        List<ProjectMember> members = projectMemberRepository.findByProjectIdAndRole(projectId, role);
+        List<ProjectMember> members = projectMemberRepository.findByProjectIdAndRoleId(projectId, roleId);
         return members.stream()
                 .map(this::mapToProjectMemberResponseDto)
                 .collect(Collectors.toList());
@@ -201,9 +202,21 @@ public class ProjectMemberService {
         ProjectMemberResponseDto dto = new ProjectMemberResponseDto();
         dto.setId(projectMember.getId());
         dto.setUserId(projectMember.getUserId());
-        dto.setRole(projectMember.getRole());
+        dto.setRoleId(projectMember.getRoleId());
         dto.setJoinedAt(projectMember.getJoinedAt());
         dto.setAssignedBy(projectMember.getAssignedBy());
+        
+        // Get role name from ProjectAllowedRole
+        try {
+            List<ProjectAllowedRole> allowedRoles = projectAllowedRoleService.list(projectMember.getProject().getId());
+            allowedRoles.stream()
+                .filter(role -> role.getRoleId().equals(projectMember.getRoleId()))
+                .findFirst()
+                .ifPresent(role -> dto.setRoleName(role.getRoleName()));
+        } catch (Exception e) {
+            log.warn("Could not get role name for roleId {}: {}", projectMember.getRoleId(), e.getMessage());
+            dto.setRoleName("Unknown Role");
+        }
 
         // Lấy thông tin user từ UserService
         Optional<UserDetailDto> userOpt = getUserById(projectMember.getUserId());

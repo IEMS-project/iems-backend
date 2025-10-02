@@ -9,7 +9,7 @@ import com.iems.projectservice.dto.response.ProjectResponseDto;
 import com.iems.projectservice.dto.response.ProjectTableDto;
 import com.iems.projectservice.dto.response.UserDetailDto;
 import com.iems.projectservice.entity.Project;
-import com.iems.projectservice.entity.enums.ProjectRole;
+import com.iems.projectservice.entity.ProjectAllowedRole;
 import com.iems.projectservice.entity.enums.ProjectStatus;
 import com.iems.projectservice.entity.ProjectMember;
 import com.iems.projectservice.exception.AppException;
@@ -38,6 +38,7 @@ public class ProjectService {
     
     private final ProjectRepository projectRepository;
     private final ProjectMemberService projectMemberService;
+    private final ProjectAllowedRoleService projectAllowedRoleService;
 
     @Autowired
     private UserServiceFeignClient userServiceFeignClient;
@@ -122,10 +123,13 @@ public class ProjectService {
         
         Project savedProject = projectRepository.save(project);
         
-        // Add manager as project member
-        projectMemberService.addMemberToProject(savedProject.getId(), 
-                createProjectDto.getManagerId(),
-                ProjectRole.PROJECT_MANAGER);
+        // Add manager as project member with default role (first available role or null)
+        UUID managerRoleId = getDefaultManagerRoleId(savedProject.getId());
+        if (managerRoleId != null) {
+            projectMemberService.addMemberToProject(savedProject.getId(), 
+                    createProjectDto.getManagerId(),
+                    managerRoleId);
+        }
         
         return mapToProjectResponseDto(savedProject);
     }
@@ -171,8 +175,11 @@ public class ProjectService {
             !updateProjectDto.getManagerId().equals(project.getManagerId())) {
             // Update project manager
             project.setManagerId(updateProjectDto.getManagerId());
-            projectMemberService.updateMemberRole(projectId, updateProjectDto.getManagerId(), 
-                    ProjectRole.PROJECT_MANAGER);
+            UUID managerRoleId = getDefaultManagerRoleId(projectId);
+            if (managerRoleId != null) {
+                projectMemberService.updateMemberRole(projectId, updateProjectDto.getManagerId(), 
+                        managerRoleId);
+            }
         }
         
         Project updatedProject = projectRepository.save(project);
@@ -270,8 +277,11 @@ public class ProjectService {
         projectRepository.save(project);
         
         // Update or add new manager as project member
-        projectMemberService.updateMemberRole(projectId, newManagerId, 
-                ProjectRole.PROJECT_MANAGER);
+        UUID managerRoleId = getDefaultManagerRoleId(projectId);
+        if (managerRoleId != null) {
+            projectMemberService.updateMemberRole(projectId, newManagerId, 
+                    managerRoleId);
+        }
     }
     
     private boolean hasPermissionToUpdateProject(Project project, UUID userId) {
@@ -338,5 +348,25 @@ public class ProjectService {
         dto.setProgress(progress);
         
         return dto;
+    }
+    
+    private UUID getDefaultManagerRoleId(UUID projectId) {
+        try {
+            // Get first available role from project allowed roles
+            List<ProjectAllowedRole> allowedRoles = projectAllowedRoleService.list(projectId);
+            if (!allowedRoles.isEmpty()) {
+                // Try to find a role with "manager" in the name, otherwise use first role
+                return allowedRoles.stream()
+                    .filter(role -> role.getRoleName().toLowerCase().contains("manager") || 
+                                   role.getRoleName().toLowerCase().contains("quản lý"))
+                    .map(ProjectAllowedRole::getRoleId)
+                    .findFirst()
+                    .orElse(allowedRoles.get(0).getRoleId());
+            }
+            return null;
+        } catch (Exception e) {
+            log.warn("Could not find default manager role for project {}: {}", projectId, e.getMessage());
+            return null;
+        }
     }
 }
