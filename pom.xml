@@ -43,6 +43,7 @@
         <module>iam-service</module>
         <module>document-service</module>
 		<module>project-service</module>
+		<module>chat-service</module>
 	</modules>
 
 	<build>

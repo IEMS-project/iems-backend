@@ -33,6 +33,11 @@ public class MessageService {
     private final ConversationRepository conversationRepository;
     private final SimpMessagingTemplate messagingTemplate;
     private final MongoTemplate mongoTemplate;
+    private final MessageBroadcastService messageBroadcastService;
+    private final MessageReadService messageReadService;
+    private final MessageDeletionService messageDeletionService;
+    private final MessagePinService messagePinService;
+    private final MessageReactionService messageReactionService;
 
     @Autowired
     private UserServiceFeignClient userServiceFeignClient;
@@ -123,53 +128,7 @@ public class MessageService {
     }
 
     public Message saveAndBroadcast(Message message) {
-        // Persist
-        Message saved = messageRepository.save(message);
-
-        // Fetch conversation to decide routing
-        Conversation conv = conversationRepository.findById(saved.getConversationId()).orElse(null);
-        if (conv != null) {
-            // For demo simplicity: always broadcast to the conversation topic so browser clients receive without user session mapping
-            messagingTemplate.convertAndSend("/topic/conversations/" + conv.getId(), saved);
-            // Optionally still fan-out to user queues if client uses user destinations later
-            if (!"GROUP".equalsIgnoreCase(conv.getType())) {
-                List<String> members = conv.getMembers();
-                for (String memberId : members) {
-                    messagingTemplate.convertAndSendToUser(memberId, "/queue/messages", saved);
-                }
-            }
-
-            // Also send lightweight user-updates to each member so sidebars can update last message in realtime
-            try {
-                List<String> members = conv.getMembers();
-                if (members != null) {
-                    for (String memberId : members) {
-                        Map<String, Object> payload = new HashMap<>();
-                        payload.put("event", "message");
-                        payload.put("conversationId", conv.getId());
-                        payload.put("senderId", saved.getSenderId());
-                        payload.put("content", saved.getContent());
-                        payload.put("type", saved.getType());
-                        payload.put("messageId", saved.getId());
-                        payload.put("timestamp", saved.getSentAt().toString());
-                        
-                        // Add unread count for members who haven't read this message (excluding sender)
-                        if (!memberId.equals(saved.getSenderId())) {
-                            int unreadCount = getUnreadCountForConversation(conv.getId(), memberId);
-                            payload.put("unreadCount", unreadCount);
-                        } else {
-                            payload.put("unreadCount", 0);
-                        }
-                        
-                        messagingTemplate.convertAndSend("/topic/user-updates/" + memberId, payload);
-                    }
-                    
-                    // Broadcast conversation list update
-                    broadcastConversationUpdate(conv, saved);
-                }
-            } catch (Exception ignore) { }
-        }
-        return saved;
+        return messageBroadcastService.saveAndBroadcast(message);
     }
 
     public Page<Message> getRecentMessages(String conversationId, int page, int size) {
@@ -204,55 +163,12 @@ public class MessageService {
     }
 
     public Map<String, Integer> getUnreadCountsByUser(String userId) {
-        if (userId == null || userId.isBlank()) return Map.of();
-        Aggregation agg = Aggregation.newAggregation(
-                Aggregation.match(new Criteria().andOperator(
-                        Criteria.where("senderId").ne(userId),
-                        Criteria.where("recalled").ne(true), // Exclude recalled messages
-                        new Criteria().orOperator(
-                                Criteria.where("deletedForUsers").exists(false),
-                                Criteria.where("deletedForUsers").nin(userId)
-                        ), // Exclude messages deleted by user
-                        new Criteria().orOperator(
-                                Criteria.where("readBy").exists(false),
-                                Criteria.where("readBy").nin(userId)
-                        )
-                )),
-                Aggregation.group("conversationId").count().as("count")
-        );
-        AggregationResults<UnreadCountRow> res = mongoTemplate.aggregate(agg, "messages", UnreadCountRow.class);
-        Map<String, Integer> map = new HashMap<>();
-        for (UnreadCountRow row : res.getMappedResults()) {
-            if (row != null && row.id != null) {
-                map.put(row.id, row.count);
-            }
-        }
-        return map;
+        return messageReadService.getUnreadCountsByUser(userId);
     }
 
     // Get unread count for specific conversation
     public int getUnreadCountForConversation(String conversationId, String userId) {
-        if (userId == null || userId.isBlank() || conversationId == null || conversationId.isBlank()) {
-            return 0;
-        }
-        
-        // Combine all criteria into a single $and query to avoid MongoDB BasicDocument limitations
-        Criteria combinedCriteria = new Criteria().andOperator(
-            Criteria.where("conversationId").is(conversationId),
-            Criteria.where("senderId").ne(userId), // Exclude own messages
-            Criteria.where("recalled").ne(true), // Exclude recalled messages
-            new Criteria().orOperator(
-                Criteria.where("deletedForUsers").exists(false),
-                Criteria.where("deletedForUsers").nin(userId)
-            ), // Exclude messages deleted by user
-            new Criteria().orOperator(
-                Criteria.where("readBy").exists(false),
-                Criteria.where("readBy").nin(userId)
-            ) // Only unread messages
-        );
-        
-        Query query = new Query(combinedCriteria);
-        return (int) mongoTemplate.count(query, Message.class);
+        return messageReadService.getUnreadCountForConversation(conversationId, userId);
     }
 
     // Reply message functionality
@@ -276,188 +192,32 @@ public class MessageService {
 
     // Add reaction to message
     public Message addReaction(String messageId, String userId, String emoji) {
-        Query query = new Query(Criteria.where("id").is(messageId));
-        Update update = new Update().addToSet("reactions." + emoji, userId);
-        
-        mongoTemplate.updateFirst(query, update, Message.class);
-        Message updatedMessage = messageRepository.findById(messageId).orElse(null);
-        
-        if (updatedMessage != null) {
-            // Broadcast reaction update
-            broadcastMessageUpdate(updatedMessage, "reaction_added", Map.of("userId", userId, "emoji", emoji));
-        }
-        
-        return updatedMessage;
+       return messageReactionService.addReaction(messageId, userId, emoji);
     }
 
     // Remove reaction from message
     public Message removeReaction(String messageId, String userId) {
-        Message message = messageRepository.findById(messageId).orElse(null);
-        if (message == null) return null;
-
-        Map<String, List<String>> reactions = message.getReactions();
-        if (reactions != null) {
-            String removedEmoji = null;
-            for (Map.Entry<String, List<String>> entry : reactions.entrySet()) {
-                if (entry.getValue().contains(userId)) {
-                    entry.getValue().remove(userId);
-                    if (entry.getValue().isEmpty()) {
-                        reactions.remove(entry.getKey());
-                    }
-                    removedEmoji = entry.getKey();
-                    break;
-                }
-            }
-            
-            message.setReactions(reactions);
-            Message saved = messageRepository.save(message);
-            
-            if (removedEmoji != null) {
-                broadcastMessageUpdate(saved, "reaction_removed", Map.of("userId", userId, "emoji", removedEmoji));
-            }
-            
-            return saved;
-        }
-        
-        return message;
+        return messageReactionService.removeReaction(messageId, userId);
     }
 
     // Delete message for user (delete for me)
     public boolean deleteForMe(String messageId, String userId) {
-        // First check if message exists and user has access
-        Message message = messageRepository.findById(messageId).orElse(null);
-        if (message == null) {
-            return false;
-        }
-
-        // Check if user is member of the conversation
-        Conversation conversation = conversationRepository.findById(message.getConversationId()).orElse(null);
-        if (conversation == null || !conversation.getMembers().contains(userId)) {
-            return false;
-        }
-
-        // Check if already deleted for this user
-        if (message.getDeletedForUsers() != null && message.getDeletedForUsers().contains(userId)) {
-            return true; // Already deleted, consider success
-        }
-
-        // Add user to deletedForUsers list
-        Query query = new Query(Criteria.where("id").is(messageId));
-        Update update = new Update().addToSet("deletedForUsers", userId);
-        
-        mongoTemplate.updateFirst(query, update, Message.class);
-        
-        // Broadcast delete update to other clients
-        try {
-            Map<String, Object> payload = Map.of(
-                "event", "message_deleted_for_user",
-                "messageId", messageId,
-                "userId", userId,
-                "conversationId", message.getConversationId()
-            );
-            
-            for (String memberId : conversation.getMembers()) {
-                messagingTemplate.convertAndSend("/topic/user-updates/" + memberId, payload);
-            }
-            // Send user-specific conversation update with the latest visible message
-            Message latestVisible = getLatestVisibleMessageForUser(message.getConversationId(), userId);
-            Map<String, Object> convUpdate = new HashMap<>();
-            convUpdate.put("event", "conversation_updated");
-            convUpdate.put("conversationId", message.getConversationId());
-            if (latestVisible != null) {
-                String lmContent = (Boolean.TRUE.equals(latestVisible.isRecalled())) ?
-                        "Tin nhắn đã được thu hồi" : latestVisible.getContent();
-                convUpdate.put("lastMessage", Map.of(
-                        "id", latestVisible.getId(),
-                        "content", lmContent,
-                        "senderId", latestVisible.getSenderId(),
-                        "sentAt", latestVisible.getSentAt(),
-                        "type", latestVisible.getType()
-                ));
-                convUpdate.put("updatedAt", latestVisible.getSentAt());
-            }
-            convUpdate.put("unreadCount", getUnreadCountForConversation(message.getConversationId(), userId));
-            messagingTemplate.convertAndSend("/topic/user-updates/" + userId, convUpdate);
-        } catch (Exception e) {
-            // Log but don't fail the operation
-            System.err.println("Failed to broadcast delete event: " + e.getMessage());
-        }
-        
-        return true;
+        return messageDeletionService.deleteForMe(messageId, userId);
     }
 
     // Recall message (delete for everyone)
     public Message recallMessage(String messageId, String userId) {
-        Message message = messageRepository.findById(messageId).orElse(null);
-        if (message == null) return null;
-
-        // Only sender can recall message
-        if (!message.getSenderId().equals(userId)) {
-            throw new RuntimeException("Only sender can recall message");
-        }
-
-        message.setRecalled(true);
-        message.setRecalledAt(LocalDateTime.now());
-        Message saved = messageRepository.save(message);
-
-        // Broadcast recall update
-        broadcastMessageUpdate(saved, "message_recalled", Map.of("recalledBy", userId));
-        
-        // Also broadcast conversation list update for sidebars
-        Conversation conv = conversationRepository.findById(saved.getConversationId()).orElse(null);
-        if (conv != null) {
-            broadcastConversationUpdate(conv, saved);
-        }
-        
-        return saved;
+        return messageDeletionService.recallMessage(messageId, userId);
     }
 
     // Pin message
     public Message pinMessage(String conversationId, String messageId, String userId) {
-        // Update message
-        Query messageQuery = new Query(Criteria.where("id").is(messageId));
-        Update messageUpdate = new Update()
-                .set("pinned", true)
-                .set("pinnedBy", userId)
-                .set("pinnedAt", LocalDateTime.now());
-        
-        mongoTemplate.updateFirst(messageQuery, messageUpdate, Message.class);
-
-        // Update conversation
-        Query convQuery = new Query(Criteria.where("id").is(conversationId));
-        Update convUpdate = new Update().addToSet("pinnedMessageIds", messageId);
-        mongoTemplate.updateFirst(convQuery, convUpdate, Conversation.class);
-
-        Message pinnedMessage = messageRepository.findById(messageId).orElse(null);
-        if (pinnedMessage != null) {
-            broadcastMessageUpdate(pinnedMessage, "message_pinned", Map.of("pinnedBy", userId));
-        }
-
-        return pinnedMessage;
+        return messagePinService.pinMessage(conversationId, messageId, userId);
     }
 
     // Unpin message
     public Message unpinMessage(String conversationId, String messageId, String userId) {
-        // Update message
-        Query messageQuery = new Query(Criteria.where("id").is(messageId));
-        Update messageUpdate = new Update()
-                .set("pinned", false)
-                .unset("pinnedBy")
-                .unset("pinnedAt");
-        
-        mongoTemplate.updateFirst(messageQuery, messageUpdate, Message.class);
-
-        // Update conversation
-        Query convQuery = new Query(Criteria.where("id").is(conversationId));
-        Update convUpdate = new Update().pull("pinnedMessageIds", messageId);
-        mongoTemplate.updateFirst(convQuery, convUpdate, Conversation.class);
-
-        Message unpinnedMessage = messageRepository.findById(messageId).orElse(null);
-        if (unpinnedMessage != null) {
-            broadcastMessageUpdate(unpinnedMessage, "message_unpinned", Map.of("unpinnedBy", userId));
-        }
-
-        return unpinnedMessage;
+        return messagePinService.unpinMessage(conversationId, messageId, userId);
     }
 
     // Get pinned messages for conversation
@@ -469,79 +229,14 @@ public class MessageService {
 
     // Enhanced mark as read with last read message tracking
     public void markAsReadWithLastMessage(String conversationId, String userId, String lastMessageId) {
-        // Mark messages as read
-        markAsRead(conversationId, userId);
-        
-        // Update last read message in conversation
-        if (lastMessageId != null) {
-            Query convQuery = new Query(Criteria.where("id").is(conversationId));
-            Update convUpdate = new Update().set("lastReadMessageId." + userId, lastMessageId);
-            mongoTemplate.updateFirst(convQuery, convUpdate, Conversation.class);
-        }
-
-        // Broadcast read status update
-        broadcastReadStatusUpdate(conversationId, userId, lastMessageId);
+        messageReadService.markAsReadWithLastMessage(conversationId, userId, lastMessageId);
     }
 
     // Mark entire conversation as read
     public boolean markConversationAsRead(String conversationId, String userId) {
-        // Verify user is member of conversation
-        Conversation conversation = conversationRepository.findById(conversationId).orElse(null);
-        if (conversation == null || !conversation.getMembers().contains(userId)) {
-            return false;
-        }
-
-        // Mark all unread messages in this conversation as read
-        Criteria markReadCriteria = new Criteria().andOperator(
-            Criteria.where("conversationId").is(conversationId),
-            Criteria.where("senderId").ne(userId), // Don't mark own messages
-            new Criteria().orOperator(
-                Criteria.where("readBy").exists(false),
-                Criteria.where("readBy").nin(userId)
-            )
-        );
-        Query query = new Query(markReadCriteria);
-
-        Update update = new Update().addToSet("readBy", userId);
-        mongoTemplate.updateMulti(query, update, Message.class);
-
-        // Get the latest message to update lastReadMessageId
-        Query latestQuery = new Query();
-        latestQuery.addCriteria(Criteria.where("conversationId").is(conversationId));
-        latestQuery.with(Sort.by(Sort.Direction.DESC, "sentAt"));
-        latestQuery.limit(1);
-        
-        Message latestMessage = mongoTemplate.findOne(latestQuery, Message.class);
-        if (latestMessage != null) {
-            Query convQuery = new Query(Criteria.where("id").is(conversationId));
-            Update convUpdate = new Update().set("lastReadMessageId." + userId, latestMessage.getId());
-            mongoTemplate.updateFirst(convQuery, convUpdate, Conversation.class);
-        }
-
-        // Broadcast read status update
-        broadcastReadStatusUpdate(conversationId, userId, latestMessage != null ? latestMessage.getId() : null);
-        
-        return true;
+       return messageReadService.markConversationAsRead(conversationId, userId);
     }
 
-    // Broadcast read status update to all conversation members
-    private void broadcastReadStatusUpdate(String conversationId, String userId, String lastMessageId) {
-        Conversation conv = conversationRepository.findById(conversationId).orElse(null);
-        if (conv != null) {
-            Map<String, Object> payload = Map.of(
-                "event", "messages_read",
-                "conversationId", conversationId,
-                "userId", userId,
-                "lastMessageId", lastMessageId != null ? lastMessageId : "",
-                "unreadCount", 0
-            );
-            
-            // Send to all members
-            for (String memberId : conv.getMembers()) {
-                messagingTemplate.convertAndSend("/topic/user-updates/" + memberId, payload);
-            }
-        }
-    }
 
     // Get messages with user-specific filtering (exclude deleted/recalled)
     public List<Message> getMessagesForUser(String conversationId, String userId, int page, int size) {
@@ -620,73 +315,7 @@ public class MessageService {
         return result;
     }
 
-    // Broadcast message updates for realtime features
-    private void broadcastMessageUpdate(Message message, String eventType, Map<String, Object> additionalData) {
-        Conversation conv = conversationRepository.findById(message.getConversationId()).orElse(null);
-        if (conv != null) {
-            Map<String, Object> payload = new HashMap<>();
-            payload.put("event", eventType);
-            payload.put("messageId", message.getId());
-            payload.put("conversationId", message.getConversationId());
-            payload.put("message", message);
-            payload.putAll(additionalData);
-
-            // Broadcast to conversation
-            messagingTemplate.convertAndSend("/topic/conversations/" + conv.getId(), payload);
-            
-            // Also send to user updates
-            for (String memberId : conv.getMembers()) {
-                messagingTemplate.convertAndSend("/topic/user-updates/" + memberId, payload);
-            }
-        }
-    }
-    
-    private void broadcastConversationUpdate(Conversation conv, Message lastMessage) {
-        try {
-            List<String> members = conv.getMembers();
-            if (members != null) {
-                for (String memberId : members) {
-                    Map<String, Object> conversationUpdate = new HashMap<>();
-                    conversationUpdate.put("event", "conversation_updated");
-                    conversationUpdate.put("conversationId", conv.getId());
-                    if (lastMessage != null) {
-                        String content = (Boolean.TRUE.equals(lastMessage.isRecalled()))
-                                ? "Tin nhắn đã được thu hồi"
-                                : lastMessage.getContent();
-                        conversationUpdate.put("lastMessage", Map.of(
-                                "id", lastMessage.getId(),
-                                "content", content,
-                                "senderId", lastMessage.getSenderId(),
-                                "sentAt", lastMessage.getSentAt(),
-                                "type", lastMessage.getType()
-                        ));
-                        conversationUpdate.put("updatedAt", lastMessage.getSentAt());
-                    }
-                    conversationUpdate.put("unreadCount", getUnreadCountForConversation(conv.getId(), memberId));
-                    
-                    messagingTemplate.convertAndSend("/topic/user-updates/" + memberId, conversationUpdate);
-                }
-            }
-        } catch (Exception e) {
-            System.err.println("Error broadcasting conversation update: " + e.getMessage());
-        }
-    }
-
-    // Latest visible message for a specific user (exclude recalled and deleted-for-user)
-    private Message getLatestVisibleMessageForUser(String conversationId, String userId) {
-        Criteria criteria = new Criteria().andOperator(
-                Criteria.where("conversationId").is(conversationId),
-                Criteria.where("recalled").ne(true),
-                new Criteria().orOperator(
-                        Criteria.where("deletedForUsers").exists(false),
-                        Criteria.where("deletedForUsers").nin(userId)
-                )
-        );
-        Query q = new Query(criteria);
-        q.with(Sort.by(Sort.Direction.DESC, "sentAt"));
-        q.limit(1);
-        return mongoTemplate.findOne(q, Message.class);
-    }
+    // Broadcast helpers moved to MessageBroadcastService
 
     // Get message by ID with neighbors for jump-to-message functionality
     public Map<String, Object> getMessageWithNeighbors(String messageId, boolean withNeighbors, int neighborLimit) {
