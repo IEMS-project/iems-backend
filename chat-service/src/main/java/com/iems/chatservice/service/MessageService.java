@@ -3,12 +3,15 @@ package com.iems.chatservice.service;
 import com.iems.chatservice.client.UserServiceFeignClient;
 import com.iems.chatservice.dto.MemberResponseDto;
 import com.iems.chatservice.dto.UserDetailDto;
+import com.iems.chatservice.security.JwtUserDetails;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import com.iems.chatservice.entity.Conversation;
 import com.iems.chatservice.entity.Message;
@@ -146,33 +149,40 @@ public class MessageService {
         return mongoTemplate.find(q, Message.class);
     }
 
-    public void markAsRead(String conversationId, String userId) {
-        if (conversationId == null || userId == null || conversationId.isBlank() || userId.isBlank()) return;
+    public void markAsRead(String conversationId) {
+        UUID userId = getUserIdFromRequest();
+        String userIdStr = userId.toString();
+        if (conversationId == null || conversationId.isBlank()) return;
         
         Criteria markCriteria = new Criteria().andOperator(
             Criteria.where("conversationId").is(conversationId),
-            Criteria.where("senderId").ne(userId),
+            Criteria.where("senderId").ne(userIdStr),
             new Criteria().orOperator(
                 Criteria.where("readBy").exists(false),
-                Criteria.where("readBy").nin(userId)
+                Criteria.where("readBy").nin(userIdStr)
             )
         );
         Query q = new Query(markCriteria);
-        Update up = new Update().addToSet("readBy", userId);
+        Update up = new Update().addToSet("readBy", userIdStr);
         mongoTemplate.updateMulti(q, up, Message.class);
     }
 
-    public Map<String, Integer> getUnreadCountsByUser(String userId) {
-        return messageReadService.getUnreadCountsByUser(userId);
+    public Map<String, Integer> getUnreadCountsByUser() {
+        UUID userId = getUserIdFromRequest();
+        return messageReadService.getUnreadCountsByUser(userId.toString());
     }
 
     // Get unread count for specific conversation
-    public int getUnreadCountForConversation(String conversationId, String userId) {
-        return messageReadService.getUnreadCountForConversation(conversationId, userId);
+    public int getUnreadCountForConversation(String conversationId) {
+        UUID userId = getUserIdFromRequest();
+        return messageReadService.getUnreadCountForConversation(conversationId, userId.toString());
     }
 
     // Reply message functionality
-    public Message replyToMessage(String conversationId, String senderId, String content, String replyToMessageId) {
+    public Message replyToMessage(String conversationId, String content, String replyToMessageId) {
+        UUID userId = getUserIdFromRequest();
+        String senderId = userId.toString();
+        
         // Get original message for context
         Message originalMessage = messageRepository.findById(replyToMessageId).orElse(null);
         if (originalMessage == null) {
@@ -191,33 +201,39 @@ public class MessageService {
     }
 
     // Add reaction to message
-    public Message addReaction(String messageId, String userId, String emoji) {
-       return messageReactionService.addReaction(messageId, userId, emoji);
+    public Message addReaction(String messageId, String emoji) {
+        UUID userId = getUserIdFromRequest();
+        return messageReactionService.addReaction(messageId, userId.toString(), emoji);
     }
 
     // Remove reaction from message
-    public Message removeReaction(String messageId, String userId) {
-        return messageReactionService.removeReaction(messageId, userId);
+    public Message removeReaction(String messageId) {
+        UUID userId = getUserIdFromRequest();
+        return messageReactionService.removeReaction(messageId, userId.toString());
     }
 
     // Delete message for user (delete for me)
-    public boolean deleteForMe(String messageId, String userId) {
-        return messageDeletionService.deleteForMe(messageId, userId);
+    public boolean deleteForMe(String messageId) {
+        UUID userId = getUserIdFromRequest();
+        return messageDeletionService.deleteForMe(messageId, userId.toString());
     }
 
     // Recall message (delete for everyone)
-    public Message recallMessage(String messageId, String userId) {
-        return messageDeletionService.recallMessage(messageId, userId);
+    public Message recallMessage(String messageId) {
+        UUID userId = getUserIdFromRequest();
+        return messageDeletionService.recallMessage(messageId, userId.toString());
     }
 
     // Pin message
-    public Message pinMessage(String conversationId, String messageId, String userId) {
-        return messagePinService.pinMessage(conversationId, messageId, userId);
+    public Message pinMessage(String conversationId, String messageId) {
+        UUID userId = getUserIdFromRequest();
+        return messagePinService.pinMessage(conversationId, messageId, userId.toString());
     }
 
     // Unpin message
-    public Message unpinMessage(String conversationId, String messageId, String userId) {
-        return messagePinService.unpinMessage(conversationId, messageId, userId);
+    public Message unpinMessage(String conversationId, String messageId) {
+        UUID userId = getUserIdFromRequest();
+        return messagePinService.unpinMessage(conversationId, messageId, userId.toString());
     }
 
     // Get pinned messages for conversation
@@ -228,23 +244,28 @@ public class MessageService {
     }
 
     // Enhanced mark as read with last read message tracking
-    public void markAsReadWithLastMessage(String conversationId, String userId, String lastMessageId) {
-        messageReadService.markAsReadWithLastMessage(conversationId, userId, lastMessageId);
+    public void markAsReadWithLastMessage(String conversationId, String lastMessageId) {
+        UUID userId = getUserIdFromRequest();
+        messageReadService.markAsReadWithLastMessage(conversationId, userId.toString(), lastMessageId);
     }
 
     // Mark entire conversation as read
-    public boolean markConversationAsRead(String conversationId, String userId) {
-       return messageReadService.markConversationAsRead(conversationId, userId);
+    public boolean markConversationAsRead(String conversationId) {
+        UUID userId = getUserIdFromRequest();
+        return messageReadService.markConversationAsRead(conversationId, userId.toString());
     }
 
 
     // Get messages with user-specific filtering (exclude deleted/recalled)
-    public List<Message> getMessagesForUser(String conversationId, String userId, int page, int size) {
+    public List<Message> getMessagesForUser(String conversationId, int page, int size) {
+        UUID userId = getUserIdFromRequest();
+        String userIdStr = userId.toString();
+        
         Criteria userMessagesCriteria = new Criteria().andOperator(
             Criteria.where("conversationId").is(conversationId),
             new Criteria().orOperator(
                 Criteria.where("deletedForUsers").exists(false),
-                Criteria.where("deletedForUsers").nin(userId)
+                Criteria.where("deletedForUsers").nin(userIdStr)
             )
         );
         
@@ -258,12 +279,15 @@ public class MessageService {
     }
 
     // Get paginated messages for conversation with cursor-based pagination
-    public Map<String, Object> getConversationMessagesPaginated(String conversationId, String userId, int limit, String before) {
+    public Map<String, Object> getConversationMessagesPaginated(String conversationId, int limit, String before) {
+        UUID userId = getUserIdFromRequest();
+        String userIdStr = userId.toString();
+        
         Criteria baseCriteria = new Criteria().andOperator(
             Criteria.where("conversationId").is(conversationId),
             new Criteria().orOperator(
                 Criteria.where("deletedForUsers").exists(false),
-                Criteria.where("deletedForUsers").nin(userId)
+                Criteria.where("deletedForUsers").nin(userIdStr)
             )
         );
         
@@ -487,6 +511,14 @@ public class MessageService {
         query.with(Sort.by(Sort.Direction.ASC, "sentAt"));
 
         return mongoTemplate.find(query, Message.class);
+    }
+
+
+    public UUID getUserIdFromRequest() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        JwtUserDetails userDetails = (JwtUserDetails) authentication.getPrincipal();
+        UUID userId = userDetails.getUserId();
+        return userId;
     }
 
     public static class UnreadCountRow {

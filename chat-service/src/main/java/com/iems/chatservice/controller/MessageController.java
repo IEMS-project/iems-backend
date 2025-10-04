@@ -65,31 +65,29 @@ public class MessageController {
     @PostMapping("/read")
     public ResponseEntity<Void> markRead(
             @RequestParam String conversationId,
-            @RequestParam String userId,
             @RequestParam(required = false) String lastMessageId
     ) {
         if (lastMessageId != null && !lastMessageId.isBlank()) {
-            messageService.markAsReadWithLastMessage(conversationId, userId, lastMessageId);
+            messageService.markAsReadWithLastMessage(conversationId, lastMessageId);
         } else {
-            messageService.markAsRead(conversationId, userId);
+            messageService.markAsRead(conversationId);
         }
         return ResponseEntity.ok().build();
     }
 
-    @GetMapping("/unread/{userId}")
-    public ResponseEntity<Map<String, Integer>> unreadCounts(@PathVariable String userId) {
-        return ResponseEntity.ok(messageService.getUnreadCountsByUser(userId));
+    @GetMapping("/unread")
+    public ResponseEntity<Map<String, Integer>> unreadCounts() {
+        return ResponseEntity.ok(messageService.getUnreadCountsByUser());
     }
 
     // Reply to message
     @PostMapping("/reply")
     public ResponseEntity<Message> replyToMessage(
             @RequestParam String conversationId,
-            @RequestParam String senderId,
             @RequestParam String content,
             @RequestParam String replyToMessageId
     ) {
-        Message reply = messageService.replyToMessage(conversationId, senderId, content, replyToMessageId);
+        Message reply = messageService.replyToMessage(conversationId, content, replyToMessageId);
         return ResponseEntity.ok(reply);
     }
 
@@ -97,30 +95,27 @@ public class MessageController {
     @PostMapping("/{messageId}/reactions")
     public ResponseEntity<Message> addReaction(
             @PathVariable String messageId,
-            @RequestParam String userId,
             @RequestParam String emoji 
     ) {
-        Message message = messageService.addReaction(messageId, userId, emoji);
+        Message message = messageService.addReaction(messageId, emoji);
         return ResponseEntity.ok(message);
     }
 
     // Remove reaction from message
-    @DeleteMapping("/{messageId}/reactions/{userId}")
+    @DeleteMapping("/{messageId}/reactions")
     public ResponseEntity<Message> removeReaction(
-            @PathVariable String messageId,
-            @PathVariable String userId
+            @PathVariable String messageId
     ) {
-        Message message = messageService.removeReaction(messageId, userId);
+        Message message = messageService.removeReaction(messageId);
         return ResponseEntity.ok(message);
     }
 
     // Delete message for me
     @PostMapping("/{messageId}/delete")
     public ResponseEntity<Void> deleteForMe(
-            @PathVariable String messageId,
-            @RequestParam String userId
+            @PathVariable String messageId
     ) {
-        boolean success = messageService.deleteForMe(messageId, userId);
+        boolean success = messageService.deleteForMe(messageId);
         if (success) {
             return ResponseEntity.ok().build();
         } else {
@@ -131,10 +126,9 @@ public class MessageController {
     // Alternative endpoint with DELETE method
     @DeleteMapping("/{messageId}/me")
     public ResponseEntity<Void> deleteForMeAlt(
-            @PathVariable String messageId,
-            @RequestParam String userId
+            @PathVariable String messageId
     ) {
-        boolean success = messageService.deleteForMe(messageId, userId);
+        boolean success = messageService.deleteForMe(messageId);
         if (success) {
             return ResponseEntity.ok().build();
         } else {
@@ -145,10 +139,9 @@ public class MessageController {
     // Recall message (delete for everyone)
     @PostMapping("/{messageId}/recall")
     public ResponseEntity<Message> recallMessage(
-            @PathVariable String messageId,
-            @RequestParam String userId
+            @PathVariable String messageId
     ) {
-        Message message = messageService.recallMessage(messageId, userId);
+        Message message = messageService.recallMessage(messageId);
         return ResponseEntity.ok(message);
     }
 
@@ -163,11 +156,10 @@ public class MessageController {
     @GetMapping("/for-user")
     public ResponseEntity<List<Message>> getMessagesForUser(
             @RequestParam String conversationId,
-            @RequestParam String userId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "30") int size
     ) {
-        List<Message> messages = messageService.getMessagesForUser(conversationId, userId, page, size);
+        List<Message> messages = messageService.getMessagesForUser(conversationId, page, size);
         return ResponseEntity.ok(messages);
     }
 
@@ -175,11 +167,10 @@ public class MessageController {
     @GetMapping("/conversations/{conversationId}/messages")
     public ResponseEntity<Map<String, Object>> getConversationMessages(
             @PathVariable String conversationId,
-            @RequestParam String userId,
             @RequestParam(defaultValue = "20") int limit,
             @RequestParam(required = false) String before
     ) {
-        Map<String, Object> result = messageService.getConversationMessagesPaginated(conversationId, userId, limit, before);
+        Map<String, Object> result = messageService.getConversationMessagesPaginated(conversationId, limit, before);
         return ResponseEntity.ok(result);
     }
 

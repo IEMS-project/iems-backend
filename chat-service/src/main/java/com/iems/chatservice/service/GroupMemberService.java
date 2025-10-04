@@ -9,6 +9,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
+import com.iems.chatservice.security.JwtUserDetails;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import java.util.UUID;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -27,7 +31,17 @@ public class GroupMemberService {
     private final SimpMessagingTemplate messagingTemplate;
     private final UserServiceFeignClient userServiceFeignClient;
 
-    public Conversation addMember(String conversationId, String userId, String actorUserId) {
+    public UUID getUserIdFromRequest() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        JwtUserDetails userDetails = (JwtUserDetails) authentication.getPrincipal();
+        UUID userId = userDetails.getUserId();
+        return userId;
+    }
+
+    public Conversation addMember(String conversationId, String userId) {
+        UUID actorUserId = getUserIdFromRequest();
+        String actorUserIdStr = actorUserId.toString();
+        
         Conversation conv = conversationRepository.findById(conversationId).orElse(null);
         if (conv == null) return null;
         List<String> members = conv.getMembers();
@@ -45,17 +59,20 @@ public class GroupMemberService {
         createAndBroadcastSystemLog(updated.getId(), content);
 
         // Broadcast member-added event to all participants
-        broadcastMemberEvent(updated, "member_added", userId, actorUserId);
+        broadcastMemberEvent(updated, "member_added", userId, actorUserIdStr);
         return updated;
     }
 
-    public Conversation removeMember(String conversationId, String userId, String actorUserId) {
+    public Conversation removeMember(String conversationId, String userId) {
+        UUID actorUserId = getUserIdFromRequest();
+        String actorUserIdStr = actorUserId.toString();
+        
         Conversation conv = conversationRepository.findById(conversationId).orElse(null);
         if (conv == null) return null;
         try {
             String creatorId = conv.getCreatedBy();
-            boolean isSelfRemoval = actorUserId != null && actorUserId.equals(userId);
-            boolean isCreator = actorUserId != null && actorUserId.equals(creatorId);
+            boolean isSelfRemoval = actorUserIdStr.equals(userId);
+            boolean isCreator = actorUserIdStr.equals(creatorId);
             if (!isSelfRemoval && !isCreator) {
                 // Not allowed
                 return null;
@@ -69,7 +86,7 @@ public class GroupMemberService {
 
         String content = String.format("%s đã rời nhóm", resolveUserName(userId));
         createAndBroadcastSystemLog(updated.getId(), content);
-        broadcastMemberEvent(updated, "member_removed", userId, actorUserId);
+        broadcastMemberEvent(updated, "member_removed", userId, actorUserIdStr);
         return updated;
     }
 
@@ -104,7 +121,7 @@ public class GroupMemberService {
         } catch (Exception ignore) { }
     }
 
-    // Placeholder for resolving display name (can be enhanced to call user service)
+    // Resolve display name by calling user service
     private String resolveUserName(String userId) {
         try {
             java.util.UUID uuid = java.util.UUID.fromString(userId);
@@ -119,8 +136,12 @@ public class GroupMemberService {
                 String full = (firstName + " " + lastName).trim();
                 return full.isBlank() ? (email.isBlank() ? userId : email) : full;
             }
-        } catch (Exception ignored) { }
-        return userId;
+        } catch (Exception e) {
+            // Log the error for debugging
+            System.err.println("Error resolving user name for " + userId + ": " + e.getMessage());
+        }
+        // Return a more user-friendly fallback instead of raw userId
+        return "Người dùng";
     }
 }
 

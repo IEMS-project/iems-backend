@@ -10,8 +10,12 @@ import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Service;
 
+import com.iems.chatservice.security.JwtUserDetails;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import java.util.*;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Service
 public class ConversationService {
@@ -25,9 +29,19 @@ public class ConversationService {
     @Autowired
     private MessageService messageService;
 
-    public List<Map<String, Object>> getConversationsByUser(String userId) {
+    public UUID getUserIdFromRequest() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        JwtUserDetails userDetails = (JwtUserDetails) authentication.getPrincipal();
+        UUID userId = userDetails.getUserId();
+        return userId;
+    }
+
+    public List<Map<String, Object>> getConversationsByUser() {
+        UUID userId = getUserIdFromRequest();
+        String userIdStr = userId.toString();
+        
         Query query = new Query();
-        query.addCriteria(Criteria.where("members").in(userId));
+        query.addCriteria(Criteria.where("members").in(userIdStr));
         query.with(Sort.by(Sort.Direction.DESC, "updatedAt"));
         List<Conversation> conversations = mongoTemplate.find(query, Conversation.class);
         
@@ -46,24 +60,24 @@ public class ConversationService {
             convData.put("avatarUrl", conv.getAvatarUrl());
             
             // Check if this conversation is pinned by the user
-            boolean isPinned = conv.getPinnedBy() != null && conv.getPinnedBy().containsKey(userId);
+            boolean isPinned = conv.getPinnedBy() != null && conv.getPinnedBy().containsKey(userIdStr);
             convData.put("isPinned", isPinned);
             if (isPinned) {
-                convData.put("pinnedAt", conv.getPinnedBy().get(userId));
+                convData.put("pinnedAt", conv.getPinnedBy().get(userIdStr));
             }
             
             // Check notification settings for this user
             boolean notificationsEnabled = conv.getNotificationSettings() == null || 
-                conv.getNotificationSettings().getOrDefault(userId, true);
+                conv.getNotificationSettings().getOrDefault(userIdStr, true);
             convData.put("notificationsEnabled", notificationsEnabled);
             
             // Check if manually marked as unread by this user
             boolean manuallyMarkedAsUnread = conv.getManuallyMarkedAsUnread() != null && 
-                conv.getManuallyMarkedAsUnread().contains(userId);
+                conv.getManuallyMarkedAsUnread().contains(userIdStr);
             convData.put("manuallyMarkedAsUnread", manuallyMarkedAsUnread);
             
             // Get last message
-            Message lastMessage = getLastMessageForConversation(conv.getId(), userId);
+            Message lastMessage = getLastMessageForConversation(conv.getId(), userIdStr);
             if (lastMessage != null) {
                 Map<String, Object> lastMsgData = new HashMap<>();
                 lastMsgData.put("id", lastMessage.getId());
@@ -75,7 +89,7 @@ public class ConversationService {
             }
             
             // Get unread count for this user
-            int unreadCount = messageService.getUnreadCountForConversation(conv.getId(), userId);
+            int unreadCount = messageService.getUnreadCountForConversation(conv.getId());
             
             // Apply manual unread logic: if manually marked as unread, show 1; otherwise show actual unread count
             int displayUnreadCount;
@@ -196,7 +210,10 @@ public class ConversationService {
         return conversationRepository.findByMembersContaining(userId);
     }
     
-    public boolean pinConversation(String conversationId, String userId) {
+    public boolean pinConversation(String conversationId) {
+        UUID userId = getUserIdFromRequest();
+        String userIdStr = userId.toString();
+        
         try {
             Conversation conversation = conversationRepository.findById(conversationId).orElse(null);
             if (conversation == null) {
@@ -204,7 +221,7 @@ public class ConversationService {
             }
             
             // Check if user is a member of the conversation
-            if (!conversation.getMembers().contains(userId)) {
+            if (!conversation.getMembers().contains(userIdStr)) {
                 return false;
             }
             
@@ -214,7 +231,7 @@ public class ConversationService {
             }
             
             // Add user to pinnedBy map with current timestamp
-            conversation.getPinnedBy().put(userId, LocalDateTime.now());
+            conversation.getPinnedBy().put(userIdStr, LocalDateTime.now());
             conversation.setUpdatedAt(LocalDateTime.now());
             
             conversationRepository.save(conversation);
@@ -224,7 +241,10 @@ public class ConversationService {
         }
     }
     
-    public boolean unpinConversation(String conversationId, String userId) {
+    public boolean unpinConversation(String conversationId) {
+        UUID userId = getUserIdFromRequest();
+        String userIdStr = userId.toString();
+        
         try {
             Conversation conversation = conversationRepository.findById(conversationId).orElse(null);
             if (conversation == null) {
@@ -232,13 +252,13 @@ public class ConversationService {
             }
             
             // Check if user is a member of the conversation
-            if (!conversation.getMembers().contains(userId)) {
+            if (!conversation.getMembers().contains(userIdStr)) {
                 return false;
             }
             
             // Remove user from pinnedBy map
             if (conversation.getPinnedBy() != null) {
-                conversation.getPinnedBy().remove(userId);
+                conversation.getPinnedBy().remove(userIdStr);
                 conversation.setUpdatedAt(LocalDateTime.now());
                 conversationRepository.save(conversation);
             }
@@ -249,7 +269,10 @@ public class ConversationService {
         }
     }
     
-    public boolean markConversationAsUnread(String conversationId, String userId) {
+    public boolean markConversationAsUnread(String conversationId) {
+        UUID userId = getUserIdFromRequest();
+        String userIdStr = userId.toString();
+        
         try {
             Conversation conversation = conversationRepository.findById(conversationId).orElse(null);
             if (conversation == null) {
@@ -257,7 +280,7 @@ public class ConversationService {
             }
             
             // Check if user is a member of the conversation
-            if (!conversation.getMembers().contains(userId)) {
+            if (!conversation.getMembers().contains(userIdStr)) {
                 return false;
             }
             
@@ -267,7 +290,7 @@ public class ConversationService {
             }
             
             // Add user to manually marked as unread set
-            conversation.getManuallyMarkedAsUnread().add(userId);
+            conversation.getManuallyMarkedAsUnread().add(userIdStr);
             conversation.setUpdatedAt(LocalDateTime.now());
             
             conversationRepository.save(conversation);
@@ -277,7 +300,10 @@ public class ConversationService {
         }
     }
     
-    public boolean toggleNotificationSettings(String conversationId, String userId) {
+    public boolean toggleNotificationSettings(String conversationId) {
+        UUID userId = getUserIdFromRequest();
+        String userIdStr = userId.toString();
+        
         try {
             Conversation conversation = conversationRepository.findById(conversationId).orElse(null);
             if (conversation == null) {
@@ -285,7 +311,7 @@ public class ConversationService {
             }
             
             // Check if user is a member of the conversation
-            if (!conversation.getMembers().contains(userId)) {
+            if (!conversation.getMembers().contains(userIdStr)) {
                 return false;
             }
             
@@ -295,8 +321,8 @@ public class ConversationService {
             }
             
             // Toggle notification setting for this user
-            boolean currentSetting = conversation.getNotificationSettings().getOrDefault(userId, true);
-            conversation.getNotificationSettings().put(userId, !currentSetting);
+            boolean currentSetting = conversation.getNotificationSettings().getOrDefault(userIdStr, true);
+            conversation.getNotificationSettings().put(userIdStr, !currentSetting);
             conversation.setUpdatedAt(LocalDateTime.now());
             
             conversationRepository.save(conversation);
