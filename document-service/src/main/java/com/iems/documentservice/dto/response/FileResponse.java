@@ -1,6 +1,6 @@
 package com.iems.documentservice.dto.response;
 
-import com.iems.documentservice.entity.Permission;
+import com.iems.documentservice.entity.enums.Permission;
 import lombok.Builder;
 import lombok.Data;
 
@@ -20,6 +20,7 @@ public class FileResponse {
     private Permission permission;
     private OffsetDateTime createdAt;
     private String presignedUrl;
+    private boolean favorite;
 }
 
 

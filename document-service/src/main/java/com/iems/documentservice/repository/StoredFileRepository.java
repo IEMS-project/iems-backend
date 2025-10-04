@@ -6,7 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
-import com.iems.documentservice.entity.Permission;
+import com.iems.documentservice.entity.enums.Permission;
 
 public interface StoredFileRepository extends JpaRepository<StoredFile, UUID> {
     List<StoredFile> findByFolderId(UUID folderId);

@@ -1,5 +1,6 @@
 package com.iems.documentservice.entity;
 
+import com.iems.documentservice.entity.enums.Permission;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.UuidGenerator;

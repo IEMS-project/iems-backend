@@ -11,8 +11,8 @@
 	<groupId>tlcn</groupId>
 	<artifactId>document-service</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
-	<name>report-service</name>
-	<description>report-service</description>
+	<name>document-service</name>
+	<description>document-service</description>
 	<url/>
 	<licenses>
 		<license/>
@@ -47,6 +47,12 @@
 		<dependency>
 			<groupId>org.springframework.cloud</groupId>
 			<artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
+		</dependency>
+		
+		<!-- OpenFeign -->
+		<dependency>
+			<groupId>org.springframework.cloud</groupId>
+			<artifactId>spring-cloud-starter-openfeign</artifactId>
 		</dependency>
 
         <dependency>
