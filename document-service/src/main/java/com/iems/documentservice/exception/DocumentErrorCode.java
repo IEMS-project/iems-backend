@@ -13,6 +13,7 @@ public enum DocumentErrorCode {
     FILE_NOT_FOUND("File not found", HttpStatus.NOT_FOUND),
     FOLDER_NOT_FOUND("Folder not found", HttpStatus.NOT_FOUND),
     PERMISSION_DENIED("Permission denied", HttpStatus.FORBIDDEN),
+    WRITE_PERMISSION_REQUIRED("Bạn chỉ có quyền xem. Cần quyền chỉnh sửa để thực hiện thao tác này", HttpStatus.FORBIDDEN),
     UPLOAD_FAILED("File upload failed", HttpStatus.INTERNAL_SERVER_ERROR);
 
     private final String message;

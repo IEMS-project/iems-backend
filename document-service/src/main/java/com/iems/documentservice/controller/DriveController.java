@@ -196,6 +196,22 @@ public class DriveController {
         driveService.removeShare(shareId);
         return ResponseEntity.ok(new ApiResponseDto<>(200, "Share removed", null));
     }
+
+    // Move folder
+    @PatchMapping("/folders/{folderId}/move")
+    @Operation(summary = "Move folder to new parent")
+    public ResponseEntity<ApiResponseDto<Object>> moveFolder(@PathVariable UUID folderId, @RequestParam(value = "parentId", required = false) UUID newParentId) {
+        driveService.moveFolder(folderId, newParentId);
+        return ResponseEntity.ok(new ApiResponseDto<>(200, "Folder moved successfully", null));
+    }
+
+    // Move file
+    @PatchMapping("/files/{fileId}/move")
+    @Operation(summary = "Move file to new folder")
+    public ResponseEntity<ApiResponseDto<Object>> moveFile(@PathVariable UUID fileId, @RequestParam(value = "folderId", required = false) UUID newFolderId) {
+        driveService.moveFile(fileId, newFolderId);
+        return ResponseEntity.ok(new ApiResponseDto<>(200, "File moved successfully", null));
+    }
 }
 
 

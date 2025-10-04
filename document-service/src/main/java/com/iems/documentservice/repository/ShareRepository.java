@@ -11,4 +11,5 @@ public interface ShareRepository extends JpaRepository<Share, UUID> {
     List<Share> findBySharedWithUserId(UUID sharedWithUserId);
     boolean existsByTargetIdAndTargetTypeAndSharedWithUserId(UUID targetId, String targetType, UUID sharedWithUserId);
     void deleteByTargetIdAndTargetTypeAndSharedWithUserId(UUID targetId, String targetType, UUID sharedWithUserId);
+    boolean existsByTargetIdAndTargetTypeAndSharedWithUserIdAndPermission(UUID targetId, String targetType, UUID sharedWithUserId, com.iems.documentservice.entity.enums.SharePermission permission);
 }

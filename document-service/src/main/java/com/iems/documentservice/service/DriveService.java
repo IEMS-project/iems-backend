@@ -69,6 +69,10 @@ public class DriveService {
     @Transactional
     public FolderResponse createFolder(CreateFolderRequest request) {
         UUID currentUserId = getCurrentUserId();
+        
+        // Check write permission for the parent folder
+        enforceWritePermission(request.getParentId(), currentUserId);
+        
         Folder parent = null;
         if (request.getParentId() != null) {
             parent = folderRepository.findById(request.getParentId())
@@ -93,6 +97,10 @@ public class DriveService {
     @Transactional
     public FileResponse uploadFile(UUID folderId, MultipartFile file) throws Exception {
         UUID ownerId = getCurrentUserId();
+        
+        // Check write permission for the folder
+        enforceWritePermission(folderId, ownerId);
+        
         if (file.getSize() > MAX_UPLOAD_SIZE) {
             throw new AppException(DocumentErrorCode.INVALID_REQUEST);
         }
@@ -198,6 +206,33 @@ public class DriveService {
         }
     }
 
+    private void enforceWritePermission(UUID folderId, UUID requesterId) {
+        if (folderId == null) {
+            return; // Root folder - allow creation for authenticated users
+        }
+        
+        Folder folder = folderRepository.findById(folderId)
+                .orElseThrow(() -> new AppException(DocumentErrorCode.FOLDER_NOT_FOUND));
+        
+        // Owner always has write permission
+        if (folder.getOwnerId().equals(requesterId)) {
+            return;
+        }
+        
+        // Check if user has EDITOR permission through sharing
+        if (shareRepository.existsByTargetIdAndTargetTypeAndSharedWithUserIdAndPermission(
+                folderId, "FOLDER", requesterId, SharePermission.EDITOR)) {
+            return;
+        }
+        
+        // Check if user has VIEWER permission to provide specific error message
+        if (shareRepository.existsByTargetIdAndTargetTypeAndSharedWithUserId(folderId, "FOLDER", requesterId)) {
+            throw new AppException(DocumentErrorCode.WRITE_PERMISSION_REQUIRED);
+        }
+        
+        throw new AppException(DocumentErrorCode.PERMISSION_DENIED);
+    }
+
     private String generateObjectKey(UUID folderId, UUID ownerId, String fileName) {
         String folderPart = folderId != null ? String.valueOf(folderId) : "root";
         long ts = System.currentTimeMillis();
@@ -278,16 +313,34 @@ public class DriveService {
             .collect(Collectors.toList());
     }
 
-    // Allow public folder
+    // Allow public folder (but still check individual file permissions)
     if (folder.getPermission() == Permission.PUBLIC) {
         return storedFileRepository.findByFolderId(folderId).stream()
+            .filter(f -> {
+    try {
+        // Check if user can read this specific file
+        enforceReadPermission(f, requesterId);
+        return true;
+    } catch (Exception e) {
+        return false; // Skip files user can't read
+    }
+})
             .map(f -> toResponse(f, null, requesterId))
             .collect(Collectors.toList());
     }
 
-    // Allow if folder is shared with requester
+    // Allow if folder is shared with requester (but still need to check individual file permissions)
     if (shareRepository.existsByTargetIdAndTargetTypeAndSharedWithUserId(folderId, "FOLDER", requesterId)) {
         return storedFileRepository.findByFolderId(folderId).stream()
+            .filter(f -> {
+                try {
+                    // Check if user can read this specific file
+                    enforceReadPermission(f, requesterId);
+                    return true;
+                } catch (Exception e) {
+                    return false; // Skip files user can't read
+                }
+            })
             .map(f -> toResponse(f, null, requesterId))
             .collect(Collectors.toList());
     }
@@ -560,6 +613,21 @@ public class DriveService {
         folderRepository.save(folder);
     }
 
+    // Update file permission
+    @Transactional
+    public void updateFilePermission(UUID fileId, Permission permission) {
+        UUID ownerId = getCurrentUserId();
+        StoredFile file = storedFileRepository.findById(fileId)
+                .orElseThrow(() -> new AppException(DocumentErrorCode.FILE_NOT_FOUND));
+        
+        if (!file.getOwnerId().equals(ownerId)) {
+            throw new AppException(DocumentErrorCode.PERMISSION_DENIED);
+        }
+        
+        file.setPermission(permission);
+        storedFileRepository.save(file);
+    }
+
     // Rename folder
     @Transactional
     public void renameFolder(UUID folderId, String newName) {
@@ -590,20 +658,6 @@ public class DriveService {
         storedFileRepository.save(file);
     }
 
-    // Update file permission
-    @Transactional
-    public void updateFilePermission(UUID fileId, Permission permission) {
-        UUID ownerId = getCurrentUserId();
-        StoredFile file = storedFileRepository.findById(fileId)
-                .orElseThrow(() -> new AppException(DocumentErrorCode.FILE_NOT_FOUND));
-        
-        if (!file.getOwnerId().equals(ownerId)) {
-            throw new AppException(DocumentErrorCode.PERMISSION_DENIED);
-        }
-        
-        file.setPermission(permission);
-        storedFileRepository.save(file);
-    }
 
     // Get shared users for an item
     public List<SharedUserResponse> getSharedUsers(UUID itemId, String type) {
@@ -683,6 +737,61 @@ public class DriveService {
         }
         
         shareRepository.delete(share);
+    }
+
+    // Move folder to new parent
+    @Transactional
+    public void moveFolder(UUID folderId, UUID newParentId) {
+        UUID ownerId = getCurrentUserId();
+        
+        Folder folder = folderRepository.findById(folderId)
+                .orElseThrow(() -> new AppException(DocumentErrorCode.FOLDER_NOT_FOUND));
+        
+        // Check ownership of the folder being moved
+        if (!folder.getOwnerId().equals(ownerId)) {
+            throw new AppException(DocumentErrorCode.PERMISSION_DENIED);
+        }
+        
+        // Check permission to move to destination
+        enforceWritePermission(newParentId, ownerId);
+        
+        // Check for circular reference
+        if (newParentId != null) {
+            Folder newParent = folderRepository.findById(newParentId)
+                    .orElseThrow(() -> new AppException(DocumentErrorCode.FOLDER_NOT_FOUND));
+            
+            // Check if moving folder would create circular reference
+            Folder current = newParent;
+            while (current != null) {
+                if (current.getId().equals(folderId)) {
+                    throw new AppException(DocumentErrorCode.INVALID_REQUEST);
+                }
+                current = current.getParent();
+            }
+        }
+        
+        folder.setParent(newParentId != null ? folderRepository.findById(newParentId).orElse(null) : null);
+        folderRepository.save(folder);
+    }
+
+    // Move file to new folder
+    @Transactional
+    public void moveFile(UUID fileId, UUID newFolderId) {
+        UUID ownerId = getCurrentUserId();
+        
+        StoredFile file = storedFileRepository.findById(fileId)
+                .orElseThrow(() -> new AppException(DocumentErrorCode.FILE_NOT_FOUND));
+        
+        // Check ownership of the file being moved
+        if (!file.getOwnerId().equals(ownerId)) {
+            throw new AppException(DocumentErrorCode.PERMISSION_DENIED);
+        }
+        
+        // Check permission to move to destination folder
+        enforceWritePermission(newFolderId, ownerId);
+        
+        file.setFolder(newFolderId != null ? folderRepository.findById(newFolderId).orElse(null) : null);
+        storedFileRepository.save(file);
     }
 
     private UUID getCurrentUserId() {

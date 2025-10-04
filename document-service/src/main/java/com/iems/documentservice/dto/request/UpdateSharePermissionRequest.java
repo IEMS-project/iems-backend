@@ -9,8 +9,5 @@ import java.util.UUID;
 @Data
 public class UpdateSharePermissionRequest {
     @NotNull
-    private UUID shareId;
-    
-    @NotNull
     private SharePermission permission;
 }
