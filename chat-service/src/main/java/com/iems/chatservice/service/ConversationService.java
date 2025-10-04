@@ -40,6 +40,7 @@ public class ConversationService {
             convData.put("members", conv.getMembers());
             convData.put("createdAt", conv.getCreatedAt());
             convData.put("updatedAt", conv.getUpdatedAt());
+            convData.put("createdBy", conv.getCreatedBy());
             convData.put("pinnedMessageIds", conv.getPinnedMessageIds());
             // expose avatar url if any (used by frontend for group avatar)
             convData.put("avatarUrl", conv.getAvatarUrl());
