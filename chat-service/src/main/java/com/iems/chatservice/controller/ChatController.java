@@ -62,12 +62,11 @@ public class ChatController {
     // Handle reply message via WebSocket
     @MessageMapping("/conversations/{conversationId}/reply")
     public void replyToMessage(@DestinationVariable String conversationId, @Payload Map<String, Object> payload) {
-        String senderId = (String) payload.get("senderId");
         String content = (String) payload.get("content");
         String replyToMessageId = (String) payload.get("replyToMessageId");
         
-        if (senderId != null && content != null && replyToMessageId != null) {
-            messageService.replyToMessage(conversationId, senderId, content, replyToMessageId);
+        if (content != null && replyToMessageId != null) {
+            messageService.replyToMessage(conversationId, content, replyToMessageId);
         }
     }
 
@@ -75,15 +74,14 @@ public class ChatController {
     @MessageMapping("/conversations/{conversationId}/reaction")
     public void handleReaction(@DestinationVariable String conversationId, @Payload Map<String, Object> payload) {
         String messageId = (String) payload.get("messageId");
-        String userId = (String) payload.get("userId");
         String emoji = (String) payload.get("emoji");
         String action = (String) payload.get("action"); // "add" or "remove"
         
-        if (messageId != null && userId != null) {
+        if (messageId != null) {
             if ("add".equals(action) && emoji != null) {
-                messageService.addReaction(messageId, userId, emoji);
+                messageService.addReaction(messageId, emoji);
             } else if ("remove".equals(action)) {
-                messageService.removeReaction(messageId, userId);
+                messageService.removeReaction(messageId);
             }
         }
     }
@@ -92,14 +90,13 @@ public class ChatController {
     @MessageMapping("/conversations/{conversationId}/delete")
     public void handleMessageDelete(@DestinationVariable String conversationId, @Payload Map<String, Object> payload) {
         String messageId = (String) payload.get("messageId");
-        String userId = (String) payload.get("userId");
         String action = (String) payload.get("action"); // "delete_for_me" or "recall"
         
-        if (messageId != null && userId != null && action != null) {
+        if (messageId != null && action != null) {
             if ("delete_for_me".equals(action)) {
-                messageService.deleteForMe(messageId, userId);
+                messageService.deleteForMe(messageId);
             } else if ("recall".equals(action)) {
-                messageService.recallMessage(messageId, userId);
+                messageService.recallMessage(messageId);
             }
         }
     }
@@ -108,14 +105,13 @@ public class ChatController {
     @MessageMapping("/conversations/{conversationId}/pin")
     public void handleMessagePin(@DestinationVariable String conversationId, @Payload Map<String, Object> payload) {
         String messageId = (String) payload.get("messageId");
-        String userId = (String) payload.get("userId");
         String action = (String) payload.get("action"); // "pin" or "unpin"
         
-        if (messageId != null && userId != null && action != null) {
+        if (messageId != null && action != null) {
             if ("pin".equals(action)) {
-                messageService.pinMessage(conversationId, messageId, userId);
+                messageService.pinMessage(conversationId, messageId);
             } else if ("unpin".equals(action)) {
-                messageService.unpinMessage(conversationId, messageId, userId);
+                messageService.unpinMessage(conversationId, messageId);
             }
         }
     }
@@ -123,15 +119,12 @@ public class ChatController {
     // Handle read status events via WebSocket
     @MessageMapping("/conversations/{conversationId}/read")
     public void handleReadStatus(@DestinationVariable String conversationId, @Payload Map<String, Object> payload) {
-        String userId = (String) payload.get("userId");
         String lastMessageId = (String) payload.get("lastMessageId");
         
-        if (userId != null) {
-            if (lastMessageId != null) {
-                messageService.markAsReadWithLastMessage(conversationId, userId, lastMessageId);
-            } else {
-                messageService.markAsRead(conversationId, userId);
-            }
+        if (lastMessageId != null) {
+            messageService.markAsReadWithLastMessage(conversationId, lastMessageId);
+        } else {
+            messageService.markAsRead(conversationId);
         }
     }
 
@@ -147,11 +140,7 @@ public class ChatController {
     // Handle mark conversation as read via WebSocket
     @MessageMapping("/conversations/{conversationId}/mark-read")
     public void handleMarkConversationAsRead(@DestinationVariable String conversationId, @Payload Map<String, Object> payload) {
-        String userId = (String) payload.get("userId");
-        
-        if (userId != null) {
-            messageService.markConversationAsRead(conversationId, userId);
-        }
+        messageService.markConversationAsRead(conversationId);
     }
 }
 

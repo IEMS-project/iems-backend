@@ -162,9 +162,9 @@ public class ConversationController {
     public ResponseEntity<List<MemberResponseDto>> getMembers(@PathVariable String id) {
         return ResponseEntity.ok(messageService.getMembersByConversationId(id));
     }
-    @GetMapping("/user/{userId}")
-    public ResponseEntity<List<Map<String, Object>>> byUser(@PathVariable String userId) {
-        return ResponseEntity.ok(conversationService.getConversationsByUser(userId));
+    @GetMapping("/user")
+    public ResponseEntity<List<Map<String, Object>>> byUser() {
+        return ResponseEntity.ok(conversationService.getConversationsByUser());
     }
 
     @GetMapping("/{id}")
@@ -175,14 +175,14 @@ public class ConversationController {
     }
 
     @PostMapping("/{id}/members/{userId}")
-    public ResponseEntity<Conversation> addMember(@PathVariable String id, @PathVariable String userId, @RequestParam(required = false) String actorUserId) {
-        Conversation result = groupMemberService.addMember(id, userId, actorUserId);
+    public ResponseEntity<Conversation> addMember(@PathVariable String id, @PathVariable String userId) {
+        Conversation result = groupMemberService.addMember(id, userId);
         return result == null ? ResponseEntity.notFound().build() : ResponseEntity.ok(result);
     }
 
     @DeleteMapping("/{id}/members/{userId}")
-    public ResponseEntity<Conversation> removeMember(@PathVariable String id, @PathVariable String userId, @RequestParam(required = false) String actorUserId) {
-        Conversation result = groupMemberService.removeMember(id, userId, actorUserId);
+    public ResponseEntity<Conversation> removeMember(@PathVariable String id, @PathVariable String userId) {
+        Conversation result = groupMemberService.removeMember(id, userId);
         return result == null ? ResponseEntity.notFound().build() : ResponseEntity.ok(result);
     }
 
@@ -220,12 +220,11 @@ public class ConversationController {
             @RequestBody Map<String, String> request
     ) {
         String messageId = request.get("messageId");
-        String userId = request.get("userId");
-        if (messageId == null || userId == null) {
+        if (messageId == null) {
             return ResponseEntity.badRequest().build();
         }
         
-        com.iems.chatservice.entity.Message pinnedMessage = messageService.pinMessage(conversationId, messageId, userId);
+        com.iems.chatservice.entity.Message pinnedMessage = messageService.pinMessage(conversationId, messageId);
         return ResponseEntity.ok(pinnedMessage);
     }
 
@@ -236,22 +235,20 @@ public class ConversationController {
             @RequestBody Map<String, String> request
     ) {
         String messageId = request.get("messageId");
-        String userId = request.get("userId");
-        if (messageId == null || userId == null) {
+        if (messageId == null) {
             return ResponseEntity.badRequest().build();
         }
         
-        com.iems.chatservice.entity.Message unpinnedMessage = messageService.unpinMessage(conversationId, messageId, userId);
+        com.iems.chatservice.entity.Message unpinnedMessage = messageService.unpinMessage(conversationId, messageId);
         return ResponseEntity.ok(unpinnedMessage);
     }
 
     // Mark all messages in conversation as read
     @PostMapping("/{conversationId}/mark-read")
     public ResponseEntity<Void> markConversationAsRead(
-            @PathVariable String conversationId,
-            @RequestParam String userId
+            @PathVariable String conversationId
     ) {
-        boolean success = messageService.markConversationAsRead(conversationId, userId);
+        boolean success = messageService.markConversationAsRead(conversationId);
         if (success) {
             return ResponseEntity.ok().build();
         } else {
@@ -261,18 +258,17 @@ public class ConversationController {
 
     // Get unread count for all conversations of a user
     @GetMapping("/unread-count")
-    public ResponseEntity<Map<String, Integer>> getUnreadCount(@RequestParam String userId) {
-        Map<String, Integer> unreadCounts = messageService.getUnreadCountsByUser(userId);
+    public ResponseEntity<Map<String, Integer>> getUnreadCount() {
+        Map<String, Integer> unreadCounts = messageService.getUnreadCountsByUser();
         return ResponseEntity.ok(unreadCounts);
     }
 
     // Pin conversation for a user
     @PostMapping("/{conversationId}/pin-conversation")
     public ResponseEntity<Map<String, Object>> pinConversation(
-            @PathVariable String conversationId,
-            @RequestParam String userId
+            @PathVariable String conversationId
     ) {
-        boolean success = conversationService.pinConversation(conversationId, userId);
+        boolean success = conversationService.pinConversation(conversationId);
         Map<String, Object> response = new HashMap<>();
         response.put("success", success);
         if (success) {
@@ -286,10 +282,9 @@ public class ConversationController {
     // Unpin conversation for a user
     @PostMapping("/{conversationId}/unpin-conversation")
     public ResponseEntity<Map<String, Object>> unpinConversation(
-            @PathVariable String conversationId,
-            @RequestParam String userId
+            @PathVariable String conversationId
     ) {
-        boolean success = conversationService.unpinConversation(conversationId, userId);
+        boolean success = conversationService.unpinConversation(conversationId);
         Map<String, Object> response = new HashMap<>();
         response.put("success", success);
         if (success) {
@@ -303,10 +298,9 @@ public class ConversationController {
     // Mark conversation as unread for a user
     @PostMapping("/{conversationId}/mark-unread")
     public ResponseEntity<Map<String, Object>> markConversationAsUnread(
-            @PathVariable String conversationId,
-            @RequestParam String userId
+            @PathVariable String conversationId
     ) {
-        boolean success = conversationService.markConversationAsUnread(conversationId, userId);
+        boolean success = conversationService.markConversationAsUnread(conversationId);
         Map<String, Object> response = new HashMap<>();
         response.put("success", success);
         if (success) {
@@ -320,10 +314,9 @@ public class ConversationController {
     // Toggle notification settings for a user
     @PostMapping("/{conversationId}/toggle-notifications")
     public ResponseEntity<Map<String, Object>> toggleNotificationSettings(
-            @PathVariable String conversationId,
-            @RequestParam String userId
+            @PathVariable String conversationId
     ) {
-        boolean success = conversationService.toggleNotificationSettings(conversationId, userId);
+        boolean success = conversationService.toggleNotificationSettings(conversationId);
         Map<String, Object> response = new HashMap<>();
         response.put("success", success);
         if (success) {
@@ -436,8 +429,12 @@ public class ConversationController {
                 String full = (firstName + " " + lastName).trim();
                 return full.isBlank() ? (email.isBlank() ? userId : email) : full;
             }
-        } catch (Exception ignored) { }
-        return userId;
+        } catch (Exception e) {
+            // Log the error for debugging
+            System.err.println("Error resolving user name for " + userId + ": " + e.getMessage());
+        }
+        // Return a more user-friendly fallback instead of raw userId
+        return "Người dùng";
     }
 }
 

@@ -86,8 +86,12 @@ public class MessagePinService {
                 String full = (firstName + " " + lastName).trim();
                 return full.isBlank() ? (email.isBlank() ? userId : email) : full;
             }
-        } catch (Exception ignored) { }
-        return userId;
+        } catch (Exception e) {
+            // Log the error for debugging
+            System.err.println("Error resolving user name for " + userId + ": " + e.getMessage());
+        }
+        // Return a more user-friendly fallback instead of raw userId
+        return "Người dùng";
     }
 }
 
