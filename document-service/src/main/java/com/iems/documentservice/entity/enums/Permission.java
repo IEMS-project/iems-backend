@@ -1,4 +1,4 @@
-package com.iems.documentservice.entity;
+package com.iems.documentservice.entity.enums;
 
 public enum Permission {
     PRIVATE,

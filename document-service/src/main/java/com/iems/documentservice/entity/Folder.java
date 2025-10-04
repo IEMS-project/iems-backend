@@ -1,5 +1,6 @@
 package com.iems.documentservice.entity;
 
+import com.iems.documentservice.entity.enums.Permission;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.UuidGenerator;
@@ -31,6 +32,11 @@ public class Folder {
 
     @Column(name = "owner_id", nullable = false)
     private UUID ownerId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "permission", nullable = false)
+    @Builder.Default
+    private Permission permission = Permission.PUBLIC;
 
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;

@@ -1,6 +1,5 @@
 package com.iems.documentservice.dto.response;
 
-import com.iems.documentservice.entity.enums.Permission;
 import lombok.Builder;
 import lombok.Data;
 
@@ -9,14 +8,14 @@ import java.util.UUID;
 
 @Data
 @Builder
-public class FolderResponse {
+public class SearchResultItem {
     private UUID id;
     private String name;
-    private UUID parentId;
-    private UUID ownerId;
-    private Permission permission;
+    private String itemType; // FILE or FOLDER
+    private UUID parentId;   // for folder: parent, for file: folderId
+    private Long size;       // files only
+    private String mimeType; // files only
     private OffsetDateTime createdAt;
-    private boolean favorite;
 }
 
 
