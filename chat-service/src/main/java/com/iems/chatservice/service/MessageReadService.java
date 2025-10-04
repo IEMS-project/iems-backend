@@ -134,6 +134,13 @@ public class MessageReadService {
             mongoTemplate.updateFirst(convQuery, convUpdate, Conversation.class);
         }
 
+        // Clear manual unread mark when user reads messages
+        if (conversation.getManuallyMarkedAsUnread() != null && conversation.getManuallyMarkedAsUnread().contains(userId)) {
+            Query clearManualQuery = new Query(Criteria.where("id").is(conversationId));
+            Update clearManualUpdate = new Update().pull("manuallyMarkedAsUnread", userId);
+            mongoTemplate.updateFirst(clearManualQuery, clearManualUpdate, Conversation.class);
+        }
+
         broadcastReadStatusUpdate(conversationId, userId, latestMessage != null ? latestMessage.getId() : null);
         return true;
     }

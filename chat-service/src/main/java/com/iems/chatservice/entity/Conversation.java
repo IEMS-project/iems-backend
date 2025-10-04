@@ -6,6 +6,7 @@ import lombok.*;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Document(collection = "conversations")
 @Data
@@ -36,4 +37,13 @@ public class Conversation {
     private String createdBy; // userId who created the conversation
     private String description; // Optional description for group chats
     private String avatarUrl; // Optional avatar for group chats
+    
+    // Pinned conversations by user - Map<userId, pinnedAt>
+    private Map<String, LocalDateTime> pinnedBy;
+    
+    // Notification settings by user - Map<userId, notificationEnabled>
+    private Map<String, Boolean> notificationSettings;
+    
+    // Manually marked as unread by user - Set<userId>
+    private Set<String> manuallyMarkedAsUnread;
 }
