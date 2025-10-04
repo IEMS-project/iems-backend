@@ -40,24 +40,37 @@ public class ConversationController {
 
     @Autowired
     private com.iems.chatservice.service.GroupMemberService groupMemberService;
+    
+    @Autowired
+    private com.iems.chatservice.service.MessageBroadcastService messageBroadcastService;
+    
+    @Autowired
+    private com.iems.chatservice.client.UserServiceFeignClient userServiceFeignClient;
 
     @PostMapping
     public ResponseEntity<Conversation> create(@RequestBody Conversation conversation,
                                                @RequestParam(required = false) String actorUserId) {
         // Resolve actor user id from request param or security context
+        String finalActorUserId;
         if (actorUserId == null || actorUserId.isBlank()) {
             try {
                 Authentication auth = SecurityContextHolder.getContext().getAuthentication();
                 if (auth != null && auth.getPrincipal() instanceof com.iems.chatservice.security.JwtUserDetails jwt) {
-                    actorUserId = jwt.getUserId().toString();
+                    finalActorUserId = jwt.getUserId().toString();
+                } else {
+                    finalActorUserId = null;
                 }
-            } catch (Exception ignore) { }
+            } catch (Exception ignore) { 
+                finalActorUserId = null;
+            }
+        } else {
+            finalActorUserId = actorUserId;
         }
 
         // Ensure createdBy is set to actor
         try {
             if (conversation.getCreatedBy() == null || conversation.getCreatedBy().isBlank()) {
-                conversation.setCreatedBy(actorUserId);
+                conversation.setCreatedBy(finalActorUserId);
             }
         } catch (Exception ignore) { }
 
@@ -69,13 +82,64 @@ public class ConversationController {
                     members = new ArrayList<>();
                     conversation.setMembers(members);
                 }
-                if (actorUserId != null && !actorUserId.isBlank() && !members.contains(actorUserId)) {
-                    members.add(actorUserId);
+                if (finalActorUserId != null && !finalActorUserId.isBlank() && !members.contains(finalActorUserId)) {
+                    members.add(finalActorUserId);
                 }
             }
         } catch (Exception ignore) { }
 
         Conversation saved = conversationRepository.save(conversation);
+        
+        // Create system messages for GROUP conversations
+        if ("GROUP".equalsIgnoreCase(saved.getType())) {
+            try {
+                // Create "group created" system message
+                com.iems.chatservice.entity.Message groupCreatedMsg = new com.iems.chatservice.entity.Message();
+                groupCreatedMsg.setConversationId(saved.getId());
+                groupCreatedMsg.setSenderId("SYSTEM");
+                groupCreatedMsg.setType("SYSTEM_LOG");
+                groupCreatedMsg.setContent("Nhóm đã được tạo");
+                groupCreatedMsg.setSentAt(java.time.LocalDateTime.now());
+                messageBroadcastService.saveAndBroadcast(groupCreatedMsg);
+                
+                // Create "members added" system message for each member (except creator)
+                List<String> members = saved.getMembers();
+                if (members != null && members.size() > 1) {
+                    final String creatorId = finalActorUserId; // Create final reference
+                    List<String> resolvedNames = new ArrayList<>();
+                    for (String memberId : members) {
+                        if (!memberId.equals(creatorId)) {
+                            String resolvedName = resolveUserName(memberId);
+                            // Only add if name was actually resolved (not just the ID)
+                            if (!resolvedName.equals(memberId)) {
+                                resolvedNames.add(resolvedName);
+                            }
+                        }
+                    }
+                    
+                    if (!resolvedNames.isEmpty()) {
+                        String memberNames = String.join(", ", resolvedNames);
+                        com.iems.chatservice.entity.Message membersAddedMsg = new com.iems.chatservice.entity.Message();
+                        membersAddedMsg.setConversationId(saved.getId());
+                        membersAddedMsg.setSenderId("SYSTEM");
+                        membersAddedMsg.setType("SYSTEM_LOG");
+                        membersAddedMsg.setContent(memberNames + " đã được thêm vào nhóm");
+                        membersAddedMsg.setSentAt(java.time.LocalDateTime.now());
+                        messageBroadcastService.saveAndBroadcast(membersAddedMsg);
+                    } else {
+                        // If no proper names found, just say "các thành viên"
+                        com.iems.chatservice.entity.Message membersAddedMsg = new com.iems.chatservice.entity.Message();
+                        membersAddedMsg.setConversationId(saved.getId());
+                        membersAddedMsg.setSenderId("SYSTEM");
+                        membersAddedMsg.setType("SYSTEM_LOG");
+                        membersAddedMsg.setContent("Các thành viên đã được thêm vào nhóm");
+                        membersAddedMsg.setSentAt(java.time.LocalDateTime.now());
+                        messageBroadcastService.saveAndBroadcast(membersAddedMsg);
+                    }
+                }
+            } catch (Exception ignore) { }
+        }
+        
         try {
             List<String> members = saved.getMembers();
             if (members != null) {
@@ -268,6 +332,112 @@ public class ConversationController {
             response.put("message", "Failed to update notification settings");
         }
         return success ? ResponseEntity.ok(response) : ResponseEntity.badRequest().body(response);
+    }
+    
+    // Delete group conversation (only by creator)
+    @DeleteMapping("/{conversationId}")
+    public ResponseEntity<Map<String, Object>> deleteGroupConversation(
+            @PathVariable String conversationId,
+            @RequestParam(required = false) String actorUserId) {
+        
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            // Resolve actor user id from request param or security context
+            String finalActorUserId;
+            if (actorUserId == null || actorUserId.isBlank()) {
+                try {
+                    Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+                    if (auth != null && auth.getPrincipal() instanceof com.iems.chatservice.security.JwtUserDetails jwt) {
+                        finalActorUserId = jwt.getUserId().toString();
+                    } else {
+                        finalActorUserId = null;
+                    }
+                } catch (Exception ignore) { 
+                    finalActorUserId = null;
+                }
+            } else {
+                finalActorUserId = actorUserId;
+            }
+            
+            if (finalActorUserId == null || finalActorUserId.isBlank()) {
+                response.put("success", false);
+                response.put("message", "User not authenticated");
+                return ResponseEntity.badRequest().body(response);
+            }
+            
+            // Check if conversation exists and is a GROUP
+            Conversation conversation = conversationRepository.findById(conversationId).orElse(null);
+            if (conversation == null) {
+                response.put("success", false);
+                response.put("message", "Conversation not found");
+                return ResponseEntity.notFound().build();
+            }
+            
+            if (!"GROUP".equalsIgnoreCase(conversation.getType())) {
+                response.put("success", false);
+                response.put("message", "Only group conversations can be deleted");
+                return ResponseEntity.badRequest().body(response);
+            }
+            
+            // Check if user is the creator
+            if (!finalActorUserId.equals(conversation.getCreatedBy())) {
+                response.put("success", false);
+                response.put("message", "Only the group creator can delete the conversation");
+                return ResponseEntity.status(403).build();
+            }
+            
+            // Delete all messages in the conversation
+            Query messageQuery = new Query(Criteria.where("conversationId").is(conversationId));
+            mongoTemplate.remove(messageQuery, com.iems.chatservice.entity.Message.class);
+            
+            // Delete the conversation
+            conversationRepository.deleteById(conversationId);
+            
+            // Broadcast deletion event to all members
+            try {
+                List<String> members = conversation.getMembers();
+                if (members != null) {
+                    var payload = java.util.Map.of(
+                            "event", "conversation_deleted",
+                            "conversationId", conversationId,
+                            "deletedBy", finalActorUserId,
+                            "type", "GROUP"
+                    );
+                    for (String memberId : members) {
+                        messagingTemplate.convertAndSend("/topic/user-updates/" + memberId, payload);
+                    }
+                }
+            } catch (Exception ignore) { }
+            
+            response.put("success", true);
+            response.put("message", "Group conversation deleted successfully");
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "Failed to delete conversation: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(response);
+        }
+    }
+    
+    // Helper method to resolve user name
+    private String resolveUserName(String userId) {
+        try {
+            java.util.UUID uuid = java.util.UUID.fromString(userId);
+            var resp = userServiceFeignClient.getUserById(uuid);
+            var body = resp.getBody();
+            if (body != null && body.containsKey("data")) {
+                @SuppressWarnings("unchecked")
+                java.util.Map<String, Object> data = (java.util.Map<String, Object>) body.get("data");
+                String firstName = data.getOrDefault("firstName", "").toString();
+                String lastName = data.getOrDefault("lastName", "").toString();
+                String email = data.getOrDefault("email", "").toString();
+                String full = (firstName + " " + lastName).trim();
+                return full.isBlank() ? (email.isBlank() ? userId : email) : full;
+            }
+        } catch (Exception ignored) { }
+        return userId;
     }
 }
 
