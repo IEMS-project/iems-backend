@@ -200,6 +200,27 @@ public class MessageService {
         return saveAndBroadcast(reply);
     }
 
+    // Overloaded reply that accepts explicit senderId (useful for WebSocket messages that include senderId in payload)
+    public Message replyToMessage(String conversationId, String content, String replyToMessageId, String explicitSenderId) {
+        String senderId = explicitSenderId;
+
+        // Get original message for context
+        Message originalMessage = messageRepository.findById(replyToMessageId).orElse(null);
+        if (originalMessage == null) {
+            throw new RuntimeException("Original message not found");
+        }
+
+        Message reply = new Message();
+        reply.setConversationId(conversationId);
+        reply.setSenderId(senderId);
+        reply.setContent(content);
+        reply.setReplyToMessageId(replyToMessageId);
+        reply.setReplyToContent(originalMessage.getContent());
+        reply.setReplyToSenderId(originalMessage.getSenderId());
+
+        return saveAndBroadcast(reply);
+    }
+
     // Add reaction to message
     public Message addReaction(String messageId, String emoji) {
         UUID userId = getUserIdFromRequest();

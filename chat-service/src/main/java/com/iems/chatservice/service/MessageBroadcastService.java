@@ -110,6 +110,25 @@ public class MessageBroadcastService {
         }
     }
 
+    public void broadcastConversationMetaUpdate(Conversation conversation, java.util.Map<String, Object> changedFields) {
+        try {
+            java.util.List<String> members = conversation.getMembers();
+            if (members != null) {
+                for (String memberId : members) {
+                    java.util.Map<String, Object> payload = new java.util.HashMap<>();
+                    payload.put("event", "conversation_meta_updated");
+                    payload.put("conversationId", conversation.getId());
+                    if (changedFields != null) {
+                        payload.putAll(changedFields);
+                    }
+                    messagingTemplate.convertAndSend("/topic/user-updates/" + memberId, payload);
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Error broadcasting conversation meta update: " + e.getMessage());
+        }
+    }
+
     public Message getLatestVisibleMessageForUser(String conversationId, String userId) {
         Criteria criteria = new Criteria().andOperator(
                 Criteria.where("conversationId").is(conversationId),

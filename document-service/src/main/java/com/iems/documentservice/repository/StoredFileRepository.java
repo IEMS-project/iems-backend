@@ -13,6 +13,8 @@ public interface StoredFileRepository extends JpaRepository<StoredFile, UUID> {
     List<StoredFile> findByOwnerId(UUID ownerId);
     List<StoredFile> findByPermission(Permission permission);
     List<StoredFile> findByIdIn(Collection<UUID> ids);
+    java.util.Optional<StoredFile> findFirstByOwnerIdAndPathStartingWithOrderByCreatedAtDesc(UUID ownerId, String pathPrefix);
+    java.util.Optional<StoredFile> findFirstByPathStartingWithOrderByCreatedAtDesc(String pathPrefix);
 }
 
 

@@ -234,4 +234,21 @@ public class UserService {
         if (userRequest.getBankAccountNumber() != null) user.setBankAccountNumber(userRequest.getBankAccountNumber());
         if (userRequest.getBankName() != null) user.setBankName(userRequest.getBankName());
     }
+
+    public Optional<UserResponseDto> updateAvatar(UUID id, String imageUrl) {
+        try {
+            return repository.findById(id)
+                    .map(existing -> {
+                        existing.setImage(imageUrl);
+                        return convertToUserResponse(repository.save(existing));
+                    })
+                    .or(() -> {
+                        throw new AppException(UserErrorCode.USER_NOT_FOUND);
+                    });
+        } catch (AppException e) {
+            throw e;
+        } catch (Exception ex) {
+            throw new AppException(UserErrorCode.INTERNAL_SERVER_ERROR);
+        }
+    }
 }

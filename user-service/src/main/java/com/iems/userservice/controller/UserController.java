@@ -1,6 +1,7 @@
 package com.iems.userservice.controller;
 
 import com.iems.userservice.dto.request.CreateUserDto;
+import com.iems.userservice.dto.request.UpdateAvatarDto;
 import com.iems.userservice.dto.request.UpdateUserDto;
 import com.iems.userservice.dto.response.ApiResponseDto;
 import com.iems.userservice.dto.response.UserBasicInfoDto;
@@ -23,6 +24,25 @@ import java.util.UUID;
 public class UserController {
     @Autowired
     private UserService service;
+    // Added /me and /me/avatar below. Remove duplicates further down.
+
+    @Operation(summary = "Update avatar URL", description = "Update only the image field of current user")
+    @PutMapping("/me/avatar")
+    public ResponseEntity<ApiResponseDto<UserResponseDto>> updateMyAvatar(@RequestBody UpdateAvatarDto payload) {
+        try {
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            JwtUserDetails userDetails = (JwtUserDetails) authentication.getPrincipal();
+            UUID userId = userDetails.getUserId();
+
+            return service.updateAvatar(userId, payload.getImageUrl())
+                    .map(updated -> ResponseEntity.ok(new ApiResponseDto<>(HttpStatus.OK.value(), "Avatar updated", updated)))
+                    .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND)
+                            .body(new ApiResponseDto<>(HttpStatus.NOT_FOUND.value(), "User not found", null)));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ApiResponseDto<>(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Failed to update avatar: " + e.getMessage(), null));
+        }
+    }
 
     @Operation(summary = "Create user", description = "Create a new user in the system")
     @PostMapping
@@ -106,8 +126,6 @@ public class UserController {
         }
     }
 
-
-
     @Operation(summary = "Update my profile", description = "Update the profile of the authenticated user")
     @PutMapping("/me")
     public ResponseEntity<ApiResponseDto<UserResponseDto>> updateMyProfile(
@@ -151,6 +169,8 @@ public class UserController {
                             "Failed to fetch profile: " + e.getMessage(), null));
         }
     }
+
+    // Remove duplicate methods (handled above)
 
 
 }
