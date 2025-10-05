@@ -1,10 +1,8 @@
 package com.iems.taskservice.controller;
 
-import com.iems.taskservice.dto.ApiResponseDto;
-import com.iems.taskservice.dto.CreateTaskDto;
-import com.iems.taskservice.dto.TaskResponseDto;
-import com.iems.taskservice.dto.UpdateTaskDto;
+import com.iems.taskservice.dto.*;
 import com.iems.taskservice.entity.TaskStatusHistory;
+import com.iems.taskservice.entity.TaskComment;
 import com.iems.taskservice.service.TaskService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -17,6 +15,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -27,15 +26,32 @@ public class TaskController {
     private TaskService taskService;
 
     @PostMapping
-    public ResponseEntity<ApiResponseDto<TaskResponseDto>> createTask(
+    public ResponseEntity<ApiResponseDto<TaskNestedResponseDto>> createTask(
             @Valid @RequestBody CreateTaskDto createDto) {
         try {
             TaskResponseDto responseDto = taskService.createTask(createDto);
-            return ResponseEntity.ok(new ApiResponseDto<>("success", "Task created successfully", responseDto));
+            // convert to nested for consistency
+            return taskService.getTaskByIdNested(responseDto.getId())
+                    .map(nested -> ResponseEntity.ok(new ApiResponseDto<>("success", "Task created successfully", nested)))
+                    .orElseGet(() -> ResponseEntity.ok(new ApiResponseDto<>("success", "Task created successfully", null)));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(new ApiResponseDto<>("error", e.getMessage(), null));
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body(new ApiResponseDto<>("error", "Failed to create task", null));
+        }
+    }
+    @PatchMapping("/{id}")
+    @Operation(summary = "Update task", description = "Update task fields: title, description, assignedTo, priority, dates, status")
+    public ResponseEntity<ApiResponseDto<TaskUpdateResultDto>> updateTask(
+            @PathVariable UUID id,
+            @Valid @RequestBody UpdateTaskDto updateDto) {
+        try {
+            TaskUpdateResultDto updated = taskService.updateTask(id, updateDto);
+            return ResponseEntity.ok(new ApiResponseDto<>("success", "Task updated successfully", updated));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(new ApiResponseDto<>("error", e.getMessage(), null));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(new ApiResponseDto<>("error", "Failed to update task", null));
         }
     }
 
@@ -121,12 +137,57 @@ public class TaskController {
 
     @GetMapping("/project/{projectId}")
     @Operation(summary = "Get tasks by project", description = "Retrieve tasks that belong to a specific project")
-    public ResponseEntity<ApiResponseDto<List<TaskResponseDto>>> getTasksByProject(@PathVariable UUID projectId) {
+    public ResponseEntity<ApiListResponseDto<List<TaskNestedResponseDto>>> getTasksByProject(@PathVariable UUID projectId) {
         try {
-            List<TaskResponseDto> tasks = taskService.getTasksByProject(projectId);
-            return ResponseEntity.ok(new ApiResponseDto<>("success", "Project tasks retrieved successfully", tasks));
+            List<TaskNestedResponseDto> tasks = taskService.getTasksByProjectNested(projectId);
+            return ResponseEntity.ok(new ApiListResponseDto<>("success", "Project tasks retrieved successfully", tasks.size(), tasks));
         } catch (Exception e) {
-            return ResponseEntity.internalServerError().body(new ApiResponseDto<>("error", "Failed to retrieve project tasks", null));
+            return ResponseEntity.internalServerError().body(new ApiListResponseDto<>("error", "Failed to retrieve project tasks", 0, null));
+        }
+    }
+
+    @PostMapping("/status-bulk")
+    @Operation(summary = "Bulk update status", description = "Update status for multiple tasks at once")
+    public ResponseEntity<ApiListResponseDto<List<TaskBulkUpdateItemDto>>> bulkUpdateStatus(
+            @RequestParam String newStatus,
+            @RequestBody Map<String, Object> body) {
+        try {
+            @SuppressWarnings("unchecked")
+            List<String> ids = (List<String>) body.getOrDefault("ids", List.of());
+            List<UUID> taskIds = ids.stream().map(UUID::fromString).toList();
+            List<TaskBulkUpdateItemDto> updated = taskService.bulkUpdateStatus(taskIds, newStatus);
+            return ResponseEntity.ok(new ApiListResponseDto<>("success", "Tasks updated successfully", updated.size(), updated));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(new ApiListResponseDto<>("error", e.getMessage(), 0, null));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(new ApiListResponseDto<>("error", "Failed to bulk update status", 0, null));
+        }
+    }
+
+    @PostMapping("/{id}/comments")
+    @Operation(summary = "Add task comment")
+    public ResponseEntity<ApiResponseDto<TaskComment>> addComment(
+            @PathVariable UUID id,
+            @RequestBody Map<String, String> body) {
+        try {
+            String content = body.get("content");
+            TaskComment c = taskService.addComment(id, content);
+            return ResponseEntity.ok(new ApiResponseDto<>("success", "Comment added", c));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(new ApiResponseDto<>("error", e.getMessage(), null));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(new ApiResponseDto<>("error", "Failed to add comment", null));
+        }
+    }
+
+    @GetMapping("/{id}/comments")
+    @Operation(summary = "Get task comments")
+    public ResponseEntity<ApiListResponseDto<List<TaskComment>>> getComments(@PathVariable UUID id) {
+        try {
+            List<TaskComment> list = taskService.getComments(id);
+            return ResponseEntity.ok(new ApiListResponseDto<>("success", "Comments retrieved", list.size(), list));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(new ApiListResponseDto<>("error", "Failed to get comments", 0, null));
         }
     }
 
