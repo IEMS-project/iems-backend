@@ -1,14 +1,13 @@
 package com.iems.taskservice.service;
 
+import com.iems.taskservice.Client.ProjectServiceFeignClient;
 import com.iems.taskservice.Client.UserServiceFeignClient;
-import com.iems.taskservice.dto.CreateTaskDto;
-import com.iems.taskservice.dto.TaskResponseDto;
-import com.iems.taskservice.dto.UpdateTaskDto;
-import com.iems.taskservice.dto.UserDetailDto;
+import com.iems.taskservice.dto.*;
 import com.iems.taskservice.entity.Task;
 import com.iems.taskservice.entity.TaskStatusHistory;
 import com.iems.taskservice.entity.enums.TaskPriority;
 import com.iems.taskservice.entity.enums.TaskStatus;
+import com.iems.taskservice.repository.TaskCommentRepository;
 import com.iems.taskservice.repository.TaskRepository;
 import com.iems.taskservice.repository.TaskStatusHistoryRepository;
 import com.iems.taskservice.security.JwtUserDetails;
@@ -20,13 +19,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 import com.iems.taskservice.exception.AppException;
 import com.iems.taskservice.exception.TaskErrorCode;
+import com.iems.taskservice.entity.TaskComment;
 
 @Service
 @Transactional
@@ -39,6 +36,12 @@ public class TaskService {
 
     @Autowired
     private UserServiceFeignClient userServiceFeignClient;
+
+    @Autowired
+    private ProjectServiceFeignClient projectServiceFeignClient;
+
+    @Autowired
+    private TaskCommentRepository taskCommentRepository;
 
     private Optional<UserDetailDto> getUserById(UUID userId) {
         try {
@@ -93,8 +96,18 @@ public class TaskService {
     }
     public UUID getUserIdFromRequest() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        JwtUserDetails userDetails = (JwtUserDetails) authentication.getPrincipal();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new AppException(TaskErrorCode.PERMISSION_DENIED);
+        }
+        Object principal = authentication.getPrincipal();
+        if (!(principal instanceof JwtUserDetails)) {
+            throw new AppException(TaskErrorCode.PERMISSION_DENIED);
+        }
+        JwtUserDetails userDetails = (JwtUserDetails) principal;
         UUID userId = userDetails.getUserId();
+        if (userId == null) {
+            throw new AppException(TaskErrorCode.PERMISSION_DENIED);
+        }
         return userId;
     }
 
@@ -197,9 +210,60 @@ public class TaskService {
         Task savedTask = taskRepository.save(task);
         
         // Create status history
-        createStatusHistory(savedTask, newStatus, userId, comment);
+        createStatusHistoryWithOldNew(savedTask.getId(), oldStatus, newStatus, userId);
         
         return convertToResponseDto(savedTask);
+    }
+
+    public List<TaskBulkUpdateItemDto> bulkUpdateStatus(List<UUID> taskIds, String newStatusStr) {
+        TaskStatus newStatus;
+        try {
+            newStatus = TaskStatus.valueOf(newStatusStr);
+        } catch (IllegalArgumentException e) {
+            throw new AppException(TaskErrorCode.INVALID_REQUEST);
+        }
+        UUID userId = getUserIdFromRequest();
+        List<TaskBulkUpdateItemDto> updated = new ArrayList<>();
+        for (UUID id : taskIds) {
+            Task task = taskRepository.findById(id).orElse(null);
+            if (task == null) continue;
+            // Permissions: creator or assignee
+            if (!task.getCreatedBy().equals(userId) && !task.getAssignedTo().equals(userId)) {
+                continue;
+            }
+            TaskStatus oldStatus = task.getStatus();
+            if (!isValidStatusTransition(oldStatus, newStatus)) {
+                continue;
+            }
+            task.setStatus(newStatus);
+            task.setUpdatedBy(userId);
+            Task saved = taskRepository.save(task);
+            createStatusHistoryWithOldNew(saved.getId(), oldStatus, newStatus, userId);
+            TaskBulkUpdateItemDto item = new TaskBulkUpdateItemDto();
+            item.setOldStatus(oldStatus.getDisplayName());
+            item.setNewStatus(newStatus.getDisplayName());
+            item.setTask(convertToResponseDto(saved));
+            updated.add(item);
+        }
+        return updated;
+    }
+
+    public TaskComment addComment(UUID taskId, String content) {
+        if (content == null || content.isBlank()) {
+            throw new AppException(TaskErrorCode.INVALID_REQUEST);
+        }
+        Task task = taskRepository.findById(taskId)
+                .orElseThrow(() -> new AppException(TaskErrorCode.TASK_NOT_FOUND));
+        UUID userId = getUserIdFromRequest();
+        TaskComment c = new TaskComment();
+        c.setTaskId(task.getId());
+        c.setAuthorId(userId);
+        c.setContent(content);
+        return taskCommentRepository.save(c);
+    }
+
+    public List<TaskComment> getComments(UUID taskId) {
+        return taskCommentRepository.findByTaskIdOrderByCreatedAtAsc(taskId);
     }
 
     // UC27: Thiết lập Ngày và Mức ưu tiên Nhiệm vụ
@@ -263,6 +327,10 @@ public class TaskService {
         return taskRepository.findById(id).map(this::convertToResponseDto);
     }
 
+    public Optional<TaskNestedResponseDto> getTaskByIdNested(UUID id) {
+        return taskRepository.findById(id).map(this::convertToNestedResponse);
+    }
+
     // Get all tasks
     public List<TaskResponseDto> getAllTasks() {
         return taskRepository.findAll().stream()
@@ -276,6 +344,85 @@ public class TaskService {
         return tasks.stream()
                 .map(this::convertToResponseDto)
                 .collect(Collectors.toList());
+    }
+
+    // Get tasks by project (nested response)
+    public List<TaskNestedResponseDto> getTasksByProjectNested(UUID projectId) {
+        List<Task> tasks = taskRepository.findByProjectId(projectId);
+        return tasks.stream()
+                .map(this::convertToNestedResponse)
+                .collect(Collectors.toList());
+    }
+
+    // Generic update: title/description/assignedTo/priority/dates/status
+    public TaskUpdateResultDto updateTask(UUID taskId, UpdateTaskDto updateDto) {
+        Task task = taskRepository.findById(taskId)
+                .orElseThrow(() -> new AppException(TaskErrorCode.TASK_NOT_FOUND));
+        UUID userId = getUserIdFromRequest();
+        // Permissions: creator or current assignee can update; extend with project roles as needed
+        if (!task.getCreatedBy().equals(userId) && !task.getAssignedTo().equals(userId)) {
+            throw new AppException(TaskErrorCode.PERMISSION_DENIED);
+        }
+
+        boolean hasChanges = false;
+        TaskStatus oldStatus = task.getStatus();
+
+        if (updateDto.getTitle() != null && !updateDto.getTitle().isBlank() && !updateDto.getTitle().equals(task.getTitle())) {
+            task.setTitle(updateDto.getTitle());
+            hasChanges = true;
+        }
+
+        if (updateDto.getDescription() != null && !updateDto.getDescription().equals(task.getDescription())) {
+            task.setDescription(updateDto.getDescription());
+            hasChanges = true;
+        }
+
+        if (updateDto.getAssignedTo() != null && !updateDto.getAssignedTo().equals(task.getAssignedTo())) {
+            task.setAssignedTo(updateDto.getAssignedTo());
+            hasChanges = true;
+        }
+
+        if (updateDto.getPriority() != null && !updateDto.getPriority().equals(task.getPriority())) {
+            task.setPriority(updateDto.getPriority());
+            hasChanges = true;
+        }
+
+        if (updateDto.getStartDate() != null && !updateDto.getStartDate().equals(task.getStartDate())) {
+            task.setStartDate(updateDto.getStartDate());
+            hasChanges = true;
+        }
+
+        if (updateDto.getDueDate() != null && !updateDto.getDueDate().equals(task.getDueDate())) {
+            task.setDueDate(updateDto.getDueDate());
+            hasChanges = true;
+        }
+
+        if (updateDto.getStatus() != null && !updateDto.getStatus().equals(task.getStatus())) {
+            // validate transition
+            if (!isValidStatusTransition(task.getStatus(), updateDto.getStatus())) {
+                throw new AppException(TaskErrorCode.INVALID_REQUEST);
+            }
+            task.setStatus(updateDto.getStatus());
+            hasChanges = true;
+        }
+
+        TaskUpdateResultDto result = new TaskUpdateResultDto();
+        if (hasChanges) {
+            task.setUpdatedBy(userId);
+            Task saved = taskRepository.save(task);
+            // Only write history if status actually changed
+            if (updateDto.getStatus() != null && !oldStatus.equals(saved.getStatus())) {
+                createStatusHistoryWithOldNew(saved.getId(), oldStatus, saved.getStatus(), userId);
+                result.setOldStatus(oldStatus.getDisplayName());
+                result.setNewStatus(saved.getStatus().getDisplayName());
+            }
+            result.setTask(convertToNestedResponse(saved));
+            return result;
+        }
+        result.setTask(convertToNestedResponse(task));
+        result.setOldStatus(null);
+        result.setNewStatus(null);
+        return result;
     }
 
     // Get active tasks by project (excluding completed)
@@ -292,22 +439,26 @@ public class TaskService {
     }
 
     // Helper methods
-    private void createStatusHistory(Task task, TaskStatus status, UUID updatedBy, String comment) {
+    private void createStatusHistory(Task task, TaskStatus newStatus, UUID updatedBy, String _comment) {
+        createStatusHistoryWithOldNew(task.getId(), task.getStatus(), newStatus, updatedBy);
+    }
+
+    private void createStatusHistoryWithOldNew(UUID taskId, TaskStatus oldStatus, TaskStatus newStatus, UUID updatedBy) {
         TaskStatusHistory history = new TaskStatusHistory();
-        history.setTaskId(task.getId());
-        history.setStatus(status);
+        history.setTaskId(taskId);
+        history.setOldStatus(oldStatus);
+        history.setNewStatus(newStatus);
         history.setUpdatedBy(updatedBy);
-        history.setComment(comment);
         statusHistoryRepository.save(history);
     }
 
     private boolean isValidStatusTransition(TaskStatus currentStatus, TaskStatus newStatus) {
-        // Define valid status transitions
+        // Define valid status transitions per requirement:
+        // TO_DO -> IN_PROGRESS, TO_DO -> COMPLETED, IN_PROGRESS -> COMPLETED, COMPLETED -> IN_PROGRESS
         if (TaskStatus.TO_DO.equals(currentStatus)) {
-            return TaskStatus.IN_PROGRESS.equals(newStatus);
+            return TaskStatus.IN_PROGRESS.equals(newStatus) || TaskStatus.COMPLETED.equals(newStatus);
         } else if (TaskStatus.IN_PROGRESS.equals(currentStatus)) {
-            return TaskStatus.COMPLETED.equals(newStatus) || 
-                   TaskStatus.TO_DO.equals(newStatus);
+            return TaskStatus.COMPLETED.equals(newStatus);
         } else if (TaskStatus.COMPLETED.equals(currentStatus)) {
             return TaskStatus.IN_PROGRESS.equals(newStatus);
         }
@@ -351,8 +502,71 @@ public class TaskService {
             dto.setUpdatedByImage(user.getImage());
         });
 
-        // TODO: Project name, nếu bạn có service
-        // dto.setProjectName(projectService.getProjectName(task.getProjectId()));
+        // Project name via PROJECT-SERVICE
+        try {
+            ResponseEntity<Map<String, Object>> res = projectServiceFeignClient.getProjectById(task.getProjectId());
+            if (res.getBody() != null && res.getBody().containsKey("data")) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> project = (Map<String, Object>) res.getBody().get("data");
+                Object name = project.get("name");
+                if (name != null) {
+                    dto.setProjectName(name.toString());
+                }
+            }
+        } catch (Exception ignored) {
+        }
+
+        return dto;
+    }
+
+    private TaskNestedResponseDto convertToNestedResponse(Task task) {
+        TaskNestedResponseDto dto = new TaskNestedResponseDto();
+        dto.setId(task.getId());
+        TaskNestedResponseDto.ProjectInfo project = new TaskNestedResponseDto.ProjectInfo();
+        project.setId(task.getProjectId());
+        try {
+            ResponseEntity<Map<String, Object>> res = projectServiceFeignClient.getProjectById(task.getProjectId());
+            if (res.getBody() != null && res.getBody().containsKey("data")) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> p = (Map<String, Object>) res.getBody().get("data");
+                Object name = p.get("name");
+                project.setName(name != null ? name.toString() : null);
+            }
+        } catch (Exception ignored) {}
+        dto.setProject(project);
+
+        dto.setTitle(task.getTitle());
+        dto.setDescription(task.getDescription());
+        dto.setStatus(task.getStatus().getDisplayName());
+        dto.setPriority(task.getPriority().getDisplayName());
+        dto.setStartDate(task.getStartDate());
+        dto.setDueDate(task.getDueDate());
+        dto.setCreatedAt(task.getCreatedAt());
+        dto.setUpdatedAt(task.getUpdatedAt());
+
+        TaskNestedResponseDto.UserInfo assigned = new TaskNestedResponseDto.UserInfo();
+        assigned.setId(task.getAssignedTo());
+        getUserById(task.getAssignedTo()).ifPresent(u -> {
+            assigned.setName(u.getFirstName() + " " + u.getLastName());
+            assigned.setImage(u.getImage());
+        });
+        dto.setAssignedTo(assigned);
+
+        TaskNestedResponseDto.UserInfo created = new TaskNestedResponseDto.UserInfo();
+        created.setId(task.getCreatedBy());
+        getUserById(task.getCreatedBy()).ifPresent(u -> {
+            created.setName(u.getFirstName() + " " + u.getLastName());
+            created.setImage(u.getImage());
+        });
+        dto.setCreatedBy(created);
+
+        TaskNestedResponseDto.UserInfo updated = new TaskNestedResponseDto.UserInfo();
+        updated.setId(task.getUpdatedBy());
+        getUserById(task.getUpdatedBy()).ifPresent(u -> {
+            updated.setName(u.getFirstName() + " " + u.getLastName());
+            updated.setImage(u.getImage());
+        });
+        dto.setUpdatedBy(updated);
 
         return dto;
     }

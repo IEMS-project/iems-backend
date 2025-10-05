@@ -21,8 +21,12 @@ public class TaskStatusHistory {
     private UUID taskId;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false)
-    private TaskStatus status; // Using enum instead of String
+    @Column(name = "old_status", nullable = false)
+    private TaskStatus oldStatus;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "new_status", nullable = false)
+    private TaskStatus newStatus;
 
     @Column(name = "updated_by", nullable = false)
     private UUID updatedBy;
@@ -30,8 +34,7 @@ public class TaskStatusHistory {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
-    @Column(name = "comment")
-    private String comment; // Optional comment when status changes
+    // Comments moved to separate task_comment table
 
     @PrePersist
     protected void onCreate() {
