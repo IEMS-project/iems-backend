@@ -64,9 +64,17 @@ public class ChatController {
     public void replyToMessage(@DestinationVariable String conversationId, @Payload Map<String, Object> payload) {
         String content = (String) payload.get("content");
         String replyToMessageId = (String) payload.get("replyToMessageId");
+        // Optional senderId provided by client (used when STOMP security context isn't available)
+        String senderId = payload.containsKey("senderId") ? (String) payload.get("senderId") : null;
         
         if (content != null && replyToMessageId != null) {
-            messageService.replyToMessage(conversationId, content, replyToMessageId);
+            if (senderId != null && !senderId.isBlank()) {
+                // Use overloaded service method that accepts explicit senderId
+                messageService.replyToMessage(conversationId, content, replyToMessageId, senderId);
+            } else {
+                // Fallback to existing behavior (use authenticated user)
+                messageService.replyToMessage(conversationId, content, replyToMessageId);
+            }
         }
     }
 

@@ -4,6 +4,7 @@ import com.iems.userservice.entity.enums.Gender;
 import com.iems.userservice.entity.enums.ContractType;
 import jakarta.persistence.*;
 import lombok.Data;
+import org.hibernate.annotations.DialectOverride;
 import org.hibernate.annotations.UuidGenerator;
 
 import java.util.Date;
@@ -42,7 +43,7 @@ public class User {
     @Column(name = "personal_id", unique = true, nullable = false, length = 20)
     private String personalID;
 
-    @Column(length = 255)
+    @Column(columnDefinition = "TEXT")
     private String image;
 
     @Column(name = "bank_account_number", length = 50)
@@ -69,4 +70,18 @@ public class User {
     @Temporal(TemporalType.TIMESTAMP)
     @Column(name = "updated_at")
     private Date updatedAt = new Date();
+
+    @PrePersist
+    protected void onCreate() {
+        Date now = new Date();
+        if (createdAt == null) {
+            createdAt = now;
+        }
+        updatedAt = now;
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = new Date();
+    }
 }
