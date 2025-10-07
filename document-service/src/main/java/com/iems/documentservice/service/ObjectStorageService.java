@@ -19,6 +19,10 @@ public class ObjectStorageService {
     @Value("${minio.presign.expiryMinutes:60}")
     private int presignExpiryMinutes;
 
+    // Base URL for publicly accessible MinIO (nginx/gateway or direct console endpoint host). Example: http://localhost:9000
+    @Value("${minio.public-url:${minio.url}}")
+    private String publicBaseUrl;
+
     public ObjectStorageService(MinioClient minioClient) {
         this.minioClient = minioClient;
     }
@@ -61,6 +65,15 @@ public class ObjectStorageService {
                         .expiry(presignExpiryMinutes, TimeUnit.MINUTES)
                         .build()
         );
+    }
+
+    public String buildPublicUrl(String objectKey) {
+        String base = publicBaseUrl;
+        if (base.endsWith("/")) {
+            base = base.substring(0, base.length() - 1);
+        }
+        // MinIO path-style URL: {base}/{bucket}/{object}
+        return base + "/" + bucketName + "/" + objectKey;
     }
 }
 

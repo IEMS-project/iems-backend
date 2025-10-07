@@ -1,15 +1,13 @@
 package com.iems.documentservice.controller;
 
 import com.iems.documentservice.dto.request.CreateFolderRequest;
-import com.iems.documentservice.dto.request.UpdatePermissionRequest;
 import com.iems.documentservice.dto.request.ShareRequest;
 import com.iems.documentservice.dto.request.RenameRequest;
 import com.iems.documentservice.dto.request.UpdateSharePermissionRequest;
 import com.iems.documentservice.dto.response.ApiResponseDto;
 import com.iems.documentservice.dto.response.FileResponse;
 import com.iems.documentservice.dto.response.FolderResponse;
-import com.iems.documentservice.dto.response.SearchResultItem;
-import com.iems.documentservice.dto.response.FavoriteItemResponse;
+import com.iems.documentservice.dto.response.SimpleFileResponse;
 import com.iems.documentservice.service.DriveService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -72,6 +70,24 @@ public class DriveController {
                                                                     @RequestPart("file") MultipartFile file) throws Exception {
         FileResponse data = driveService.uploadFile(folderId, file);
         return ResponseEntity.ok(new ApiResponseDto<>(200, "File uploaded", data));
+    }
+
+    @PostMapping(value = "/files/upload-batch", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Upload multiple files and return public URLs")
+    public ResponseEntity<ApiResponseDto<java.util.List<SimpleFileResponse>>> uploadFiles(
+            @RequestParam(required = false) UUID folderId,
+            @RequestPart("files") MultipartFile[] files) throws Exception {
+        java.util.List<SimpleFileResponse> data = driveService.uploadFilesAndBuildPublicUrls(folderId, files);
+        return ResponseEntity.ok(new ApiResponseDto<java.util.List<SimpleFileResponse>>(200, "Files uploaded", data));
+    }
+
+    @PostMapping(value = "/files/upload-chat", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Upload chat media to conversation path and return public URLs")
+    public ResponseEntity<ApiResponseDto<java.util.List<SimpleFileResponse>>> uploadChatFiles(
+            @RequestParam("conversationId") String conversationId,
+            @RequestPart("files") MultipartFile[] files) throws Exception {
+        java.util.List<SimpleFileResponse> data = driveService.uploadChatFiles(conversationId, files);
+        return ResponseEntity.ok(new ApiResponseDto<java.util.List<SimpleFileResponse>>(200, "Chat files uploaded", data));
     }
 
     @GetMapping("/files/{id}/download")

@@ -360,6 +360,73 @@ public class MessageService {
         return result;
     }
 
+    // Get newest messages by type (IMAGE/VIDEO/FILE or MEDIA=both) with before cursor
+    public Map<String, Object> getLatestByType(String conversationId, String type, int limit, String before) {
+        UUID userId = getUserIdFromRequest();
+        String userIdStr = userId.toString();
+
+        String normalizedType = (type == null ? "MEDIA" : type).toUpperCase();
+        boolean mediaBoth = normalizedType.equals("MEDIA") || normalizedType.equals("ALL");
+
+        Criteria baseCriteria = new Criteria().andOperator(
+            Criteria.where("conversationId").is(conversationId),
+            new Criteria().orOperator(
+                Criteria.where("deletedForUsers").exists(false),
+                Criteria.where("deletedForUsers").nin(userIdStr)
+            )
+        );
+
+        if (mediaBoth) {
+            baseCriteria = new Criteria().andOperator(
+                baseCriteria,
+                Criteria.where("type").in("IMAGE", "VIDEO")
+            );
+        } else {
+            baseCriteria = new Criteria().andOperator(
+                baseCriteria,
+                Criteria.where("type").is(normalizedType)
+            );
+        }
+
+        Query query = new Query(baseCriteria);
+
+        // Cursor: support ISO timestamp or messageId
+        if (before != null && !before.isBlank()) {
+            try {
+                LocalDateTime beforeTime = LocalDateTime.parse(before);
+                query.addCriteria(Criteria.where("sentAt").lt(beforeTime));
+            } catch (Exception e) {
+                try {
+                    Message beforeMessage = messageRepository.findById(before).orElse(null);
+                    if (beforeMessage != null) {
+                        query.addCriteria(Criteria.where("sentAt").lt(beforeMessage.getSentAt()));
+                    }
+                } catch (Exception ignore) { }
+            }
+        }
+
+        int lim = Math.max(1, Math.min(limit, 100));
+        query.with(Sort.by(Sort.Direction.DESC, "sentAt"));
+        query.limit(lim + 1);
+
+        List<Message> list = mongoTemplate.find(query, Message.class);
+        boolean hasMore = list.size() > lim;
+        if (hasMore) list.remove(list.size() - 1);
+
+        String nextCursor = null;
+        if (!list.isEmpty()) {
+            Message oldest = list.get(list.size() - 1);
+            nextCursor = oldest.getSentAt() != null ? oldest.getSentAt().toString() : null;
+        }
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("messages", list); // newest-first order
+        result.put("hasMore", hasMore);
+        result.put("nextCursor", nextCursor);
+        result.put("type", normalizedType);
+        return result;
+    }
+
     // Broadcast helpers moved to MessageBroadcastService
 
     // Get message by ID with neighbors for jump-to-message functionality
@@ -422,6 +489,64 @@ public class MessageService {
         query.limit(limit);
         
         return mongoTemplate.find(query, Message.class);
+    }
+
+    // Get media messages around a specific message, filtered by type
+    public Map<String, Object> getMessagesAroundByType(String messageId, String type, int before, int after) {
+        Message targetMessage = messageRepository.findById(messageId).orElse(null);
+        if (targetMessage == null) {
+            return null;
+        }
+
+        String normalizedType = (type == null ? "MEDIA" : type).toUpperCase();
+        boolean mediaBoth = normalizedType.equals("MEDIA") || normalizedType.equals("ALL");
+
+        // Before
+        Criteria beforeCriteriaBase = new Criteria().andOperator(
+            Criteria.where("conversationId").is(targetMessage.getConversationId()),
+            Criteria.where("sentAt").lt(targetMessage.getSentAt()),
+            Criteria.where("recalled").ne(true)
+        );
+        Query beforeQuery;
+        if (mediaBoth) {
+            beforeQuery = new Query(new Criteria().andOperator(
+                beforeCriteriaBase,
+                Criteria.where("type").in("IMAGE", "VIDEO")
+            ));
+        } else {
+            beforeQuery = new Query(new Criteria().andOperator(beforeCriteriaBase, Criteria.where("type").is(normalizedType)));
+        }
+        beforeQuery.with(Sort.by(Sort.Direction.DESC, "sentAt"));
+        beforeQuery.limit(Math.max(0, before));
+        List<Message> beforeMessagesDesc = mongoTemplate.find(beforeQuery, Message.class);
+        Collections.reverse(beforeMessagesDesc); // ascending
+
+        // After
+        Criteria afterCriteriaBase = new Criteria().andOperator(
+            Criteria.where("conversationId").is(targetMessage.getConversationId()),
+            Criteria.where("sentAt").gt(targetMessage.getSentAt()),
+            Criteria.where("recalled").ne(true)
+        );
+        Query afterQuery;
+        if (mediaBoth) {
+            afterQuery = new Query(new Criteria().andOperator(
+                afterCriteriaBase,
+                Criteria.where("type").in("IMAGE", "VIDEO")
+            ));
+        } else {
+            afterQuery = new Query(new Criteria().andOperator(afterCriteriaBase, Criteria.where("type").is(normalizedType)));
+        }
+        afterQuery.with(Sort.by(Sort.Direction.ASC, "sentAt"));
+        afterQuery.limit(Math.max(0, after));
+        List<Message> afterMessages = mongoTemplate.find(afterQuery, Message.class);
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("targetMessage", targetMessage);
+        result.put("beforeMessages", beforeMessagesDesc);
+        result.put("afterMessages", afterMessages);
+        result.put("conversationId", targetMessage.getConversationId());
+        result.put("type", normalizedType);
+        return result;
     }
 
     // Search messages by text content

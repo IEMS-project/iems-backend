@@ -5,6 +5,7 @@ import com.iems.documentservice.dto.request.UpdatePermissionRequest;
 import com.iems.documentservice.dto.request.ShareRequest;
 import com.iems.documentservice.dto.response.FileResponse;
 import com.iems.documentservice.dto.response.FolderResponse;
+import com.iems.documentservice.dto.response.SimpleFileResponse;
 import com.iems.documentservice.entity.Folder;
 import com.iems.documentservice.entity.StoredFile;
 import com.iems.documentservice.entity.enums.Permission;
@@ -127,6 +128,65 @@ public class DriveService {
         return toResponse(stored, null);
     }
 
+    @Transactional
+    public java.util.List<SimpleFileResponse> uploadFilesAndBuildPublicUrls(UUID folderId, MultipartFile[] files) throws Exception {
+        if (files == null || files.length == 0) return java.util.List.of();
+        java.util.List<SimpleFileResponse> results = new java.util.ArrayList<>();
+        for (MultipartFile f : files) {
+            FileResponse fr = uploadFile(folderId, f);
+            String publicUrl = storageService.buildPublicUrl(fr.getPath());
+            results.add(SimpleFileResponse.builder()
+                    .fileName(fr.getName())
+                    .url(publicUrl)
+                    .type(fr.getType())
+                    .build());
+        }
+        return results;
+    }
+
+    @Transactional
+    public java.util.List<SimpleFileResponse> uploadChatFiles(String conversationId, MultipartFile[] files) throws Exception {
+        if (files == null || files.length == 0) return java.util.List.of();
+        UUID ownerId = getCurrentUserId();
+        java.util.List<SimpleFileResponse> results = new java.util.ArrayList<>();
+        for (MultipartFile file : files) {
+            if (file.getSize() > MAX_UPLOAD_SIZE) {
+                throw new AppException(DocumentErrorCode.INVALID_REQUEST);
+            }
+            // Enforce per-type size constraints (images ≤5MB, videos ≤20MB, others ≤20MB)
+            double sizeMb = file.getSize() / (1024.0 * 1024.0);
+            String mime = file.getContentType() == null ? "" : file.getContentType();
+            if (mime.startsWith("image") && sizeMb > 5.0) {
+                throw new AppException(DocumentErrorCode.INVALID_REQUEST);
+            }
+            if (!mime.startsWith("image") && sizeMb > 20.0) {
+                throw new AppException(DocumentErrorCode.INVALID_REQUEST);
+            }
+            String objectKey = generateChatObjectKey(conversationId, file.getOriginalFilename());
+            try (InputStream in = file.getInputStream()) {
+                storageService.upload(objectKey, in, file.getSize(), file.getContentType());
+            }
+            StoredFile stored = StoredFile.builder()
+                    .name(file.getOriginalFilename())
+                    .folder(null)
+                    .ownerId(ownerId)
+                    .path(objectKey)
+                    .size(file.getSize())
+                    .type(file.getContentType())
+                    .permission(Permission.PUBLIC)
+                    .createdAt(OffsetDateTime.now())
+                    .build();
+            storedFileRepository.save(stored);
+            String publicUrl = storageService.buildPublicUrl(objectKey);
+            results.add(SimpleFileResponse.builder()
+                    .fileName(stored.getName())
+                    .url(publicUrl)
+                    .type(stored.getType())
+                    .build());
+        }
+        return results;
+    }
+
     public FileResponse downloadInfo(UUID fileId) throws Exception {
         UUID requesterId = getCurrentUserId();
         StoredFile file = storedFileRepository.findById(fileId)
@@ -239,6 +299,11 @@ public class DriveService {
         return "owners/" + ownerId + "/" + folderPart + "/" + ts + "-" + fileName;
     }
 
+    private String generateChatObjectKey(String conversationId, String fileName) {
+        long ts = System.currentTimeMillis();
+        return "conversation/" + conversationId + "/" + ts + "-" + fileName;
+    }
+
     private FileResponse toResponse(StoredFile file, String presignedUrl) {
         return toResponse(file, presignedUrl, getCurrentUserId());
     }
@@ -297,6 +362,7 @@ public class DriveService {
     public List<FileResponse> listFiles() {
         UUID ownerId = getCurrentUserId();
         return storedFileRepository.findByOwnerId(ownerId).stream()
+                .filter(f -> f.getPath() == null || !(f.getPath().startsWith("employee_avatar/") || f.getPath().startsWith("group_avatar/")))
                 .map(f -> toResponse(f, null, ownerId))
                 .collect(Collectors.toList());
     }
@@ -309,6 +375,7 @@ public class DriveService {
     // Allow if owner
     if (folder.getOwnerId().equals(requesterId)) {
         return storedFileRepository.findByFolderId(folderId).stream()
+            .filter(f -> f.getPath() == null || !(f.getPath().startsWith("employee_avatar/") || f.getPath().startsWith("group_avatar/")))
             .map(f -> toResponse(f, null, requesterId))
             .collect(Collectors.toList());
     }
@@ -316,15 +383,16 @@ public class DriveService {
     // Allow public folder (but still check individual file permissions)
     if (folder.getPermission() == Permission.PUBLIC) {
         return storedFileRepository.findByFolderId(folderId).stream()
+            .filter(f -> f.getPath() == null || !(f.getPath().startsWith("employee_avatar/") || f.getPath().startsWith("group_avatar/")))
             .filter(f -> {
-    try {
-        // Check if user can read this specific file
-        enforceReadPermission(f, requesterId);
-        return true;
-    } catch (Exception e) {
-        return false; // Skip files user can't read
-    }
-})
+                try {
+                    // Check if user can read this specific file
+                    enforceReadPermission(f, requesterId);
+                    return true;
+                } catch (Exception e) {
+                    return false; // Skip files user can't read
+                }
+            })
             .map(f -> toResponse(f, null, requesterId))
             .collect(Collectors.toList());
     }
@@ -332,6 +400,7 @@ public class DriveService {
     // Allow if folder is shared with requester (but still need to check individual file permissions)
     if (shareRepository.existsByTargetIdAndTargetTypeAndSharedWithUserId(folderId, "FOLDER", requesterId)) {
         return storedFileRepository.findByFolderId(folderId).stream()
+            .filter(f -> f.getPath() == null || !(f.getPath().startsWith("employee_avatar/") || f.getPath().startsWith("group_avatar/")))
             .filter(f -> {
                 try {
                     // Check if user can read this specific file
@@ -424,7 +493,9 @@ public class DriveService {
         // owned
         List<StoredFile> owned = storedFileRepository.findByOwnerId(requesterId);
         // public
-        List<StoredFile> publicFiles = storedFileRepository.findByPermission(Permission.PUBLIC);
+        List<StoredFile> publicFiles = storedFileRepository.findByPermission(Permission.PUBLIC).stream()
+                .filter(f -> f.getPath() == null || !(f.getPath().startsWith("employee_avatar/") || f.getPath().startsWith("group_avatar/")))
+                .collect(Collectors.toList());
         // shared
         List<Share> shares = shareRepository.findBySharedWithUserId(requesterId);
         Set<UUID> sharedFileIds = shares.stream()
@@ -437,6 +508,7 @@ public class DriveService {
         Set<UUID> seen = new HashSet<>();
         return List.of(owned, publicFiles, sharedFiles).stream()
                 .flatMap(List::stream)
+                .filter(f -> f.getPath() == null || !(f.getPath().startsWith("employee_avatar/") || f.getPath().startsWith("group_avatar/")))
                 .filter(f -> seen.add(f.getId()))
                 .map(f -> toResponse(f, null, requesterId))
                 .collect(Collectors.toList());
@@ -456,6 +528,7 @@ public class DriveService {
                         .createdAt(f.getCreatedAt())
                         .build());
         var files = storedFileRepository.findByOwnerId(ownerId).stream()
+                .filter(f -> f.getPath() == null || !(f.getPath().startsWith("employee_avatar/") || f.getPath().startsWith("group_avatar/")))
                 .filter(f -> f.getName().toLowerCase().contains(q))
                 .map(f -> com.iems.documentservice.dto.response.SearchResultItem.builder()
                         .id(f.getId())
