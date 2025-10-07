@@ -26,7 +26,7 @@ public class Message {
 
     private String content;
 
-    private String type = "TEXT"; // TEXT, IMAGE, FILE, STICKER
+    private String type = "TEXT"; // TEXT, IMAGE, VIDEO, FILE
 
     private LocalDateTime sentAt = LocalDateTime.now();
 

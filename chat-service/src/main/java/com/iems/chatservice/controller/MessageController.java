@@ -3,7 +3,9 @@ package com.iems.chatservice.controller;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 import com.iems.chatservice.entity.Message;
 import com.iems.chatservice.service.MessageService;
 import com.iems.chatservice.entity.Conversation;
@@ -17,6 +19,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.time.LocalDateTime;
+import com.iems.chatservice.client.DocumentServiceFeignClient;
 
 @RestController
 @RequestMapping("/api/messages")
@@ -27,6 +30,7 @@ public class MessageController {
     private final MongoTemplate mongoTemplate;
     private final ConversationRepository conversationRepository;
     private final SimpMessagingTemplate messagingTemplate;
+    private final DocumentServiceFeignClient documentServiceFeignClient;
 
     @GetMapping
     public ResponseEntity<Page<Message>> recent(
@@ -35,6 +39,21 @@ public class MessageController {
             @RequestParam(defaultValue = "20") int size
     ) {
         return ResponseEntity.ok(messageService.getRecentMessages(conversationId, page, size));
+    }
+
+    // Get media messages around a target message by type (e.g., IMAGE/VIDEO)
+    @GetMapping("/around/{messageId}/by-type")
+    public ResponseEntity<Map<String, Object>> getMediaAroundByType(
+            @PathVariable String messageId,
+            @RequestParam(defaultValue = "MEDIA") String type,
+            @RequestParam(defaultValue = "5") int before,
+            @RequestParam(defaultValue = "5") int after
+    ) {
+        Map<String, Object> result = messageService.getMessagesAroundByType(messageId, type, before, after);
+        if (result == null) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(result);
     }
 
     @GetMapping("/scroll")
@@ -174,6 +193,18 @@ public class MessageController {
         return ResponseEntity.ok(result);
     }
 
+    // Newest media/files for conversation by type (IMAGE/VIDEO/FILE or MEDIA)
+    @GetMapping("/conversations/{conversationId}/latest-by-type")
+    public ResponseEntity<Map<String, Object>> getLatestByType(
+            @PathVariable String conversationId,
+            @RequestParam(defaultValue = "MEDIA") String type,
+            @RequestParam(defaultValue = "8") int limit,
+            @RequestParam(required = false) String before
+    ) {
+        Map<String, Object> result = messageService.getLatestByType(conversationId, type, limit, before);
+        return ResponseEntity.ok(result);
+    }
+
     // Get message by ID with neighbors for jump-to-message functionality
     @GetMapping("/{messageId}")
     public ResponseEntity<Map<String, Object>> getMessageWithNeighbors(
@@ -268,6 +299,44 @@ public class MessageController {
             } catch (Exception ignore) { }
         }
         return ResponseEntity.ok(saved);
+    }
+
+    @PostMapping(value = "/media", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<List<Message>> sendMedia(
+            @RequestParam String senderId,
+            @RequestParam String conversationId,
+            @RequestPart("files") MultipartFile[] files
+    ) {
+        if (senderId == null || conversationId == null || senderId.isBlank() || conversationId.isBlank()) {
+            return ResponseEntity.badRequest().build();
+        }
+        try {
+            var resp = documentServiceFeignClient.uploadChatFiles(conversationId, files);
+            var body = resp.getBody();
+            if (body == null || !body.containsKey("data")) {
+                return ResponseEntity.internalServerError().build();
+            }
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> simpleFiles = (List<Map<String, Object>>) body.get("data");
+            List<Message> created = new java.util.ArrayList<>();
+            for (Map<String, Object> f : simpleFiles) {
+                String url = (String) f.get("url");
+                String mime = (String) f.get("type");
+                Message m = new Message();
+                m.setConversationId(conversationId);
+                m.setSenderId(senderId);
+                m.setContent(url);
+                String t;
+                if (mime != null && mime.startsWith("video")) t = "VIDEO";
+                else if (mime != null && mime.startsWith("image")) t = "IMAGE";
+                else t = "FILE";
+                m.setType(t);
+                created.add(messageService.saveAndBroadcast(m));
+            }
+            return ResponseEntity.ok(created);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().build();
+        }
     }
 }
 

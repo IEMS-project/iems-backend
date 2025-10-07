@@ -73,7 +73,7 @@ public class AvatarController {
                 .build();
         storedFileRepository.save(stored);
 
-        String presignedUrl = storageService.presignGetUrl(objectKey);
+        String presignedUrl = storageService.buildPublicUrl(objectKey);
 
         // Call user-service to update my avatar URL (Authorization header forwarded by Feign interceptor)
         userServiceFeignClient.updateMyAvatar(new UpdateAvatarRequest(presignedUrl));
@@ -114,7 +114,7 @@ public class AvatarController {
                 .build();
         storedFileRepository.save(stored);
 
-        String presignedUrl = storageService.presignGetUrl(objectKey);
+        String presignedUrl = storageService.buildPublicUrl(objectKey);
 
         // Notify chat-service to update the group avatar URL
         chatServiceFeignClient.updateGroupAvatar(groupId, new UpdateGroupAvatarRequest(presignedUrl));
@@ -133,7 +133,7 @@ public class AvatarController {
             return ResponseEntity.ok(new ApiResponseDto<>(200, "No group avatar", null));
         }
 
-        String presignedUrl = storageService.presignGetUrl(latest.get().getPath());
+        String presignedUrl = storageService.buildPublicUrl(latest.get().getPath());
         return ResponseEntity.ok(new ApiResponseDto<>(200, "OK", presignedUrl));
     }
 
@@ -147,7 +147,7 @@ public class AvatarController {
             return ResponseEntity.ok(new ApiResponseDto<>(200, "No avatar", null));
         }
 
-        String presignedUrl = storageService.presignGetUrl(latest.get().getPath());
+        String presignedUrl = storageService.buildPublicUrl(latest.get().getPath());
         return ResponseEntity.ok(new ApiResponseDto<>(200, "OK", presignedUrl));
     }
 }
