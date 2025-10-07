@@ -8,6 +8,7 @@ import com.iems.userservice.dto.request.CreateUserDto;
 import com.iems.userservice.dto.request.UpdateUserDto;
 import com.iems.userservice.dto.response.UserBasicInfoDto;
 import com.iems.userservice.dto.response.UserResponseDto;
+import com.iems.userservice.dto.response.UserProfileDto;
 import com.iems.userservice.exception.AppException;
 import com.iems.userservice.exception.UserErrorCode;
 import com.iems.userservice.entity.User;
@@ -242,6 +243,27 @@ public class UserService {
                         existing.setImage(imageUrl);
                         return convertToUserResponse(repository.save(existing));
                     })
+                    .or(() -> {
+                        throw new AppException(UserErrorCode.USER_NOT_FOUND);
+                    });
+        } catch (AppException e) {
+            throw e;
+        } catch (Exception ex) {
+            throw new AppException(UserErrorCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    public Optional<UserProfileDto> getUserProfile(UUID id) {
+        try {
+            return repository.findById(id)
+                    .map(user -> new UserProfileDto(
+                            user.getId(),
+                            user.getFirstName(),
+                            user.getLastName(),
+                            user.getEmail(),
+                            user.getImage(),
+                            user.getRole()
+                    ))
                     .or(() -> {
                         throw new AppException(UserErrorCode.USER_NOT_FOUND);
                     });

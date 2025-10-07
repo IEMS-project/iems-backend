@@ -6,6 +6,7 @@ import com.iems.userservice.dto.request.UpdateUserDto;
 import com.iems.userservice.dto.response.ApiResponseDto;
 import com.iems.userservice.dto.response.UserBasicInfoDto;
 import com.iems.userservice.dto.response.UserResponseDto;
+import com.iems.userservice.dto.response.UserProfileDto;
 import com.iems.userservice.security.JwtUserDetails;
 import com.iems.userservice.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -167,6 +168,27 @@ public class UserController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(new ApiResponseDto<>(HttpStatus.INTERNAL_SERVER_ERROR.value(),
                             "Failed to fetch profile: " + e.getMessage(), null));
+        }
+    }
+
+    @Operation(summary = "Get my profile info", description = "Retrieve basic profile information for UI display")
+    @GetMapping("/me/profile")
+    public ResponseEntity<ApiResponseDto<UserProfileDto>> getMyProfileInfo() {
+        try {
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            JwtUserDetails userDetails = (JwtUserDetails) authentication.getPrincipal();
+            UUID userId = userDetails.getUserId();
+
+            return service.getUserProfile(userId)
+                    .map(profile -> ResponseEntity.ok(
+                            new ApiResponseDto<>(HttpStatus.OK.value(), "Profile info retrieved successfully", profile)
+                    ))
+                    .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND)
+                            .body(new ApiResponseDto<>(HttpStatus.NOT_FOUND.value(), "User not found", null)));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ApiResponseDto<>(HttpStatus.INTERNAL_SERVER_ERROR.value(),
+                            "Failed to fetch profile info: " + e.getMessage(), null));
         }
     }
 
