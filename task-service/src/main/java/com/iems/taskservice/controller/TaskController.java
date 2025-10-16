@@ -135,6 +135,17 @@ public class TaskController {
         }
     }
 
+    @GetMapping("/{id}/subtasks")
+    @Operation(summary = "Get subtasks", description = "Retrieve all subtasks of a task")
+    public ResponseEntity<ApiResponseDto<List<TaskResponseDto>>> getSubtasks(@PathVariable UUID id) {
+        try {
+            List<TaskResponseDto> tasks = taskService.getSubtasks(id);
+            return ResponseEntity.ok(new ApiResponseDto<>("success", "Subtasks retrieved successfully", tasks));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(new ApiResponseDto<>("error", "Failed to retrieve subtasks", null));
+        }
+    }
+
     @GetMapping("/project/{projectId}")
     @Operation(summary = "Get tasks by project", description = "Retrieve tasks that belong to a specific project")
     public ResponseEntity<ApiListResponseDto<List<TaskNestedResponseDto>>> getTasksByProject(@PathVariable UUID projectId) {

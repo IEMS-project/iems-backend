@@ -1,6 +1,7 @@
 package com.iems.taskservice.dto;
 
 import com.iems.taskservice.entity.enums.TaskPriority;
+import com.iems.taskservice.entity.enums.TaskType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -27,8 +28,14 @@ public class CreateTaskDto {
     @NotNull(message = "Priority is required")
     private TaskPriority priority; // Using enum for validation
 
+    @NotNull(message = "Task type is required")
+    private TaskType taskType;
+
     private LocalDate startDate;
 
     @NotNull(message = "Due date is required")
     private LocalDate dueDate;
+
+    // Optional parent task for subtask creation
+    private UUID parentTaskId;
 }

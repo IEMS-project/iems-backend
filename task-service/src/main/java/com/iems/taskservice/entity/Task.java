@@ -2,6 +2,7 @@ package com.iems.taskservice.entity;
 
 import com.iems.taskservice.entity.enums.TaskPriority;
 import com.iems.taskservice.entity.enums.TaskStatus;
+import com.iems.taskservice.entity.enums.TaskType;
 import jakarta.persistence.*;
 import lombok.Data;
 import org.hibernate.annotations.UuidGenerator;
@@ -42,6 +43,10 @@ public class Task {
     @Column(name = "priority", nullable = false)
     private TaskPriority priority; // Using enum instead of String
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "task_type", nullable = false)
+    private TaskType taskType;
+
     @Column(name = "start_date")
     private LocalDate startDate;
 
@@ -56,6 +61,10 @@ public class Task {
 
     @Column(name = "updated_by")
     private UUID updatedBy;
+
+    // Parent task for subtask relation (nullable). If set, this task is a subtask.
+    @Column(name = "parent_task_id")
+    private UUID parentTaskId;
 
     @PrePersist
     protected void onCreate() {

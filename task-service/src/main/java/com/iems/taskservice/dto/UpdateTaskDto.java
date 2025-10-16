@@ -2,6 +2,7 @@ package com.iems.taskservice.dto;
 
 import com.iems.taskservice.entity.enums.TaskPriority;
 import com.iems.taskservice.entity.enums.TaskStatus;
+import com.iems.taskservice.entity.enums.TaskType;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
@@ -24,10 +25,14 @@ public class UpdateTaskDto {
 
     private TaskPriority priority; // Using enum for type safety
 
+    private TaskType taskType; // Allow changing task type
+
     private LocalDate startDate;
 
     private LocalDate dueDate;
 
     @Size(max = 500, message = "Comment must not exceed 500 characters")
     private String comment; // Optional comment when updating status
+
+    private UUID parentTaskId; // Allow reparenting or setting as subtask
 }
