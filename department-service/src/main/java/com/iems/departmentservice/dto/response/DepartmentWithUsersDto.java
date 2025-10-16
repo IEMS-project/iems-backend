@@ -16,6 +16,7 @@ public class DepartmentWithUsersDto {
     private String departmentName;
     private String description;
     private UUID managerId;
+    private String managerName;
     private LocalDateTime createdAt;
     private UUID createdBy;
     private LocalDateTime updatedAt;

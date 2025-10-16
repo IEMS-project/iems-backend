@@ -31,4 +31,6 @@ public interface TaskRepository extends JpaRepository<Task, UUID> {
     
     @Query("SELECT t FROM Task t WHERE t.projectId = :projectId AND t.status != :completedStatus")
     List<Task> findActiveTasksByProject(@Param("projectId") UUID projectId, @Param("completedStatus") TaskStatus completedStatus);
+
+    List<Task> findByParentTaskId(UUID parentTaskId);
 }

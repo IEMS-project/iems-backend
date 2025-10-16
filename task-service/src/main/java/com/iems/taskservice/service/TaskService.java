@@ -7,6 +7,7 @@ import com.iems.taskservice.entity.Task;
 import com.iems.taskservice.entity.TaskStatusHistory;
 import com.iems.taskservice.entity.enums.TaskPriority;
 import com.iems.taskservice.entity.enums.TaskStatus;
+import com.iems.taskservice.entity.enums.TaskType;
 import com.iems.taskservice.repository.TaskCommentRepository;
 import com.iems.taskservice.repository.TaskRepository;
 import com.iems.taskservice.repository.TaskStatusHistoryRepository;
@@ -133,6 +134,17 @@ public class TaskService {
         task.setCreatedBy(userId);
         task.setStatus(TaskStatus.TO_DO); // Default status using enum
         task.setPriority(createDto.getPriority()); // Using enum directly
+        task.setTaskType(createDto.getTaskType());
+        // Validate parentTaskId by business rule
+        if (createDto.getParentTaskId() != null) {
+            UUID parentId = createDto.getParentTaskId();
+            Task parent = taskRepository.findById(parentId)
+                    .orElseThrow(() -> new AppException(TaskErrorCode.TASK_NOT_FOUND));
+            if (TaskType.EPIC.equals(parent.getTaskType()) || TaskType.TASK.equals(parent.getTaskType()) || TaskType.STORY.equals(parent.getTaskType()) || TaskType.BUG.equals(parent.getTaskType())) {
+                // Allow any type to be a parent for now; customize if needed
+            }
+            task.setParentTaskId(parentId);
+        }
         task.setStartDate(createDto.getStartDate());
         task.setDueDate(createDto.getDueDate());
         task.setCreatedBy(userId);
@@ -354,6 +366,11 @@ public class TaskService {
                 .collect(Collectors.toList());
     }
 
+    public List<TaskResponseDto> getSubtasks(UUID parentTaskId) {
+        List<Task> tasks = taskRepository.findByParentTaskId(parentTaskId);
+        return tasks.stream().map(this::convertToResponseDto).collect(Collectors.toList());
+    }
+
     // Generic update: title/description/assignedTo/priority/dates/status
     public TaskUpdateResultDto updateTask(UUID taskId, UpdateTaskDto updateDto) {
         Task task = taskRepository.findById(taskId)
@@ -407,6 +424,19 @@ public class TaskService {
         }
 
         TaskUpdateResultDto result = new TaskUpdateResultDto();
+        if (updateDto.getTaskType() != null && !updateDto.getTaskType().equals(task.getTaskType())) {
+            task.setTaskType(updateDto.getTaskType());
+            hasChanges = true;
+        }
+
+        if (updateDto.getParentTaskId() != null && !updateDto.getParentTaskId().equals(task.getParentTaskId())) {
+            // Validate parent exists
+            UUID parentId = updateDto.getParentTaskId();
+            taskRepository.findById(parentId).orElseThrow(() -> new AppException(TaskErrorCode.TASK_NOT_FOUND));
+            task.setParentTaskId(parentId);
+            hasChanges = true;
+        }
+
         if (hasChanges) {
             task.setUpdatedBy(userId);
             Task saved = taskRepository.save(task);
@@ -477,6 +507,8 @@ public class TaskService {
         dto.setUpdatedAt(task.getUpdatedAt());
         dto.setStatus(task.getStatus().getDisplayName());
         dto.setPriority(task.getPriority().getDisplayName());
+        dto.setTaskType(task.getTaskType() != null ? task.getTaskType().getDisplayName() : null);
+        dto.setParentTaskId(task.getParentTaskId());
 
         // AssignedTo
         dto.setAssignedTo(task.getAssignedTo());
@@ -539,6 +571,8 @@ public class TaskService {
         dto.setDescription(task.getDescription());
         dto.setStatus(task.getStatus().getDisplayName());
         dto.setPriority(task.getPriority().getDisplayName());
+        dto.setTaskType(task.getTaskType() != null ? task.getTaskType().getDisplayName() : null);
+        dto.setParentTaskId(task.getParentTaskId());
         dto.setStartDate(task.getStartDate());
         dto.setDueDate(task.getDueDate());
         dto.setCreatedAt(task.getCreatedAt());

@@ -13,6 +13,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpHeaders;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -34,6 +35,7 @@ public class DriveController {
 
     @PostMapping("/folders")
     @Operation(summary = "Create folder")
+    @PreAuthorize("hasAuthority('DOC_CREATE')")
     public ResponseEntity<ApiResponseDto<FolderResponse>> createFolder(@Valid @RequestBody CreateFolderRequest request) {
         FolderResponse data = driveService.createFolder(request);
         return ResponseEntity.ok(new ApiResponseDto<>(200, "Folder created", data));
@@ -42,24 +44,28 @@ public class DriveController {
 
     @GetMapping("/folders")
     @Operation(summary = "List all folders of owner")
+    @PreAuthorize("hasAuthority('DOC_READ')")
     public ResponseEntity<ApiResponseDto<Object>> listFolders() {
         return ResponseEntity.ok(new ApiResponseDto<>(200, "OK", driveService.listFolders()));
     }
 
     @GetMapping("/files")
     @Operation(summary = "List all files of owner")
+    @PreAuthorize("hasAuthority('DOC_READ')")
     public ResponseEntity<ApiResponseDto<Object>> listFiles() {
         return ResponseEntity.ok(new ApiResponseDto<>(200, "OK", driveService.listFiles()));
     }
 
     @GetMapping("/files/accessible")
     @Operation(summary = "List all files accessible to requester (owned/public/shared)")
+    @PreAuthorize("hasAuthority('DOC_READ')")
     public ResponseEntity<ApiResponseDto<Object>> listAccessibleFiles() {
         return ResponseEntity.ok(new ApiResponseDto<>(200, "OK", driveService.listAccessibleFiles()));
     }
 
     @GetMapping("/folders/{id}/contents")
     @Operation(summary = "List all folders and files inside a folder")
+    @PreAuthorize("hasAuthority('DOC_READ')")
     public ResponseEntity<ApiResponseDto<Object>> listFolderContents(@PathVariable UUID id) {
         return ResponseEntity.ok(new ApiResponseDto<>(200, "OK", driveService.listFolderContents(id)));
     }

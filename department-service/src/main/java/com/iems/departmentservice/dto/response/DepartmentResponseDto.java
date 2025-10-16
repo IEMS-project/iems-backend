@@ -15,6 +15,6 @@ public class DepartmentResponseDto {
     private String departmentName;
     private String description;
     private UUID managerId;
-    private List<DepartmentUserDto> users;
+    private String managerName;
     private long totalUsers;
 }

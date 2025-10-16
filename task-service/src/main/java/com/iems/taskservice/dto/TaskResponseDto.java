@@ -31,6 +31,8 @@ public class TaskResponseDto {
     // Added for better UX
     private String status;
     private String priority;
+    private String taskType;
+    private UUID parentTaskId;
     private LocalDate startDate;
     private LocalDate dueDate;
     private LocalDateTime createdAt;

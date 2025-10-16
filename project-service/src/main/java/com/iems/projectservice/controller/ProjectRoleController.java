@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -24,6 +25,7 @@ public class ProjectRoleController {
 
     @GetMapping
     @Operation(summary = "List project roles")
+    @PreAuthorize("hasAuthority('PROJECT_READ')")
     public ResponseEntity<ApiResponseDto<List<ProjectAllowedRoleDto>>> list(@PathVariable UUID projectId) {
         List<ProjectAllowedRole> list = service.list(projectId);
         List<ProjectAllowedRoleDto> dto = list.stream()
@@ -34,6 +36,7 @@ public class ProjectRoleController {
 
     @PostMapping
     @Operation(summary = "Add role to project")
+    @PreAuthorize("hasAuthority('PROJECT_MANAGE')")
     public ResponseEntity<ApiResponseDto<ProjectAllowedRoleDto>> add(@PathVariable UUID projectId,
                                                                   @RequestBody Map<String, String> payload) {
         UUID roleId = UUID.fromString(payload.get("roleId"));
@@ -45,6 +48,7 @@ public class ProjectRoleController {
 
     @DeleteMapping("/{id}")
     @Operation(summary = "Delete role from project")
+    @PreAuthorize("hasAuthority('PROJECT_MANAGE')")
     public ResponseEntity<ApiResponseDto<Void>> delete(@PathVariable UUID projectId, @PathVariable UUID id) {
         service.delete(projectId, id);
         return ResponseEntity.ok(new ApiResponseDto<>("success", "Deleted", null));

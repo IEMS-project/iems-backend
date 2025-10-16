@@ -12,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -28,6 +29,7 @@ public class ProjectMemberController {
     
     @PostMapping
     @Operation(summary = "Add member to project", description = "Add a new member to the project with specified role")
+    @PreAuthorize("hasAuthority('PROJECT_MANAGE')")
     public ResponseEntity<ApiResponseDto<ProjectMemberResponseDto>> addMember(
             @Parameter(description = "Project ID", required = true)
             @PathVariable UUID projectId,
@@ -46,6 +48,7 @@ public class ProjectMemberController {
     
     @GetMapping
     @Operation(summary = "Get project members", description = "Get all members of the project")
+    @PreAuthorize("hasAuthority('PROJECT_READ')")
     public ResponseEntity<ApiResponseDto<List<ProjectMemberResponseDto>>> getProjectMembers(
             @Parameter(description = "Project ID", required = true)
             @PathVariable UUID projectId) {
@@ -61,6 +64,7 @@ public class ProjectMemberController {
     
     @GetMapping("/role/{roleId}")
     @Operation(summary = "Get members by role", description = "Get project members filtered by specific role")
+    @PreAuthorize("hasAuthority('PROJECT_READ')")
     public ResponseEntity<ApiResponseDto<List<ProjectMemberResponseDto>>> getMembersByRole(
             @Parameter(description = "Project ID", required = true)
             @PathVariable UUID projectId,
@@ -78,6 +82,7 @@ public class ProjectMemberController {
     
     @PutMapping("/{userId}/role")
     @Operation(summary = "Update member role", description = "Update the role of a project member")
+    @PreAuthorize("hasAuthority('PROJECT_MANAGE')")
     public ResponseEntity<ApiResponseDto<ProjectMemberResponseDto>> updateMemberRole(
             @Parameter(description = "Project ID", required = true)
             @PathVariable UUID projectId,
@@ -98,6 +103,7 @@ public class ProjectMemberController {
     
     @DeleteMapping("/{userId}")
     @Operation(summary = "Remove member from project", description = "Remove a member from the project")
+    @PreAuthorize("hasAuthority('PROJECT_MANAGE')")
     public ResponseEntity<ApiResponseDto<Void>> removeMember(
             @Parameter(description = "Project ID", required = true)
             @PathVariable UUID projectId,

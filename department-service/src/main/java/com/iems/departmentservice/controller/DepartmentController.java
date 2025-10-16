@@ -9,6 +9,7 @@ import com.iems.departmentservice.dto.response.DepartmentUserDto;
 import com.iems.departmentservice.dto.response.DepartmentMemberCountDto;
 import com.iems.departmentservice.dto.response.DepartmentWithUsersDto;
 import com.iems.departmentservice.service.DepartmentService;
+import com.iems.departmentservice.dto.request.UpdateManagerDto;
 import com.iems.departmentservice.dto.request.UpdateDepartmentDto;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -82,6 +83,22 @@ public class DepartmentController {
             return ResponseEntity.badRequest().body(new ApiResponseDto<>("error", e.getMessage(), null));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(new ApiResponseDto<>("error", "Failed to update department", null));
+        }
+    }
+
+    @PatchMapping("/{id}/manager")
+    @Operation(summary = "Assign or update manager", description = "Set manager for a department by userId; pass null to clear")
+    public ResponseEntity<ApiResponseDto<DepartmentResponseDto>> updateManager(
+            @PathVariable UUID id,
+            @RequestBody UpdateManagerDto updateManagerDto
+    ) {
+        try {
+            return service.updateDepartmentManager(id, updateManagerDto.getManagerId())
+                    .map(updated -> ResponseEntity.ok(new ApiResponseDto<DepartmentResponseDto>("success", "Manager updated successfully", updated)))
+                    .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND)
+                            .body(new ApiResponseDto<DepartmentResponseDto>("error", "Department not found", null)));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(new ApiResponseDto<>("error", "Failed to update manager", null));
         }
     }
 

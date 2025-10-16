@@ -86,6 +86,16 @@ public class DepartmentService {
         });
     }
 
+    public Optional<DepartmentResponseDto> updateDepartmentManager(UUID id, UUID newManagerId) {
+        return departmentRepository.findById(id).map(existing -> {
+            UUID userId = this.getUserIdFromRequest();
+            existing.setManagerId(newManagerId);
+            existing.setUpdatedBy(userId);
+            Department saved = departmentRepository.save(existing);
+            return convertToResponseDto(saved);
+        });
+    }
+
     public boolean deleteDepartment(UUID id) {
         if (!departmentRepository.existsById(id)) {
             return false;
@@ -144,19 +154,32 @@ public class DepartmentService {
     }
 
     private DepartmentResponseDto convertToResponseDto(Department department) {
-        List<DepartmentUser> allUsers = departmentUserRepository.findByDepartmentId(department.getId());
+        long totalUsers = departmentUserRepository.countUsersByDepartmentId(department.getId());
 
-        List<DepartmentUserDto> userDtos = allUsers.stream()
-                .map(this::convertToDepartmentUserDto)
-                .collect(Collectors.toList());
+        String managerName = null;
+        UUID managerId = department.getManagerId();
+        if (managerId != null) {
+            try {
+                managerName = getUserById(managerId)
+                        .map(u -> {
+                            String first = u.getFirstName() != null ? u.getFirstName() : "";
+                            String last = u.getLastName() != null ? u.getLastName() : "";
+                            String full = (first + " " + last).trim();
+                            return full.isEmpty() ? null : full;
+                        })
+                        .orElse(null);
+            } catch (Exception ignored) {
+                managerName = null;
+            }
+        }
 
         return new DepartmentResponseDto(
                 department.getId(),
                 department.getDepartmentName(),
                 department.getDescription(),
                 department.getManagerId(),
-                userDtos,
-                allUsers.size()
+                managerName,
+                totalUsers
         );
     }
 
@@ -197,11 +220,29 @@ public class DepartmentService {
                     })
                     .collect(Collectors.toList());
 
+            String managerName = null;
+            UUID managerId = department.getManagerId();
+            if (managerId != null) {
+                try {
+                    managerName = getUserById(managerId)
+                            .map(u -> {
+                                String first = u.getFirstName() != null ? u.getFirstName() : "";
+                                String last = u.getLastName() != null ? u.getLastName() : "";
+                                String full = (first + " " + last).trim();
+                                return full.isEmpty() ? null : full;
+                            })
+                            .orElse(null);
+                } catch (Exception ignored) {
+                    managerName = null;
+                }
+            }
+
             return new DepartmentWithUsersDto(
                     department.getId(),
                     department.getDepartmentName(),
                     department.getDescription(),
                     department.getManagerId(),
+                    managerName,
                     department.getCreatedAt(),
                     department.getCreatedBy(),
                     department.getUpdatedAt(),

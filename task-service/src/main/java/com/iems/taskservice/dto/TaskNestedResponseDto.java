@@ -17,6 +17,8 @@ public class TaskNestedResponseDto {
     private UserInfo updatedBy;
     private String status;
     private String priority;
+    private String taskType;
+    private UUID parentTaskId;
     private LocalDate startDate;
     private LocalDate dueDate;
     private LocalDateTime createdAt;
