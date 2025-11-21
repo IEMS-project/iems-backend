@@ -1,17 +1,17 @@
-package com.iems.chatservice.service;
+package com.iems.chatservice.service.Impl;
 
 import com.iems.chatservice.entity.Conversation;
 import com.iems.chatservice.entity.Message;
 import com.iems.chatservice.repository.ConversationRepository;
-import com.iems.chatservice.client.UserServiceFeignClient;
 import com.iems.chatservice.repository.MessageRepository;
+import com.iems.chatservice.service.IGroupMemberService;
+import com.iems.chatservice.service.IMessageBroadcastService;
+import com.iems.chatservice.service.IUserService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
-import com.iems.chatservice.security.JwtUserDetails;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import java.util.UUID;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -21,25 +21,26 @@ import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
-public class GroupMemberService {
+public class GroupMemberService implements IGroupMemberService {
 
     private static final String SYSTEM_SENDER = "SYSTEM";
 
-    private final ConversationRepository conversationRepository;
-    private final MessageRepository messageRepository;
-    private final MessageBroadcastService messageBroadcastService;
-    private final SimpMessagingTemplate messagingTemplate;
-    private final UserServiceFeignClient userServiceFeignClient;
+    @Autowired
+    private ConversationRepository conversationRepository;
+    @Autowired
+    private MessageRepository messageRepository;
+    @Autowired
+    private IMessageBroadcastService messageBroadcastService;
+    @Autowired
+    private SimpMessagingTemplate messagingTemplate;
 
-    public UUID getUserIdFromRequest() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        JwtUserDetails userDetails = (JwtUserDetails) authentication.getPrincipal();
-        UUID userId = userDetails.getUserId();
-        return userId;
-    }
 
+    @Autowired
+    private IUserService userService;
+
+    @Override
     public Conversation addMember(String conversationId, String userId) {
-        UUID actorUserId = getUserIdFromRequest();
+        UUID actorUserId = userService.getUserIdFromRequest();
         String actorUserIdStr = actorUserId.toString();
         
         Conversation conv = conversationRepository.findById(conversationId).orElse(null);
@@ -55,7 +56,7 @@ public class GroupMemberService {
         Conversation updated = conversationRepository.save(conv);
 
         // Create system log message
-        String content = String.format("%s đã tham gia nhóm", resolveUserName(userId));
+        String content = String.format("%s đã tham gia nhóm", userService.resolveUserName(userId));
         createAndBroadcastSystemLog(updated.getId(), content);
 
         // Broadcast member-added event to all participants
@@ -63,8 +64,9 @@ public class GroupMemberService {
         return updated;
     }
 
+    @Override
     public Conversation removeMember(String conversationId, String userId) {
-        UUID actorUserId = getUserIdFromRequest();
+        UUID actorUserId = userService.getUserIdFromRequest();
         String actorUserIdStr = actorUserId.toString();
         
         Conversation conv = conversationRepository.findById(conversationId).orElse(null);
@@ -84,13 +86,14 @@ public class GroupMemberService {
         }
         Conversation updated = conversationRepository.save(conv);
 
-        String content = String.format("%s đã rời nhóm", resolveUserName(userId));
+        String content = String.format("%s đã rời nhóm", userService.resolveUserName(userId));
         createAndBroadcastSystemLog(updated.getId(), content);
         broadcastMemberEvent(updated, "member_removed", userId, actorUserIdStr);
         return updated;
     }
 
-    private void createAndBroadcastSystemLog(String conversationId, String content) {
+    @Override
+    public void createAndBroadcastSystemLog(String conversationId, String content) {
         Message log = new Message();
         log.setConversationId(conversationId);
         log.setSenderId(SYSTEM_SENDER);
@@ -100,7 +103,8 @@ public class GroupMemberService {
         messageBroadcastService.saveAndBroadcast(log);
     }
 
-    private void broadcastMemberEvent(Conversation conversation, String event, String targetUserId, String actorUserId) {
+    @Override
+    public void broadcastMemberEvent(Conversation conversation, String event, String targetUserId, String actorUserId) {
         try {
             Map<String, Object> payload = new HashMap<>();
             payload.put("event", event);
@@ -119,29 +123,6 @@ public class GroupMemberService {
                 }
             }
         } catch (Exception ignore) { }
-    }
-
-    // Resolve display name by calling user service
-    private String resolveUserName(String userId) {
-        try {
-            java.util.UUID uuid = java.util.UUID.fromString(userId);
-            var resp = userServiceFeignClient.getUserById(uuid);
-            var body = resp.getBody();
-            if (body != null && body.containsKey("data")) {
-                @SuppressWarnings("unchecked")
-                java.util.Map<String, Object> data = (java.util.Map<String, Object>) body.get("data");
-                String firstName = data.getOrDefault("firstName", "").toString();
-                String lastName = data.getOrDefault("lastName", "").toString();
-                String email = data.getOrDefault("email", "").toString();
-                String full = (firstName + " " + lastName).trim();
-                return full.isBlank() ? (email.isBlank() ? userId : email) : full;
-            }
-        } catch (Exception e) {
-            // Log the error for debugging
-            System.err.println("Error resolving user name for " + userId + ": " + e.getMessage());
-        }
-        // Return a more user-friendly fallback instead of raw userId
-        return "Người dùng";
     }
 }
 

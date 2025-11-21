@@ -1,8 +1,10 @@
 package com.iems.chatservice.controller;
 
 import com.iems.chatservice.dto.MemberResponseDto;
-import com.iems.chatservice.service.MessageService;
-import com.iems.chatservice.service.ConversationService;
+import com.iems.chatservice.service.IMessageService;
+import com.iems.chatservice.service.Impl.GroupMemberService;
+import com.iems.chatservice.service.Impl.MessageBroadcastService;
+import com.iems.chatservice.service.Impl.ConversationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -28,21 +30,25 @@ import org.springframework.data.mongodb.core.query.Query;
 @RequiredArgsConstructor
 public class ConversationController {
 
-    private final ConversationRepository conversationRepository;
-    private final MongoTemplate mongoTemplate;
-    private final SimpMessagingTemplate messagingTemplate;
+    @Autowired
+    private ConversationRepository conversationRepository;
+    @Autowired
+    private MongoTemplate mongoTemplate;
 
     @Autowired
-    private MessageService messageService;
+    private SimpMessagingTemplate messagingTemplate;
+
+    @Autowired
+    private IMessageService messageService;
 
     @Autowired
     private ConversationService conversationService;
 
     @Autowired
-    private com.iems.chatservice.service.GroupMemberService groupMemberService;
+    private GroupMemberService groupMemberService;
     
     @Autowired
-    private com.iems.chatservice.service.MessageBroadcastService messageBroadcastService;
+    private MessageBroadcastService messageBroadcastService;
     
     @Autowired
     private com.iems.chatservice.client.UserServiceFeignClient userServiceFeignClient;

@@ -1,25 +1,18 @@
-package com.iems.chatservice.service;
+package com.iems.chatservice.service.Impl;
 
-import com.iems.chatservice.client.UserServiceFeignClient;
 import com.iems.chatservice.dto.MemberResponseDto;
 import com.iems.chatservice.dto.UserDetailDto;
-import com.iems.chatservice.security.JwtUserDetails;
+import com.iems.chatservice.service.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.http.ResponseEntity;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import com.iems.chatservice.entity.Conversation;
 import com.iems.chatservice.entity.Message;
 import com.iems.chatservice.repository.ConversationRepository;
 import com.iems.chatservice.repository.MessageRepository;
 import org.springframework.data.mongodb.core.MongoTemplate;
-import org.springframework.data.mongodb.core.aggregation.Aggregation;
-import org.springframework.data.mongodb.core.aggregation.AggregationResults;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
@@ -30,72 +23,31 @@ import java.time.LocalDateTime;
 
 @Service
 @RequiredArgsConstructor
-public class MessageService {
-
-    private final MessageRepository messageRepository;
-    private final ConversationRepository conversationRepository;
-    private final SimpMessagingTemplate messagingTemplate;
-    private final MongoTemplate mongoTemplate;
-    private final MessageBroadcastService messageBroadcastService;
-    private final MessageReadService messageReadService;
-    private final MessageDeletionService messageDeletionService;
-    private final MessagePinService messagePinService;
-    private final MessageReactionService messageReactionService;
+public class MessageService implements IMessageService {
 
     @Autowired
-    private UserServiceFeignClient userServiceFeignClient;
+    private MessageRepository messageRepository;
+    @Autowired
+    private ConversationRepository conversationRepository;
+    @Autowired
+    private  MongoTemplate mongoTemplate;
+    @Autowired
+    private IMessageBroadcastService messageBroadcastService;
+    @Autowired
+    private IMessageReadService messageReadService;
+    @Autowired
+    private IMessageDeletionService messageDeletionService;
+    @Autowired
+    private IMessagePinService messagePinService;
+    @Autowired
+    private IMessageReactionService messageReactionService;
+    
+    
+    @Autowired
+    private IUserService userService;
 
-    private Optional<UserDetailDto> getUserById(UUID userId) {
-        try {
-            ResponseEntity<Map<String, Object>> response = userServiceFeignClient.getUserById(userId);
 
-            if (response.getBody() != null && response.getBody().containsKey("data")) {
-                @SuppressWarnings("unchecked")
-                Map<String, Object> userData = (Map<String, Object>) response.getBody().get("data");
-                return Optional.of(convertToUserDetailDto(userData));
-            }
-
-            return Optional.empty();
-        } catch (Exception e) {
-            // Log error and return empty
-            System.err.println("Error fetching user " + userId + " from User Service: " + e.getMessage());
-            return Optional.empty();
-        }
-    }
-    private UserDetailDto convertToUserDetailDto(Map<String, Object> userData) {
-        UserDetailDto dto = new UserDetailDto();
-        dto.setId(UUID.fromString(userData.get("id").toString()));
-        dto.setFirstName((String) userData.get("firstName"));
-        dto.setLastName((String) userData.get("lastName"));
-        dto.setEmail((String) userData.get("email"));
-        dto.setAddress((String) userData.get("address"));
-        dto.setPhone((String) userData.get("phone"));
-
-        // Handle Date objects - convert to string
-        Object dob = userData.get("dob");
-        dto.setDob(dob != null ? dob.toString() : null);
-
-        // Handle enum objects - convert to string
-        Object gender = userData.get("gender");
-        dto.setGender(gender != null ? gender.toString() : null);
-
-        dto.setPersonalID((String) userData.get("personalID"));
-        dto.setImage((String) userData.get("image"));
-        dto.setBankAccountNumber((String) userData.get("bankAccountNumber"));
-        dto.setBankName((String) userData.get("bankName"));
-
-        // Handle enum objects - convert to string
-        Object contractType = userData.get("contractType");
-        dto.setContractType(contractType != null ? contractType.toString() : null);
-
-        // Handle Date objects - convert to string
-        Object startDate = userData.get("startDate");
-        dto.setStartDate(startDate != null ? startDate.toString() : null);
-
-        dto.setRole((String) userData.get("role"));
-        return dto;
-    }
-
+    @Override
     public List<MemberResponseDto> getMembersByConversationId(String conversationId) {
         Optional<Conversation> conversationOpt = conversationRepository.findById(conversationId);
         if (conversationOpt.isEmpty()) {
@@ -113,7 +65,7 @@ public class MessageService {
         for (String memberId : memberIds) {
             try {
                 UUID uuid = UUID.fromString(memberId);
-                Optional<UserDetailDto> userOpt = getUserById(uuid);
+                Optional<UserDetailDto> userOpt = userService.getUserById(uuid);
                 userOpt.ifPresent(user -> {
                     members.add(MemberResponseDto.builder()
                             .userId(user.getId())
@@ -130,14 +82,17 @@ public class MessageService {
         return members;
     }
 
+    @Override
     public Message saveAndBroadcast(Message message) {
         return messageBroadcastService.saveAndBroadcast(message);
     }
 
+    @Override
     public Page<Message> getRecentMessages(String conversationId, int page, int size) {
         return messageRepository.findByConversationIdOrderBySentAtDesc(conversationId, PageRequest.of(page, size));
     }
 
+    @Override
     public List<Message> getMessagesScroll(String conversationId, LocalDateTime before, int limit) {
         Query q = new Query();
         q.addCriteria(Criteria.where("conversationId").is(conversationId));
@@ -149,8 +104,9 @@ public class MessageService {
         return mongoTemplate.find(q, Message.class);
     }
 
+    @Override
     public void markAsRead(String conversationId) {
-        UUID userId = getUserIdFromRequest();
+        UUID userId = userService.getUserIdFromRequest();
         String userIdStr = userId.toString();
         if (conversationId == null || conversationId.isBlank()) return;
         
@@ -167,20 +123,21 @@ public class MessageService {
         mongoTemplate.updateMulti(q, up, Message.class);
     }
 
+    @Override
     public Map<String, Integer> getUnreadCountsByUser() {
-        UUID userId = getUserIdFromRequest();
+        UUID userId = userService.getUserIdFromRequest();
         return messageReadService.getUnreadCountsByUser(userId.toString());
     }
 
-    // Get unread count for specific conversation
+    @Override
     public int getUnreadCountForConversation(String conversationId) {
-        UUID userId = getUserIdFromRequest();
+        UUID userId = userService.getUserIdFromRequest();
         return messageReadService.getUnreadCountForConversation(conversationId, userId.toString());
     }
 
-    // Reply message functionality
+    @Override
     public Message replyToMessage(String conversationId, String content, String replyToMessageId) {
-        UUID userId = getUserIdFromRequest();
+        UUID userId = userService.getUserIdFromRequest();
         String senderId = userId.toString();
         
         // Get original message for context
@@ -200,7 +157,7 @@ public class MessageService {
         return saveAndBroadcast(reply);
     }
 
-    // Overloaded reply that accepts explicit senderId (useful for WebSocket messages that include senderId in payload)
+    @Override
     public Message replyToMessage(String conversationId, String content, String replyToMessageId, String explicitSenderId) {
         String senderId = explicitSenderId;
 
@@ -222,42 +179,49 @@ public class MessageService {
     }
 
     // Add reaction to message
+    @Override
     public Message addReaction(String messageId, String emoji) {
-        UUID userId = getUserIdFromRequest();
+        UUID userId = userService.getUserIdFromRequest();
         return messageReactionService.addReaction(messageId, userId.toString(), emoji);
     }
 
     // Remove reaction from message
+    @Override
     public Message removeReaction(String messageId) {
-        UUID userId = getUserIdFromRequest();
+        UUID userId = userService.getUserIdFromRequest();
         return messageReactionService.removeReaction(messageId, userId.toString());
     }
 
     // Delete message for user (delete for me)
+    @Override
     public boolean deleteForMe(String messageId) {
-        UUID userId = getUserIdFromRequest();
+        UUID userId = userService.getUserIdFromRequest();
         return messageDeletionService.deleteForMe(messageId, userId.toString());
     }
 
     // Recall message (delete for everyone)
+    @Override
     public Message recallMessage(String messageId) {
-        UUID userId = getUserIdFromRequest();
+        UUID userId = userService.getUserIdFromRequest();
         return messageDeletionService.recallMessage(messageId, userId.toString());
     }
 
     // Pin message
+    @Override
     public Message pinMessage(String conversationId, String messageId) {
-        UUID userId = getUserIdFromRequest();
+        UUID userId = userService.getUserIdFromRequest();
         return messagePinService.pinMessage(conversationId, messageId, userId.toString());
     }
 
     // Unpin message
+    @Override
     public Message unpinMessage(String conversationId, String messageId) {
-        UUID userId = getUserIdFromRequest();
+        UUID userId = userService.getUserIdFromRequest();
         return messagePinService.unpinMessage(conversationId, messageId, userId.toString());
     }
 
     // Get pinned messages for conversation
+    @Override
     public List<Message> getPinnedMessages(String conversationId) {
         Query query = new Query(Criteria.where("conversationId").is(conversationId).and("pinned").is(true));
         query.with(Sort.by(Sort.Direction.DESC, "pinnedAt"));
@@ -265,21 +229,24 @@ public class MessageService {
     }
 
     // Enhanced mark as read with last read message tracking
+    @Override
     public void markAsReadWithLastMessage(String conversationId, String lastMessageId) {
-        UUID userId = getUserIdFromRequest();
+        UUID userId = userService.getUserIdFromRequest();
         messageReadService.markAsReadWithLastMessage(conversationId, userId.toString(), lastMessageId);
     }
 
     // Mark entire conversation as read
+    @Override
     public boolean markConversationAsRead(String conversationId) {
-        UUID userId = getUserIdFromRequest();
+        UUID userId = userService.getUserIdFromRequest();
         return messageReadService.markConversationAsRead(conversationId, userId.toString());
     }
 
 
     // Get messages with user-specific filtering (exclude deleted/recalled)
+    @Override
     public List<Message> getMessagesForUser(String conversationId, int page, int size) {
-        UUID userId = getUserIdFromRequest();
+        UUID userId = userService.getUserIdFromRequest();
         String userIdStr = userId.toString();
         
         Criteria userMessagesCriteria = new Criteria().andOperator(
@@ -300,8 +267,9 @@ public class MessageService {
     }
 
     // Get paginated messages for conversation with cursor-based pagination
+    @Override
     public Map<String, Object> getConversationMessagesPaginated(String conversationId, int limit, String before) {
-        UUID userId = getUserIdFromRequest();
+        UUID userId = userService.getUserIdFromRequest();
         String userIdStr = userId.toString();
         
         Criteria baseCriteria = new Criteria().andOperator(
@@ -361,8 +329,9 @@ public class MessageService {
     }
 
     // Get newest messages by type (IMAGE/VIDEO/FILE or MEDIA=both) with before cursor
+    @Override
     public Map<String, Object> getLatestByType(String conversationId, String type, int limit, String before) {
-        UUID userId = getUserIdFromRequest();
+        UUID userId = userService.getUserIdFromRequest();
         String userIdStr = userId.toString();
 
         String normalizedType = (type == null ? "MEDIA" : type).toUpperCase();
@@ -430,6 +399,7 @@ public class MessageService {
     // Broadcast helpers moved to MessageBroadcastService
 
     // Get message by ID with neighbors for jump-to-message functionality
+    @Override
     public Map<String, Object> getMessageWithNeighbors(String messageId, boolean withNeighbors, int neighborLimit) {
         // First, get the target message
         Message targetMessage = messageRepository.findById(messageId).orElse(null);
@@ -460,7 +430,8 @@ public class MessageService {
     }
 
     // Get messages before a specific message
-    private List<Message> getMessagesBefore(Message targetMessage, int limit) {
+    @Override
+    public List<Message> getMessagesBefore(Message targetMessage, int limit) {
         Criteria criteria = new Criteria().andOperator(
             Criteria.where("conversationId").is(targetMessage.getConversationId()),
             Criteria.where("sentAt").lt(targetMessage.getSentAt()),
@@ -477,7 +448,8 @@ public class MessageService {
     }
 
     // Get messages after a specific message
-    private List<Message> getMessagesAfter(Message targetMessage, int limit) {
+    @Override
+    public List<Message> getMessagesAfter(Message targetMessage, int limit) {
         Criteria criteria = new Criteria().andOperator(
             Criteria.where("conversationId").is(targetMessage.getConversationId()),
             Criteria.where("sentAt").gt(targetMessage.getSentAt()),
@@ -492,6 +464,7 @@ public class MessageService {
     }
 
     // Get media messages around a specific message, filtered by type
+    @Override
     public Map<String, Object> getMessagesAroundByType(String messageId, String type, int before, int after) {
         Message targetMessage = messageRepository.findById(messageId).orElse(null);
         if (targetMessage == null) {
@@ -550,6 +523,7 @@ public class MessageService {
     }
 
     // Search messages by text content
+    @Override
     public Map<String, Object> searchMessages(String conversationId, String keyword, int page, int size) {
         if (keyword == null || keyword.trim().isEmpty()) {
             return Map.of("messages", List.of(), "total", 0, "page", page, "size", size);
@@ -600,6 +574,7 @@ public class MessageService {
     }
 
     // Get messages around a specific message (for jump-to-message)
+    @Override
     public Map<String, Object> getMessagesAround(String messageId, int before, int after) {
         // First, get the target message
         Message targetMessage = messageRepository.findById(messageId).orElse(null);
@@ -626,6 +601,7 @@ public class MessageService {
     }
 
     // Get messages between two message IDs (for gap filling)
+    @Override
     public List<Message> getMessagesBetween(String fromMessageId, String toMessageId, String conversationId) {
         // Get the two boundary messages
         Message fromMessage = messageRepository.findById(fromMessageId).orElse(null);
@@ -660,12 +636,7 @@ public class MessageService {
     }
 
 
-    public UUID getUserIdFromRequest() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        JwtUserDetails userDetails = (JwtUserDetails) authentication.getPrincipal();
-        UUID userId = userDetails.getUserId();
-        return userId;
-    }
+
 
     public static class UnreadCountRow {
         public String id; // _id from group -> conversationId

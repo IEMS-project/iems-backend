@@ -1,8 +1,9 @@
-package com.iems.chatservice.service;
+package com.iems.chatservice.service.Impl;
 
 import com.iems.chatservice.entity.Conversation;
 import com.iems.chatservice.entity.Message;
 import com.iems.chatservice.repository.ConversationRepository;
+import com.iems.chatservice.service.IMessageReadService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.aggregation.Aggregation;
@@ -19,12 +20,13 @@ import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
-public class MessageReadService {
+public class MessageReadService implements IMessageReadService {
 
     private final MongoTemplate mongoTemplate;
     private final ConversationRepository conversationRepository;
     private final SimpMessagingTemplate messagingTemplate;
 
+    @Override
     public void markAsRead(String conversationId, String userId) {
         if (conversationId == null || userId == null || conversationId.isBlank() || userId.isBlank()) return;
 
@@ -41,6 +43,7 @@ public class MessageReadService {
         mongoTemplate.updateMulti(q, up, Message.class);
     }
 
+    @Override
     public Map<String, Integer> getUnreadCountsByUser(String userId) {
         if (userId == null || userId.isBlank()) return Map.of();
         Aggregation agg = Aggregation.newAggregation(
@@ -58,9 +61,9 @@ public class MessageReadService {
                 )),
                 Aggregation.group("conversationId").count().as("count")
         );
-        AggregationResults<com.iems.chatservice.service.MessageService.UnreadCountRow> res = mongoTemplate.aggregate(agg, "messages", com.iems.chatservice.service.MessageService.UnreadCountRow.class);
+        AggregationResults<MessageService.UnreadCountRow> res = mongoTemplate.aggregate(agg, "messages", MessageService.UnreadCountRow.class);
         Map<String, Integer> map = new HashMap<>();
-        for (com.iems.chatservice.service.MessageService.UnreadCountRow row : res.getMappedResults()) {
+        for (MessageService.UnreadCountRow row : res.getMappedResults()) {
             if (row != null && row.id != null) {
                 map.put(row.id, row.count);
             }
@@ -68,6 +71,7 @@ public class MessageReadService {
         return map;
     }
 
+    @Override
     public int getUnreadCountForConversation(String conversationId, String userId) {
         if (userId == null || userId.isBlank() || conversationId == null || conversationId.isBlank()) {
             return 0;
@@ -91,6 +95,7 @@ public class MessageReadService {
         return (int) mongoTemplate.count(query, Message.class);
     }
 
+    @Override
     public void markAsReadWithLastMessage(String conversationId, String userId, String lastMessageId) {
         markAsRead(conversationId, userId);
 
@@ -103,6 +108,7 @@ public class MessageReadService {
         broadcastReadStatusUpdate(conversationId, userId, lastMessageId);
     }
 
+    @Override
     public boolean markConversationAsRead(String conversationId, String userId) {
         Conversation conversation = conversationRepository.findById(conversationId).orElse(null);
         if (conversation == null || !conversation.getMembers().contains(userId)) {
@@ -145,7 +151,8 @@ public class MessageReadService {
         return true;
     }
 
-    private void broadcastReadStatusUpdate(String conversationId, String userId, String lastMessageId) {
+    @Override
+    public void broadcastReadStatusUpdate(String conversationId, String userId, String lastMessageId) {
         Conversation conv = conversationRepository.findById(conversationId).orElse(null);
         if (conv != null) {
             Map<String, Object> payload = Map.of(

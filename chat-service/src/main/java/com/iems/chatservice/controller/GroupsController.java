@@ -2,11 +2,12 @@ package com.iems.chatservice.controller;
 
 import com.iems.chatservice.entity.Conversation;
 import com.iems.chatservice.entity.Message;
-import com.iems.chatservice.service.MessageBroadcastService;
+import com.iems.chatservice.service.IMessageBroadcastService;
 import com.iems.chatservice.client.UserServiceFeignClient;
 import com.iems.chatservice.repository.ConversationRepository;
 import com.iems.chatservice.security.JwtUserDetails;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
@@ -20,10 +21,12 @@ import java.util.*;
 @RequestMapping("/api/groups")
 @RequiredArgsConstructor
 public class GroupsController {
-
-    private final ConversationRepository conversationRepository;
-    private final MessageBroadcastService messageBroadcastService;
-    private final UserServiceFeignClient userServiceFeignClient;
+    @Autowired
+    private ConversationRepository conversationRepository;
+    @Autowired
+    private IMessageBroadcastService messageBroadcastService;
+    @Autowired
+    private UserServiceFeignClient userServiceFeignClient;
 
     @PostMapping
     public ResponseEntity<Conversation> createGroup(@RequestBody Map<String, Object> body) {

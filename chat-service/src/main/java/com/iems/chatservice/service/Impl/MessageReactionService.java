@@ -1,8 +1,11 @@
-package com.iems.chatservice.service;
+package com.iems.chatservice.service.Impl;
 
 import com.iems.chatservice.entity.Message;
 import com.iems.chatservice.repository.MessageRepository;
+import com.iems.chatservice.service.IMessageBroadcastService;
+import com.iems.chatservice.service.IMessageReactionService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
@@ -14,12 +17,16 @@ import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
-public class MessageReactionService {
+public class MessageReactionService implements IMessageReactionService {
 
-    private final MongoTemplate mongoTemplate;
-    private final MessageRepository messageRepository;
-    private final MessageBroadcastService messageBroadcastService;
+    @Autowired
+    private MongoTemplate mongoTemplate;
+    @Autowired
+    private MessageRepository messageRepository;
+    @Autowired
+    private IMessageBroadcastService messageBroadcastService;
 
+    @Override
     public Message addReaction(String messageId, String userId, String emoji) {
         Query query = new Query(Criteria.where("id").is(messageId));
         Update update = new Update().addToSet("reactions." + emoji, userId);
@@ -32,6 +39,7 @@ public class MessageReactionService {
         return updatedMessage;
     }
 
+    @Override
     public Message removeReaction(String messageId, String userId) {
         Message message = messageRepository.findById(messageId).orElse(null);
         if (message == null) return null;

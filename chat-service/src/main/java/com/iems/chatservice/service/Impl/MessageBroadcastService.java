@@ -1,10 +1,12 @@
-package com.iems.chatservice.service;
+package com.iems.chatservice.service.Impl;
 
 import com.iems.chatservice.entity.Conversation;
 import com.iems.chatservice.entity.Message;
 import com.iems.chatservice.repository.ConversationRepository;
 import com.iems.chatservice.repository.MessageRepository;
+import com.iems.chatservice.service.IMessageBroadcastService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
@@ -18,13 +20,18 @@ import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
-public class MessageBroadcastService {
+public class MessageBroadcastService implements IMessageBroadcastService {
 
-    private final MessageRepository messageRepository;
-    private final ConversationRepository conversationRepository;
-    private final SimpMessagingTemplate messagingTemplate;
-    private final MongoTemplate mongoTemplate;
+    @Autowired
+    private MessageRepository messageRepository;
+    @Autowired
+    private ConversationRepository conversationRepository;
+    @Autowired
+    private SimpMessagingTemplate messagingTemplate;
+    @Autowired
+    private MongoTemplate mongoTemplate;
 
+    @Override
     public Message saveAndBroadcast(Message message) {
         Message saved = messageRepository.save(message);
 
@@ -62,6 +69,7 @@ public class MessageBroadcastService {
         return saved;
     }
 
+    @Override
     public void broadcastMessageUpdate(Message message, String eventType, Map<String, Object> additionalData) {
         Conversation conversation = conversationRepository.findById(message.getConversationId()).orElse(null);
         if (conversation != null) {
@@ -80,6 +88,7 @@ public class MessageBroadcastService {
         }
     }
 
+    @Override
     public void broadcastConversationUpdate(Conversation conversation, Message lastMessage) {
         try {
             List<String> members = conversation.getMembers();
@@ -110,6 +119,7 @@ public class MessageBroadcastService {
         }
     }
 
+    @Override
     public void broadcastConversationMetaUpdate(Conversation conversation, java.util.Map<String, Object> changedFields) {
         try {
             java.util.List<String> members = conversation.getMembers();
@@ -129,6 +139,7 @@ public class MessageBroadcastService {
         }
     }
 
+    @Override
     public Message getLatestVisibleMessageForUser(String conversationId, String userId) {
         Criteria criteria = new Criteria().andOperator(
                 Criteria.where("conversationId").is(conversationId),

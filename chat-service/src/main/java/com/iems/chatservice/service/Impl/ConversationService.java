@@ -1,8 +1,11 @@
-package com.iems.chatservice.service;
+package com.iems.chatservice.service.Impl;
 
 import com.iems.chatservice.entity.Conversation;
 import com.iems.chatservice.entity.Message;
 import com.iems.chatservice.repository.ConversationRepository;
+import com.iems.chatservice.service.IConversationService;
+import com.iems.chatservice.service.IMessageService;
+import com.iems.chatservice.service.IUserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -10,15 +13,12 @@ import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Service;
 
-import com.iems.chatservice.security.JwtUserDetails;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import java.util.*;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Service
-public class ConversationService {
+public class ConversationService implements IConversationService {
     
     @Autowired
     private ConversationRepository conversationRepository;
@@ -27,17 +27,14 @@ public class ConversationService {
     private MongoTemplate mongoTemplate;
     
     @Autowired
-    private MessageService messageService;
+    private IMessageService messageService;
 
-    public UUID getUserIdFromRequest() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        JwtUserDetails userDetails = (JwtUserDetails) authentication.getPrincipal();
-        UUID userId = userDetails.getUserId();
-        return userId;
-    }
+    @Autowired
+    private IUserService userService;
+
 
     public List<Map<String, Object>> getConversationsByUser() {
-        UUID userId = getUserIdFromRequest();
+        UUID userId = userService.getUserIdFromRequest();
         String userIdStr = userId.toString();
         
         Query query = new Query();
@@ -147,8 +144,9 @@ public class ConversationService {
         
         return result;
     }
-    
-    private Message getLastMessageForConversation(String conversationId, String userId) {
+
+    @Override
+    public Message getLastMessageForConversation(String conversationId, String userId) {
         Criteria lastMessageCriteria = new Criteria().andOperator(
             Criteria.where("conversationId").is(conversationId),
             new Criteria().orOperator(
@@ -198,20 +196,24 @@ public class ConversationService {
         return lastMessage;
     }
     
+    @Override
     public Conversation findById(String conversationId) {
         return conversationRepository.findById(conversationId).orElse(null);
     }
     
+    @Override
     public Conversation save(Conversation conversation) {
         return conversationRepository.save(conversation);
     }
     
+    @Override
     public List<Conversation> findByMembersContaining(String userId) {
         return conversationRepository.findByMembersContaining(userId);
     }
     
+    @Override
     public boolean pinConversation(String conversationId) {
-        UUID userId = getUserIdFromRequest();
+        UUID userId = userService.getUserIdFromRequest();
         String userIdStr = userId.toString();
         
         try {
@@ -241,8 +243,9 @@ public class ConversationService {
         }
     }
     
+    @Override
     public boolean unpinConversation(String conversationId) {
-        UUID userId = getUserIdFromRequest();
+        UUID userId = userService.getUserIdFromRequest();
         String userIdStr = userId.toString();
         
         try {
@@ -269,8 +272,9 @@ public class ConversationService {
         }
     }
     
+    @Override
     public boolean markConversationAsUnread(String conversationId) {
-        UUID userId = getUserIdFromRequest();
+        UUID userId = userService.getUserIdFromRequest();
         String userIdStr = userId.toString();
         
         try {
@@ -300,8 +304,9 @@ public class ConversationService {
         }
     }
     
+    @Override
     public boolean toggleNotificationSettings(String conversationId) {
-        UUID userId = getUserIdFromRequest();
+        UUID userId = userService.getUserIdFromRequest();
         String userIdStr = userId.toString();
         
         try {
@@ -332,6 +337,7 @@ public class ConversationService {
         }
     }
     
+    @Override
     public boolean clearManualUnreadMark(String conversationId, String userId) {
         try {
             Conversation conversation = conversationRepository.findById(conversationId).orElse(null);

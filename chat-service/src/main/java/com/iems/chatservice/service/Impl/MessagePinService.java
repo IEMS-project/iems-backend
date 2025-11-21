@@ -1,7 +1,12 @@
-package com.iems.chatservice.service;
+package com.iems.chatservice.service.Impl;
 
 import com.iems.chatservice.entity.Message;
+import com.iems.chatservice.repository.MessageRepository;
+import com.iems.chatservice.service.IMessageBroadcastService;
+import com.iems.chatservice.service.IMessagePinService;
+import com.iems.chatservice.service.IUserService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
@@ -10,14 +15,20 @@ import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
-public class MessagePinService {
+public class MessagePinService implements IMessagePinService {
 
-    private final MongoTemplate mongoTemplate;
-    private final com.iems.chatservice.repository.MessageRepository messageRepository;
-    private final MessageBroadcastService messageBroadcastService;
-    private final com.iems.chatservice.client.UserServiceFeignClient userServiceFeignClient;
-    private static final String SYSTEM_SENDER = "SYSTEM";
+    @Autowired
+    private MongoTemplate mongoTemplate;
+    @Autowired
+    private MessageRepository messageRepository;
+    @Autowired
+    private IMessageBroadcastService messageBroadcastService;
+    @Autowired
+    private IUserService userService;
 
+    private final String SYSTEM_SENDER = "SYSTEM";
+
+    @Override
     public Message pinMessage(String conversationId, String messageId, String userId) {
         Query messageQuery = new Query(Criteria.where("id").is(messageId));
         Update messageUpdate = new Update()
@@ -39,12 +50,13 @@ public class MessagePinService {
             log.setConversationId(conversationId);
             log.setSenderId(SYSTEM_SENDER);
             log.setType("SYSTEM_LOG");
-            log.setContent(String.format("%s đã ghim một tin nhắn", resolveUserName(userId)));
+            log.setContent(String.format("%s đã ghim một tin nhắn", userService.resolveUserName(userId)));
             messageBroadcastService.saveAndBroadcast(log);
         }
         return pinnedMessage;
     }
 
+    @Override
     public Message unpinMessage(String conversationId, String messageId, String userId) {
         Query messageQuery = new Query(Criteria.where("id").is(messageId));
         Update messageUpdate = new Update()
@@ -66,33 +78,13 @@ public class MessagePinService {
             log.setConversationId(conversationId);
             log.setSenderId(SYSTEM_SENDER);
             log.setType("SYSTEM_LOG");
-            log.setContent(String.format("%s đã bỏ ghim một tin nhắn", resolveUserName(userId)));
+            log.setContent(String.format("%s đã bỏ ghim một tin nhắn", userService.resolveUserName(userId)));
             messageBroadcastService.saveAndBroadcast(log);
         }
         return unpinnedMessage;
     }
 
-    private String resolveUserName(String userId) {
-        try {
-            java.util.UUID uuid = java.util.UUID.fromString(userId);
-            var resp = userServiceFeignClient.getUserById(uuid);
-            var body = resp.getBody();
-            if (body != null && body.containsKey("data")) {
-                @SuppressWarnings("unchecked")
-                java.util.Map<String, Object> data = (java.util.Map<String, Object>) body.get("data");
-                String firstName = data.getOrDefault("firstName", "").toString();
-                String lastName = data.getOrDefault("lastName", "").toString();
-                String email = data.getOrDefault("email", "").toString();
-                String full = (firstName + " " + lastName).trim();
-                return full.isBlank() ? (email.isBlank() ? userId : email) : full;
-            }
-        } catch (Exception e) {
-            // Log the error for debugging
-            System.err.println("Error resolving user name for " + userId + ": " + e.getMessage());
-        }
-        // Return a more user-friendly fallback instead of raw userId
-        return "Người dùng";
-    }
+
 }
 
 

@@ -23,27 +23,26 @@ public class Conversation {
 
     private List<String> members;
 
+    //Xem tin nhan duoc doc cuoi cung cua moi nguoi
+    private Map<String, String> lastReadMessageId; // userId -> messageId
+
+    //Danh sach nhung tin nhan duoc ghim
+    private List<String> pinnedMessageIds;
+
+    //Thong tin cuoc hoi thoai
+    private String createdBy; //Truong nhom
+    private String avatarUrl;
+    
+    //Nhung nguoi ghim cuoc hoi thoai
+    private Map<String, LocalDateTime> pinnedBy;
+    
+    //Ai bat tat thong bao
+    private Map<String, Boolean> notificationSettings;
+    
+    //Danh dau chua doc
+    private Set<String> manuallyMarkedAsUnread;
+
     private LocalDateTime createdAt = LocalDateTime.now();
 
     private LocalDateTime updatedAt = LocalDateTime.now();
-
-    // Track last read message for each user to optimize unread count
-    private Map<String, String> lastReadMessageId; // userId -> messageId
-
-    // Pinned messages in this conversation
-    private List<String> pinnedMessageIds;
-
-    // Conversation settings
-    private String createdBy; // userId who created the conversation
-    private String description; // Optional description for group chats
-    private String avatarUrl; // Optional avatar for group chats
-    
-    // Pinned conversations by user - Map<userId, pinnedAt>
-    private Map<String, LocalDateTime> pinnedBy;
-    
-    // Notification settings by user - Map<userId, notificationEnabled>
-    private Map<String, Boolean> notificationSettings;
-    
-    // Manually marked as unread by user - Set<userId>
-    private Set<String> manuallyMarkedAsUnread;
 }
