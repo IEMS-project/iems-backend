@@ -1,10 +1,13 @@
-package com.iems.chatservice.service;
+package com.iems.chatservice.service.Impl;
 
 import com.iems.chatservice.entity.Conversation;
 import com.iems.chatservice.entity.Message;
 import com.iems.chatservice.repository.ConversationRepository;
 import com.iems.chatservice.repository.MessageRepository;
+import com.iems.chatservice.service.IMessageBroadcastService;
+import com.iems.chatservice.service.IMessageDeletionService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
@@ -18,14 +21,20 @@ import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
-public class MessageDeletionService {
+public class MessageDeletionService implements IMessageDeletionService {
 
-    private final MessageRepository messageRepository;
-    private final ConversationRepository conversationRepository;
-    private final MongoTemplate mongoTemplate;
-    private final SimpMessagingTemplate messagingTemplate;
-    private final MessageBroadcastService messageBroadcastService;
+    @Autowired
+    private MessageRepository messageRepository;
+    @Autowired
+    private ConversationRepository conversationRepository;
+    @Autowired
+    private MongoTemplate mongoTemplate;
+    @Autowired
+    private SimpMessagingTemplate messagingTemplate;
+    @Autowired
+    private IMessageBroadcastService messageBroadcastService;
 
+    @Override
     public boolean deleteForMe(String messageId, String userId) {
         Message message = messageRepository.findById(messageId).orElse(null);
         if (message == null) {
@@ -81,6 +90,7 @@ public class MessageDeletionService {
         return true;
     }
 
+    @Override
     public Message recallMessage(String messageId, String userId) {
         Message message = messageRepository.findById(messageId).orElse(null);
         if (message == null) return null;
