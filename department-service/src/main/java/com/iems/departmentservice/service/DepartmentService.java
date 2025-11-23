@@ -55,9 +55,9 @@ public class DepartmentService {
         return convertToResponseDto(savedDept);
     }
 
-    public List<DepartmentResponseDto> getAllDepartments() {
+    public List<DepartmentListResponseDto> getAllDepartments() {
         return departmentRepository.findAll().stream()
-                .map(this::convertToResponseDto)
+                .map(this::convertToListResponseDto)
                 .collect(Collectors.toList());
     }
 
@@ -151,6 +151,17 @@ public class DepartmentService {
         return departmentUsers.stream()
                 .map(this::convertToDepartmentUserDto)
                 .collect(Collectors.toList());
+    }
+
+    private DepartmentListResponseDto convertToListResponseDto(Department department) {
+        long totalUsers = departmentUserRepository.countUsersByDepartmentId(department.getId());
+
+        return new DepartmentListResponseDto(
+                department.getId(),
+                department.getDepartmentName(),
+                department.getDescription(),
+                totalUsers
+        );
     }
 
     private DepartmentResponseDto convertToResponseDto(Department department) {
@@ -258,11 +269,22 @@ public class DepartmentService {
             return List.of();
         }
 
-        return userIds.stream()
-                .map(this::getUserById)
-                .filter(Optional::isPresent)
-                .map(Optional::get)
-                .collect(Collectors.toList());
+        try {
+            com.iems.departmentservice.dto.request.UserIdsDto userIdsDto = new com.iems.departmentservice.dto.request.UserIdsDto();
+            userIdsDto.setIds(userIds.stream().collect(Collectors.toSet()));
+            ResponseEntity<Map<String, Object>> response = userServiceFeignClient.getUsersByID(userIdsDto);
+            if (response.getBody() != null && response.getBody().containsKey("data")) {
+                @SuppressWarnings("unchecked")
+                List<Map<String, Object>> usersData = (List<Map<String, Object>>) response.getBody().get("data");
+                return usersData.stream()
+                        .map(this::convertToUserDetailDto)
+                        .collect(Collectors.toList());
+            }
+            return List.of();
+        } catch (Exception e) {
+            System.err.println("Error fetching users from User Service: " + e.getMessage());
+            return List.of();
+        }
     }
 
     private Optional<UserDetailDto> getUserById(UUID userId) {

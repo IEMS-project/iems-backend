@@ -5,6 +5,7 @@ import com.iems.departmentservice.dto.request.AddUsersToDepartmentDto;
 import com.iems.departmentservice.dto.response.ApiResponseDto;
 import com.iems.departmentservice.dto.request.CreateDepartmentDto;
 import com.iems.departmentservice.dto.response.DepartmentResponseDto;
+import com.iems.departmentservice.dto.response.DepartmentListResponseDto;
 import com.iems.departmentservice.dto.response.DepartmentUserDto;
 import com.iems.departmentservice.dto.response.DepartmentMemberCountDto;
 import com.iems.departmentservice.dto.response.DepartmentWithUsersDto;
@@ -46,9 +47,9 @@ public class DepartmentController {
 
     @GetMapping
     @Operation(summary = "Get all departments", description = "Get a list of all departments")
-    public ResponseEntity<ApiResponseDto<List<DepartmentResponseDto>>> getAllDepartments() {
+    public ResponseEntity<ApiResponseDto<List<DepartmentListResponseDto>>> getAllDepartments() {
         try {
-            List<DepartmentResponseDto> departments = service.getAllDepartments();
+            List<DepartmentListResponseDto> departments = service.getAllDepartments();
             return ResponseEntity.ok(new ApiResponseDto<>("success", "Departments retrieved successfully", departments));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(new ApiResponseDto<>("error", "Failed to retrieve departments", Collections.emptyList()));

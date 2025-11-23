@@ -31,4 +31,6 @@ public interface ProjectRepository extends JpaRepository<Project, UUID> {
     List<Project> findByMemberId(@Param("userId") UUID userId);
     
     boolean existsByName(String name);
+
+    Optional<Project> findById(UUID projectId);
 }

@@ -1,6 +1,7 @@
 package com.iems.projectservice.service;
 
 import com.iems.projectservice.client.UserServiceFeignClient;
+import com.iems.projectservice.dto.request.UserIdsDto;
 import com.iems.projectservice.dto.response.ProjectMemberResponseDto;
 import com.iems.projectservice.dto.response.UserDetailDto;
 import com.iems.projectservice.entity.Project;
@@ -21,11 +22,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Service
 @RequiredArgsConstructor
@@ -121,15 +120,16 @@ public class ProjectMemberService {
         
         ProjectMember savedMember = projectMemberRepository.save(projectMember);
         
-        return mapToProjectMemberResponseDto(savedMember);
+        return mapToProjectMemberResponseDto(savedMember, new HashMap<>());
     }
     
     public List<ProjectMemberResponseDto> getProjectMembers(UUID projectId) {
         log.info("Getting project members: projectId={}", projectId);
         
         List<ProjectMember> members = projectMemberRepository.findByProjectId(projectId);
+        Map<UUID, UserDetailDto> userMap = getUserMapFromMembers(members);
         return members.stream()
-                .map(this::mapToProjectMemberResponseDto)
+                .map(member -> mapToProjectMemberResponseDto(member, userMap))
                 .collect(Collectors.toList());
     }
     
@@ -143,7 +143,7 @@ public class ProjectMemberService {
         projectMember.setRoleId(newRoleId);
         ProjectMember updatedMember = projectMemberRepository.save(projectMember);
         
-        return mapToProjectMemberResponseDto(updatedMember);
+        return mapToProjectMemberResponseDto(updatedMember, new HashMap<>());
     }
     
     @Transactional
@@ -184,8 +184,9 @@ public class ProjectMemberService {
         log.info("Getting project members by role: projectId={}, roleId={}", projectId, roleId);
         
         List<ProjectMember> members = projectMemberRepository.findByProjectIdAndRoleId(projectId, roleId);
+        Map<UUID, UserDetailDto> userMap = getUserMapFromMembers(members);
         return members.stream()
-                .map(this::mapToProjectMemberResponseDto)
+                .map(member -> mapToProjectMemberResponseDto(member, userMap))
                 .collect(Collectors.toList());
     }
     
@@ -198,7 +199,43 @@ public class ProjectMemberService {
                 .collect(Collectors.toList());
     }
 
+    // Helper method to get user map from members
+    private Map<UUID, UserDetailDto> getUserMapFromMembers(List<ProjectMember> members) {
+        Set<UUID> userIds = members.stream()
+                .flatMap(member -> Stream.of(
+                        member.getUserId(),
+                        member.getAssignedBy()
+                ))
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        if (userIds.isEmpty()) {
+            return new HashMap<>();
+        }
+
+        try {
+            UserIdsDto userIdsDto = new UserIdsDto();
+            userIdsDto.setIds(userIds);
+            ResponseEntity<Map<String, Object>> response = userServiceFeignClient.getUsersByID(userIdsDto);
+            if (response.getBody() != null && response.getBody().containsKey("data")) {
+                @SuppressWarnings("unchecked")
+                List<Map<String, Object>> usersData = (List<Map<String, Object>>) response.getBody().get("data");
+                return usersData.stream()
+                        .map(this::convertToUserDetailDto)
+                        .collect(Collectors.toMap(UserDetailDto::getId, user -> user));
+            }
+            return new HashMap<>();
+        } catch (Exception e) {
+            log.error("Error fetching users from User Service: {}", e.getMessage());
+            return new HashMap<>();
+        }
+    }
+
     private ProjectMemberResponseDto mapToProjectMemberResponseDto(ProjectMember projectMember) {
+        return mapToProjectMemberResponseDto(projectMember, new HashMap<>());
+    }
+
+    private ProjectMemberResponseDto mapToProjectMemberResponseDto(ProjectMember projectMember, Map<UUID, UserDetailDto> userMap) {
         ProjectMemberResponseDto dto = new ProjectMemberResponseDto();
         dto.setId(projectMember.getId());
         dto.setUserId(projectMember.getUserId());
@@ -218,10 +255,15 @@ public class ProjectMemberService {
             dto.setRoleName("Unknown Role");
         }
 
-        // Lấy thông tin user từ UserService
-        Optional<UserDetailDto> userOpt = getUserById(projectMember.getUserId());
-        if (userOpt.isPresent()) {
-            UserDetailDto user = userOpt.get();
+        // Lấy thông tin user từ userMap hoặc UserService
+        UserDetailDto user = userMap.get(projectMember.getUserId());
+        if (user == null) {
+            Optional<UserDetailDto> userOpt = getUserById(projectMember.getUserId());
+            if (userOpt.isPresent()) {
+                user = userOpt.get();
+            }
+        }
+        if (user != null) {
             dto.setUserName(user.getFirstName() + " " + user.getLastName());
             dto.setUserEmail(user.getEmail());
             dto.setUserImage(user.getImage());
@@ -233,9 +275,14 @@ public class ProjectMemberService {
 
         // Lấy thông tin assignedBy
         if (projectMember.getAssignedBy() != null) {
-            Optional<UserDetailDto> assignedByOpt = getUserById(projectMember.getAssignedBy());
-            if (assignedByOpt.isPresent()) {
-                UserDetailDto assignedByUser = assignedByOpt.get();
+            UserDetailDto assignedByUser = userMap.get(projectMember.getAssignedBy());
+            if (assignedByUser == null) {
+                Optional<UserDetailDto> assignedByOpt = getUserById(projectMember.getAssignedBy());
+                if (assignedByOpt.isPresent()) {
+                    assignedByUser = assignedByOpt.get();
+                }
+            }
+            if (assignedByUser != null) {
                 dto.setAssignedByName(assignedByUser.getFirstName() + " " + assignedByUser.getLastName());
             } else {
                 dto.setAssignedByName("Unknown User");

@@ -1,121 +1,52 @@
-package com.iems.taskservice.service;
+package com.iems.taskservice.service.Impl;
 
 import com.iems.taskservice.Client.ProjectServiceFeignClient;
-import com.iems.taskservice.Client.UserServiceFeignClient;
 import com.iems.taskservice.dto.*;
 import com.iems.taskservice.entity.Task;
 import com.iems.taskservice.entity.TaskStatusHistory;
-import com.iems.taskservice.entity.enums.TaskPriority;
 import com.iems.taskservice.entity.enums.TaskStatus;
-import com.iems.taskservice.entity.enums.TaskType;
 import com.iems.taskservice.repository.TaskCommentRepository;
 import com.iems.taskservice.repository.TaskRepository;
 import com.iems.taskservice.repository.TaskStatusHistoryRepository;
-import com.iems.taskservice.security.JwtUserDetails;
+import com.iems.taskservice.service.ITaskService;
+import com.iems.taskservice.service.IUserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import com.iems.taskservice.exception.AppException;
 import com.iems.taskservice.exception.TaskErrorCode;
 import com.iems.taskservice.entity.TaskComment;
 
 @Service
 @Transactional
-public class TaskService {
+public class TaskService implements ITaskService {
     @Autowired
     private TaskRepository taskRepository;
     
     @Autowired
     private TaskStatusHistoryRepository statusHistoryRepository;
-
-    @Autowired
-    private UserServiceFeignClient userServiceFeignClient;
-
+    
     @Autowired
     private ProjectServiceFeignClient projectServiceFeignClient;
 
     @Autowired
     private TaskCommentRepository taskCommentRepository;
+    
+    @Autowired
+    private IUserService userService;
 
-    private Optional<UserDetailDto> getUserById(UUID userId) {
-        try {
-            ResponseEntity<Map<String, Object>> response = userServiceFeignClient.getUserById(userId);
-
-            if (response.getBody() != null && response.getBody().containsKey("data")) {
-                @SuppressWarnings("unchecked")
-                Map<String, Object> userData = (Map<String, Object>) response.getBody().get("data");
-                return Optional.of(convertToUserDetailDto(userData));
-            }
-
-            return Optional.empty();
-        } catch (Exception e) {
-            // Log error and return empty
-            System.err.println("Error fetching user " + userId + " from User Service: " + e.getMessage());
-            return Optional.empty();
-        }
-    }
-
-    private UserDetailDto convertToUserDetailDto(Map<String, Object> userData) {
-        UserDetailDto dto = new UserDetailDto();
-        dto.setId(UUID.fromString(userData.get("id").toString()));
-        dto.setFirstName((String) userData.get("firstName"));
-        dto.setLastName((String) userData.get("lastName"));
-        dto.setEmail((String) userData.get("email"));
-        dto.setAddress((String) userData.get("address"));
-        dto.setPhone((String) userData.get("phone"));
-
-        // Handle Date objects - convert to string
-        Object dob = userData.get("dob");
-        dto.setDob(dob != null ? dob.toString() : null);
-
-        // Handle enum objects - convert to string
-        Object gender = userData.get("gender");
-        dto.setGender(gender != null ? gender.toString() : null);
-
-        dto.setPersonalID((String) userData.get("personalID"));
-        dto.setImage((String) userData.get("image"));
-        dto.setBankAccountNumber((String) userData.get("bankAccountNumber"));
-        dto.setBankName((String) userData.get("bankName"));
-
-        // Handle enum objects - convert to string
-        Object contractType = userData.get("contractType");
-        dto.setContractType(contractType != null ? contractType.toString() : null);
-
-        // Handle Date objects - convert to string
-        Object startDate = userData.get("startDate");
-        dto.setStartDate(startDate != null ? startDate.toString() : null);
-
-        dto.setRole((String) userData.get("role"));
-        return dto;
-    }
-    public UUID getUserIdFromRequest() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !authentication.isAuthenticated()) {
-            throw new AppException(TaskErrorCode.PERMISSION_DENIED);
-        }
-        Object principal = authentication.getPrincipal();
-        if (!(principal instanceof JwtUserDetails)) {
-            throw new AppException(TaskErrorCode.PERMISSION_DENIED);
-        }
-        JwtUserDetails userDetails = (JwtUserDetails) principal;
-        UUID userId = userDetails.getUserId();
-        if (userId == null) {
-            throw new AppException(TaskErrorCode.PERMISSION_DENIED);
-        }
-        return userId;
-    }
 
     // UC23: Tạo Nhiệm vụ
+    @Override
     public TaskResponseDto createTask(CreateTaskDto createDto) {
         // Validate dates
-        UUID userId = getUserIdFromRequest();
+        UUID userId = userService.getUserIdFromRequest();
         if (createDto.getStartDate() != null && createDto.getDueDate() != null) {
             if (createDto.getStartDate().isAfter(createDto.getDueDate())) {
                 throw new AppException(TaskErrorCode.INVALID_REQUEST);
@@ -138,11 +69,11 @@ public class TaskService {
         // Validate parentTaskId by business rule
         if (createDto.getParentTaskId() != null) {
             UUID parentId = createDto.getParentTaskId();
-            Task parent = taskRepository.findById(parentId)
-                    .orElseThrow(() -> new AppException(TaskErrorCode.TASK_NOT_FOUND));
-            if (TaskType.EPIC.equals(parent.getTaskType()) || TaskType.TASK.equals(parent.getTaskType()) || TaskType.STORY.equals(parent.getTaskType()) || TaskType.BUG.equals(parent.getTaskType())) {
-                // Allow any type to be a parent for now; customize if needed
-            }
+//            Task parent = taskRepository.findById(parentId)
+//                    .orElseThrow(() -> new AppException(TaskErrorCode.TASK_NOT_FOUND));
+//            if (TaskType.EPIC.equals(parent.getTaskType()) || TaskType.TASK.equals(parent.getTaskType()) || TaskType.STORY.equals(parent.getTaskType()) || TaskType.BUG.equals(parent.getTaskType())) {
+//                // Allow any type to be a parent for now; customize if needed
+//            }
             task.setParentTaskId(parentId);
         }
         task.setStartDate(createDto.getStartDate());
@@ -159,10 +90,11 @@ public class TaskService {
     }
 
     // UC24: Gán Nhiệm vụ
+    @Override
     public TaskResponseDto assignTask(UUID taskId, UUID newAssigneeId) {
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new AppException(TaskErrorCode.TASK_NOT_FOUND));
-        UUID userId = getUserIdFromRequest();
+        UUID userId = userService.getUserIdFromRequest();
         // Check if user has permission to reassign (project manager or task creator)
         if (!task.getCreatedBy().equals(userId)) {
             // TODO: Add project role check here
@@ -183,19 +115,68 @@ public class TaskService {
     }
 
     // UC25: Xem Danh sách Nhiệm vụ Được giao
-    public List<TaskResponseDto> getMyTasks() {
-        UUID userId = getUserIdFromRequest();
+    @Override
+    public List<MyTaskResponseDto> getMyTasks() {
+        UUID userId = userService.getUserIdFromRequest();
+
+        // Lấy danh sách task của user
         List<Task> tasks = taskRepository.findByAssignedTo(userId);
+
+        // 1. Lấy tất cả projectId không trùng
+        Set<UUID> projectIds = tasks.stream()
+                .map(Task::getProjectId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        ProjectIdsDto projectIdsDto = new ProjectIdsDto();
+        projectIdsDto.setIds(projectIds);
+        System.out.println(projectIdsDto);
+        // 2. Gọi project-service lấy projectName 1 lần
+        ResponseEntity<ApiResponseDto<List<ProjectInfoResponse>>> response = projectServiceFeignClient.getProjectsByID(projectIdsDto);
+        List<ProjectInfoResponse> projectNameList = response != null && response.getBody() != null && response.getBody().getData() != null
+                ? response.getBody().getData()
+                : new ArrayList<>();
+
+        // 3. Map projectId → projectName
+        Map<UUID, String> projectNameMap = projectNameList.stream()
+                .collect(Collectors.toMap(ProjectInfoResponse::getId, ProjectInfoResponse::getName));
+
+        // 4. Map task → DTO
         return tasks.stream()
-                .map(this::convertToResponseDto)
+                .map(task -> convertToMyTaskResponse(task, projectNameMap))
                 .collect(Collectors.toList());
     }
 
+    private MyTaskResponseDto convertToMyTaskResponse(Task task, Map<UUID, String> projectNameMap) {
+        MyTaskResponseDto dto = new MyTaskResponseDto();
+
+        dto.setId(task.getId());
+        dto.setProjectId(task.getProjectId());
+        dto.setProjectName(projectNameMap.get(task.getProjectId()));
+
+        dto.setTitle(task.getTitle());
+        dto.setDescription(task.getDescription());
+
+        dto.setStatus(task.getStatus() != null ? task.getStatus().name() : null);
+        dto.setPriority(task.getPriority() != null ? task.getPriority().name() : null);
+        dto.setTaskType(task.getTaskType() != null ? task.getTaskType().name() : null);
+
+        dto.setParentTaskId(task.getParentTaskId());
+        dto.setStartDate(task.getStartDate());
+        dto.setDueDate(task.getDueDate());
+        dto.setCreatedAt(task.getCreatedAt());
+        dto.setUpdatedAt(task.getUpdatedAt());
+
+        return dto;
+    }
+
+
     // UC26: Cập nhật Trạng thái Nhiệm vụ
+    @Override
     public TaskResponseDto updateTaskStatus(UUID taskId, String newStatusStr, String comment) {
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new AppException(TaskErrorCode.TASK_NOT_FOUND));
-        UUID userId = getUserIdFromRequest();
+        UUID userId = userService.getUserIdFromRequest();
         // Check if user is assigned to this task or has permission
         if (!task.getAssignedTo().equals(userId)) {
             // TODO: Add project role check here
@@ -227,6 +208,7 @@ public class TaskService {
         return convertToResponseDto(savedTask);
     }
 
+    @Override
     public List<TaskBulkUpdateItemDto> bulkUpdateStatus(List<UUID> taskIds, String newStatusStr) {
         TaskStatus newStatus;
         try {
@@ -234,7 +216,7 @@ public class TaskService {
         } catch (IllegalArgumentException e) {
             throw new AppException(TaskErrorCode.INVALID_REQUEST);
         }
-        UUID userId = getUserIdFromRequest();
+        UUID userId = userService.getUserIdFromRequest();
         List<TaskBulkUpdateItemDto> updated = new ArrayList<>();
         for (UUID id : taskIds) {
             Task task = taskRepository.findById(id).orElse(null);
@@ -260,13 +242,14 @@ public class TaskService {
         return updated;
     }
 
+    @Override
     public TaskComment addComment(UUID taskId, String content) {
         if (content == null || content.isBlank()) {
             throw new AppException(TaskErrorCode.INVALID_REQUEST);
         }
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new AppException(TaskErrorCode.TASK_NOT_FOUND));
-        UUID userId = getUserIdFromRequest();
+        UUID userId = userService.getUserIdFromRequest();
         TaskComment c = new TaskComment();
         c.setTaskId(task.getId());
         c.setAuthorId(userId);
@@ -274,15 +257,17 @@ public class TaskService {
         return taskCommentRepository.save(c);
     }
 
+    @Override
     public List<TaskComment> getComments(UUID taskId) {
         return taskCommentRepository.findByTaskIdOrderByCreatedAtAsc(taskId);
     }
 
     // UC27: Thiết lập Ngày và Mức ưu tiên Nhiệm vụ
+    @Override
     public TaskResponseDto updateTaskPriorityAndDates(UUID taskId, UpdateTaskDto updateDto) {
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new AppException(TaskErrorCode.TASK_NOT_FOUND));
-        UUID userId = getUserIdFromRequest();
+        UUID userId = userService.getUserIdFromRequest();
         // Check permissions
         if (!task.getCreatedBy().equals(userId) && !task.getAssignedTo().equals(userId)) {
             // TODO: Add project role check here
@@ -335,47 +320,74 @@ public class TaskService {
     }
 
     // Get task by ID
+    @Override
     public Optional<TaskResponseDto> getTaskById(UUID id) {
         return taskRepository.findById(id).map(this::convertToResponseDto);
     }
 
+    @Override
     public Optional<TaskNestedResponseDto> getTaskByIdNested(UUID id) {
         return taskRepository.findById(id).map(this::convertToNestedResponse);
     }
 
     // Get all tasks
+    @Override
     public List<TaskResponseDto> getAllTasks() {
-        return taskRepository.findAll().stream()
-                .map(this::convertToResponseDto)
+        List<Task> tasks = taskRepository.findAll();
+        Map<UUID, UserDetailDto> userMap = getUserMapFromTasks(tasks);
+        return tasks.stream()
+                .map(task -> convertToResponseDto(task, userMap))
                 .collect(Collectors.toList());
     }
 
     // Get tasks by project
+    @Override
     public List<TaskResponseDto> getTasksByProject(UUID projectId) {
         List<Task> tasks = taskRepository.findByProjectId(projectId);
+        Map<UUID, UserDetailDto> userMap = getUserMapFromTasks(tasks);
         return tasks.stream()
-                .map(this::convertToResponseDto)
+                .map(task -> convertToResponseDto(task, userMap))
                 .collect(Collectors.toList());
     }
 
     // Get tasks by project (nested response)
+    @Override
     public List<TaskNestedResponseDto> getTasksByProjectNested(UUID projectId) {
         List<Task> tasks = taskRepository.findByProjectId(projectId);
+        Map<UUID, UserDetailDto> userMap = getUserMapFromTasks(tasks);
+        
+        // Get project info ONCE instead of calling FeignClient for each task
+        String projectName = null;
+        try {
+            ResponseEntity<Map<String, Object>> res = projectServiceFeignClient.getProjectById(projectId);
+            if (res.getBody() != null && res.getBody().containsKey("data")) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> p = (Map<String, Object>) res.getBody().get("data");
+                Object name = p.get("name");
+                projectName = name != null ? name.toString() : null;
+            }
+        } catch (Exception ignored) {}
+        
+        final String finalProjectName = projectName;
         return tasks.stream()
-                .map(this::convertToNestedResponse)
+                .map(task -> convertToNestedResponse(task, userMap, finalProjectName))
+                .collect(Collectors.toList());
+    }
+    @Override
+    public List<TaskResponseDto> getSubtasks(UUID parentTaskId) {
+        List<Task> tasks = taskRepository.findByParentTaskId(parentTaskId);
+        Map<UUID, UserDetailDto> userMap = getUserMapFromTasks(tasks);
+        return tasks.stream()
+                .map(task -> convertToResponseDto(task, userMap))
                 .collect(Collectors.toList());
     }
 
-    public List<TaskResponseDto> getSubtasks(UUID parentTaskId) {
-        List<Task> tasks = taskRepository.findByParentTaskId(parentTaskId);
-        return tasks.stream().map(this::convertToResponseDto).collect(Collectors.toList());
-    }
-
     // Generic update: title/description/assignedTo/priority/dates/status
+    @Override
     public TaskUpdateResultDto updateTask(UUID taskId, UpdateTaskDto updateDto) {
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new AppException(TaskErrorCode.TASK_NOT_FOUND));
-        UUID userId = getUserIdFromRequest();
+        UUID userId = userService.getUserIdFromRequest();
         // Permissions: creator or current assignee can update; extend with project roles as needed
         if (!task.getCreatedBy().equals(userId) && !task.getAssignedTo().equals(userId)) {
             throw new AppException(TaskErrorCode.PERMISSION_DENIED);
@@ -456,24 +468,29 @@ public class TaskService {
     }
 
     // Get active tasks by project (excluding completed)
+    @Override
     public List<TaskResponseDto> getActiveTasksByProject(UUID projectId) {
         List<Task> tasks = taskRepository.findActiveTasksByProject(projectId, TaskStatus.COMPLETED);
+        Map<UUID, UserDetailDto> userMap = getUserMapFromTasks(tasks);
         return tasks.stream()
-                .map(this::convertToResponseDto)
+                .map(task -> convertToResponseDto(task, userMap))
                 .collect(Collectors.toList());
     }
 
     // Get task status history
+    @Override
     public List<TaskStatusHistory> getTaskStatusHistory(UUID taskId) {
         return statusHistoryRepository.findByTaskIdOrderByUpdatedAtDesc(taskId);
     }
 
     // Helper methods
-    private void createStatusHistory(Task task, TaskStatus newStatus, UUID updatedBy, String _comment) {
+    @Override
+    public void createStatusHistory(Task task, TaskStatus newStatus, UUID updatedBy, String _comment) {
         createStatusHistoryWithOldNew(task.getId(), task.getStatus(), newStatus, updatedBy);
     }
 
-    private void createStatusHistoryWithOldNew(UUID taskId, TaskStatus oldStatus, TaskStatus newStatus, UUID updatedBy) {
+    @Override
+    public void createStatusHistoryWithOldNew(UUID taskId, TaskStatus oldStatus, TaskStatus newStatus, UUID updatedBy) {
         TaskStatusHistory history = new TaskStatusHistory();
         history.setTaskId(taskId);
         history.setOldStatus(oldStatus);
@@ -482,7 +499,8 @@ public class TaskService {
         statusHistoryRepository.save(history);
     }
 
-    private boolean isValidStatusTransition(TaskStatus currentStatus, TaskStatus newStatus) {
+    @Override
+    public boolean isValidStatusTransition(TaskStatus currentStatus, TaskStatus newStatus) {
         // Define valid status transitions per requirement:
         // TO_DO -> IN_PROGRESS, TO_DO -> COMPLETED, IN_PROGRESS -> COMPLETED, COMPLETED -> IN_PROGRESS
         if (TaskStatus.TO_DO.equals(currentStatus)) {
@@ -493,6 +511,28 @@ public class TaskService {
             return TaskStatus.IN_PROGRESS.equals(newStatus);
         }
         return false;
+    }
+
+    // Helper method to get user map from tasks
+    private Map<UUID, UserDetailDto> getUserMapFromTasks(List<Task> tasks) {
+        Set<UUID> userIds = tasks.stream()
+                .flatMap(task -> Stream.of(
+                        task.getAssignedTo(),
+                        task.getCreatedBy(),
+                        task.getUpdatedBy()
+                ))
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        if (userIds.isEmpty()) {
+            return new HashMap<>();
+        }
+
+        UserIdsDto userIdsDto = new UserIdsDto();
+        userIdsDto.setIds(userIds);
+        List<UserDetailDto> users = userService.getUsersByIds(userIdsDto);
+        return users.stream()
+                .collect(Collectors.toMap(UserDetailDto::getId, user -> user));
     }
 
     private TaskResponseDto convertToResponseDto(Task task) {
@@ -512,7 +552,7 @@ public class TaskService {
 
         // AssignedTo
         dto.setAssignedTo(task.getAssignedTo());
-        getUserById(task.getAssignedTo()).ifPresent(user -> {
+        userService.getUserById(task.getAssignedTo()).ifPresent(user -> {
             dto.setAssignedToName(user.getFirstName() + " " + user.getLastName());
             dto.setAssignedToEmail(user.getEmail());
             dto.setAssignedToImage(user.getImage());
@@ -520,7 +560,7 @@ public class TaskService {
 
         // CreatedBy
         dto.setCreatedBy(task.getCreatedBy());
-        getUserById(task.getCreatedBy()).ifPresent(user -> {
+        userService.getUserById(task.getCreatedBy()).ifPresent(user -> {
             dto.setCreatedByName(user.getFirstName() + " " + user.getLastName());
             dto.setCreatedByEmail(user.getEmail());
             dto.setCreatedByImage(user.getImage());
@@ -528,11 +568,71 @@ public class TaskService {
 
         // UpdatedBy
         dto.setUpdatedBy(task.getUpdatedBy());
-        getUserById(task.getUpdatedBy()).ifPresent(user -> {
+        userService.getUserById(task.getUpdatedBy()).ifPresent(user -> {
             dto.setUpdatedByName(user.getFirstName() + " " + user.getLastName());
             dto.setUpdatedByEmail(user.getEmail());
             dto.setUpdatedByImage(user.getImage());
         });
+
+        // Project name via PROJECT-SERVICE
+        try {
+            ResponseEntity<Map<String, Object>> res = projectServiceFeignClient.getProjectById(task.getProjectId());
+            if (res.getBody() != null && res.getBody().containsKey("data")) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> project = (Map<String, Object>) res.getBody().get("data");
+                Object name = project.get("name");
+                if (name != null) {
+                    dto.setProjectName(name.toString());
+                }
+            }
+        } catch (Exception ignored) {
+        }
+
+        return dto;
+    }
+
+    // Overloaded version with user map for batch processing
+    private TaskResponseDto convertToResponseDto(Task task, Map<UUID, UserDetailDto> userMap) {
+        TaskResponseDto dto = new TaskResponseDto();
+        dto.setId(task.getId());
+        dto.setProjectId(task.getProjectId());
+        dto.setTitle(task.getTitle());
+        dto.setDescription(task.getDescription());
+        dto.setStartDate(task.getStartDate());
+        dto.setDueDate(task.getDueDate());
+        dto.setCreatedAt(task.getCreatedAt());
+        dto.setUpdatedAt(task.getUpdatedAt());
+        dto.setStatus(task.getStatus().getDisplayName());
+        dto.setPriority(task.getPriority().getDisplayName());
+        dto.setTaskType(task.getTaskType() != null ? task.getTaskType().getDisplayName() : null);
+        dto.setParentTaskId(task.getParentTaskId());
+
+        // AssignedTo
+        dto.setAssignedTo(task.getAssignedTo());
+        UserDetailDto assignedUser = userMap.get(task.getAssignedTo());
+        if (assignedUser != null) {
+            dto.setAssignedToName(assignedUser.getFirstName() + " " + assignedUser.getLastName());
+            dto.setAssignedToEmail(assignedUser.getEmail());
+            dto.setAssignedToImage(assignedUser.getImage());
+        }
+
+        // CreatedBy
+        dto.setCreatedBy(task.getCreatedBy());
+        UserDetailDto createdUser = userMap.get(task.getCreatedBy());
+        if (createdUser != null) {
+            dto.setCreatedByName(createdUser.getFirstName() + " " + createdUser.getLastName());
+            dto.setCreatedByEmail(createdUser.getEmail());
+            dto.setCreatedByImage(createdUser.getImage());
+        }
+
+        // UpdatedBy
+        dto.setUpdatedBy(task.getUpdatedBy());
+        UserDetailDto updatedUser = userMap.get(task.getUpdatedBy());
+        if (updatedUser != null) {
+            dto.setUpdatedByName(updatedUser.getFirstName() + " " + updatedUser.getLastName());
+            dto.setUpdatedByEmail(updatedUser.getEmail());
+            dto.setUpdatedByImage(updatedUser.getImage());
+        }
 
         // Project name via PROJECT-SERVICE
         try {
@@ -580,7 +680,7 @@ public class TaskService {
 
         TaskNestedResponseDto.UserInfo assigned = new TaskNestedResponseDto.UserInfo();
         assigned.setId(task.getAssignedTo());
-        getUserById(task.getAssignedTo()).ifPresent(u -> {
+        userService.getUserById(task.getAssignedTo()).ifPresent(u -> {
             assigned.setName(u.getFirstName() + " " + u.getLastName());
             assigned.setImage(u.getImage());
         });
@@ -588,7 +688,7 @@ public class TaskService {
 
         TaskNestedResponseDto.UserInfo created = new TaskNestedResponseDto.UserInfo();
         created.setId(task.getCreatedBy());
-        getUserById(task.getCreatedBy()).ifPresent(u -> {
+        userService.getUserById(task.getCreatedBy()).ifPresent(u -> {
             created.setName(u.getFirstName() + " " + u.getLastName());
             created.setImage(u.getImage());
         });
@@ -596,10 +696,78 @@ public class TaskService {
 
         TaskNestedResponseDto.UserInfo updated = new TaskNestedResponseDto.UserInfo();
         updated.setId(task.getUpdatedBy());
-        getUserById(task.getUpdatedBy()).ifPresent(u -> {
+        userService.getUserById(task.getUpdatedBy()).ifPresent(u -> {
             updated.setName(u.getFirstName() + " " + u.getLastName());
             updated.setImage(u.getImage());
         });
+        dto.setUpdatedBy(updated);
+
+        return dto;
+    }
+
+    // Overloaded version with user map for batch processing
+    private TaskNestedResponseDto convertToNestedResponse(Task task, Map<UUID, UserDetailDto> userMap) {
+        return convertToNestedResponse(task, userMap, null);
+    }
+    
+    // Overloaded version with user map and project name for batch processing (optimized)
+    private TaskNestedResponseDto convertToNestedResponse(Task task, Map<UUID, UserDetailDto> userMap, String projectName) {
+        TaskNestedResponseDto dto = new TaskNestedResponseDto();
+        dto.setId(task.getId());
+        TaskNestedResponseDto.ProjectInfo project = new TaskNestedResponseDto.ProjectInfo();
+        project.setId(task.getProjectId());
+        // Use provided projectName if available, otherwise fallback to FeignClient call
+        if (projectName != null) {
+            project.setName(projectName);
+        } else {
+            try {
+                ResponseEntity<Map<String, Object>> res = projectServiceFeignClient.getProjectById(task.getProjectId());
+                if (res.getBody() != null && res.getBody().containsKey("data")) {
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> p = (Map<String, Object>) res.getBody().get("data");
+                    Object name = p.get("name");
+                    project.setName(name != null ? name.toString() : null);
+                }
+            } catch (Exception ignored) {}
+        }
+        dto.setProject(project);
+
+        dto.setTitle(task.getTitle());
+        dto.setDescription(task.getDescription());
+        dto.setStatus(task.getStatus().getDisplayName());
+        dto.setPriority(task.getPriority().getDisplayName());
+        dto.setTaskType(task.getTaskType() != null ? task.getTaskType().getDisplayName() : null);
+        dto.setParentTaskId(task.getParentTaskId());
+        dto.setStartDate(task.getStartDate());
+        dto.setDueDate(task.getDueDate());
+        dto.setCreatedAt(task.getCreatedAt());
+        dto.setUpdatedAt(task.getUpdatedAt());
+
+        TaskNestedResponseDto.UserInfo assigned = new TaskNestedResponseDto.UserInfo();
+        assigned.setId(task.getAssignedTo());
+        UserDetailDto assignedUser = userMap.get(task.getAssignedTo());
+        if (assignedUser != null) {
+            assigned.setName(assignedUser.getFirstName() + " " + assignedUser.getLastName());
+            assigned.setImage(assignedUser.getImage());
+        }
+        dto.setAssignedTo(assigned);
+
+        TaskNestedResponseDto.UserInfo created = new TaskNestedResponseDto.UserInfo();
+        created.setId(task.getCreatedBy());
+        UserDetailDto createdUser = userMap.get(task.getCreatedBy());
+        if (createdUser != null) {
+            created.setName(createdUser.getFirstName() + " " + createdUser.getLastName());
+            created.setImage(createdUser.getImage());
+        }
+        dto.setCreatedBy(created);
+
+        TaskNestedResponseDto.UserInfo updated = new TaskNestedResponseDto.UserInfo();
+        updated.setId(task.getUpdatedBy());
+        UserDetailDto updatedUser = userMap.get(task.getUpdatedBy());
+        if (updatedUser != null) {
+            updated.setName(updatedUser.getFirstName() + " " + updatedUser.getLastName());
+            updated.setImage(updatedUser.getImage());
+        }
         dto.setUpdatedBy(updated);
 
         return dto;

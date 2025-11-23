@@ -3,6 +3,7 @@ package com.iems.userservice.controller;
 import com.iems.userservice.dto.request.CreateUserDto;
 import com.iems.userservice.dto.request.UpdateAvatarDto;
 import com.iems.userservice.dto.request.UpdateUserDto;
+import com.iems.userservice.dto.request.UserIdsDto;
 import com.iems.userservice.dto.response.ApiResponseDto;
 import com.iems.userservice.dto.response.UserBasicInfoDto;
 import com.iems.userservice.dto.response.UserResponseDto;
@@ -167,6 +168,20 @@ public class UserController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(new ApiResponseDto<>(HttpStatus.INTERNAL_SERVER_ERROR.value(),
                             "Failed to fetch profile: " + e.getMessage(), null));
+        }
+    }
+
+    @Operation(summary = "Get users by IDs", description = "Retrieve multiple users by their IDs")
+    @PostMapping("/by-ids")
+    public ResponseEntity<ApiResponseDto<List<UserResponseDto>>> getUsersByID(
+            @RequestBody UserIdsDto request
+    ) {
+        try {
+            List<UserResponseDto> users = service.getUsersByID(request);
+            return ResponseEntity.ok(new ApiResponseDto<>(HttpStatus.OK.value(), "Users retrieved successfully", users));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ApiResponseDto<>(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Failed to fetch users: " + e.getMessage(), null));
         }
     }
 
