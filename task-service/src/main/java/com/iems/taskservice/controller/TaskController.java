@@ -3,10 +3,9 @@ package com.iems.taskservice.controller;
 import com.iems.taskservice.dto.*;
 import com.iems.taskservice.entity.TaskStatusHistory;
 import com.iems.taskservice.entity.TaskComment;
-import com.iems.taskservice.service.TaskService;
+import com.iems.taskservice.service.ITaskService;
+import com.iems.taskservice.service.Impl.TaskService;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,7 +22,7 @@ import java.util.UUID;
 @Tag(name = "Task API", description = "Manage tasks")
 public class TaskController {
     @Autowired
-    private TaskService taskService;
+    private ITaskService taskService;
 
     @PostMapping
     public ResponseEntity<ApiResponseDto<TaskNestedResponseDto>> createTask(
@@ -72,9 +71,9 @@ public class TaskController {
 
     @GetMapping("/my-tasks")
     @Operation(summary = "Get my tasks", description = "Get tasks assigned to the current user")
-    public ResponseEntity<ApiResponseDto<List<TaskResponseDto>>> getMyTasks() {
+    public ResponseEntity<ApiResponseDto<List<MyTaskResponseDto>>> getMyTasks() {
         try {
-            List<TaskResponseDto> tasks = taskService.getMyTasks();
+            List<MyTaskResponseDto> tasks = taskService.getMyTasks();
             return ResponseEntity.ok(new ApiResponseDto<>("success", "My tasks retrieved successfully", tasks));
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body(new ApiResponseDto<>("error", "Failed to retrieve my tasks", null));
@@ -215,11 +214,11 @@ public class TaskController {
 
     @GetMapping("/my-tasks/filter")
     @Operation(summary = "Get my tasks with filter", description = "Filter my tasks by status or priority")
-    public ResponseEntity<ApiResponseDto<List<TaskResponseDto>>> getMyTasksWithFilter(
+    public ResponseEntity<ApiResponseDto<List<MyTaskResponseDto>>> getMyTasksWithFilter(
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String priority) {
         try {
-            List<TaskResponseDto> tasks;
+            List<MyTaskResponseDto> tasks;
             if (status != null && priority != null) {
                 tasks = taskService.getMyTasks();
             } else if (status != null) {

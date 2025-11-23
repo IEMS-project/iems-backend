@@ -6,6 +6,7 @@ import com.iems.userservice.dto.request.AddUserToDepartmentDto;
 import com.iems.userservice.dto.request.CreateAccountRequestDto;
 import com.iems.userservice.dto.request.CreateUserDto;
 import com.iems.userservice.dto.request.UpdateUserDto;
+import com.iems.userservice.dto.request.UserIdsDto;
 import com.iems.userservice.dto.response.UserBasicInfoDto;
 import com.iems.userservice.dto.response.UserResponseDto;
 import com.iems.userservice.exception.AppException;
@@ -148,6 +149,20 @@ public class UserService {
                     });
         } catch (AppException e) {
             throw e;
+        } catch (Exception ex) {
+            throw new AppException(UserErrorCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    public List<UserResponseDto> getUsersByID(UserIdsDto request) {
+        try {
+            if (request == null || request.getIds() == null || request.getIds().isEmpty()) {
+                return List.of();
+            }
+            return repository.findAllById(request.getIds())
+                    .stream()
+                    .map(this::convertToUserResponse)
+                    .toList();
         } catch (Exception ex) {
             throw new AppException(UserErrorCode.INTERNAL_SERVER_ERROR);
         }

@@ -2,12 +2,10 @@ package com.iems.projectservice.service;
 
 import com.iems.projectservice.client.UserServiceFeignClient;
 import com.iems.projectservice.dto.request.CreateProjectDto;
+import com.iems.projectservice.dto.request.ProjectIdsDto;
 import com.iems.projectservice.dto.request.ProjectProgressDto;
 import com.iems.projectservice.dto.request.UpdateProjectDto;
-import com.iems.projectservice.dto.response.ProjectMemberResponseDto;
-import com.iems.projectservice.dto.response.ProjectResponseDto;
-import com.iems.projectservice.dto.response.ProjectTableDto;
-import com.iems.projectservice.dto.response.UserDetailDto;
+import com.iems.projectservice.dto.response.*;
 import com.iems.projectservice.entity.Project;
 import com.iems.projectservice.entity.ProjectAllowedRole;
 import com.iems.projectservice.entity.enums.ProjectStatus;
@@ -26,10 +24,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -187,13 +183,13 @@ public class ProjectService {
         return mapToProjectResponseDto(updatedProject);
     }
 
-    public List<ProjectResponseDto> getMyProjects(){
+    public List<MyProjectResponseDto> getMyProjects(){
         UUID userId = getUserIdFromRequest();
         List<Project> projects = projectRepository.findByMemberId(userId);
-        return projects.stream().map(this::mapToProjectResponseDto).toList();
+        return projects.stream().map(this::mapToMyProjectResponseDto).toList();
     }
 
-    public ProjectResponseDto getProjectById(UUID projectId) {
+    public ProjectDetailResponseDto getProjectById(UUID projectId) {
         log.info("Getting project: {}", projectId);
         UUID currentUserId = getUserIdFromRequest();
         Project project = projectRepository.findById(projectId)
@@ -204,12 +200,22 @@ public class ProjectService {
             throw new  AppException( ProjectErrorCode.PERMISSION_DENIED);
         }
         
-        return mapToProjectResponseDto(project);
+        return mapToProjectDetailResponseDto(project);
     }
 
     public List<ProjectTableDto> getProjectsForTable() {
         List<Project> projects = projectRepository.findAll();
 
+        // Collect all manager IDs
+        Set<UUID> managerIds = projects.stream()
+                .map(Project::getManagerId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        // Fetch manager info
+        Map<UUID, UserDetailDto> managerMap = fetchManagersByIds(managerIds);
+
+        // Map projects to DTO
         return projects.stream().map(project -> {
             ProjectTableDto dto = new ProjectTableDto();
             dto.setId(project.getId());
@@ -220,16 +226,45 @@ public class ProjectService {
             dto.setStartDate(project.getStartDate());
             dto.setEndDate(project.getEndDate());
 
-            Optional<UserDetailDto> managerOpt = getUserById(project.getManagerId());
-            if (managerOpt.isPresent()) {
-                UserDetailDto manager = managerOpt.get();
+            if (project.getManagerId() != null && managerMap.containsKey(project.getManagerId())) {
+                UserDetailDto manager = managerMap.get(project.getManagerId());
                 dto.setManagerName(manager.getFirstName() + " " + manager.getLastName());
                 dto.setManagerEmail(manager.getEmail());
                 dto.setManagerImage(manager.getImage());
             }
+
             return dto;
         }).toList();
     }
+
+    private Map<UUID, UserDetailDto> fetchManagersByIds(Set<UUID> managerIds) {
+        if (managerIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        try {
+            com.iems.projectservice.dto.request.UserIdsDto userIdsDto = new com.iems.projectservice.dto.request.UserIdsDto();
+            userIdsDto.setIds(managerIds);
+
+            ResponseEntity<Map<String, Object>> response = userServiceFeignClient.getUsersByID(userIdsDto);
+
+            if (response.getBody() != null && response.getBody().containsKey("data")) {
+                Object dataObj = response.getBody().get("data");
+                if (dataObj instanceof List<?> usersList) {
+                    return usersList.stream()
+                            .filter(item -> item instanceof Map<?, ?>)
+                            .map(item -> (Map<String, Object>) item)
+                            .map(this::convertToUserDetailDto)
+                            .collect(Collectors.toMap(UserDetailDto::getId, user -> user));
+                }
+            }
+        } catch (Exception e) {
+            log.error("Error fetching managers from User Service", e);
+        }
+
+        return Collections.emptyMap();
+    }
+
 
     public List<ProjectResponseDto> getProjectsByMember(UUID userId) {
         log.info("Getting projects for member: {}", userId);
@@ -315,6 +350,44 @@ public class ProjectService {
         }
     }
     
+    private ProjectDetailResponseDto mapToProjectDetailResponseDto(Project project) {
+        ProjectDetailResponseDto dto = new ProjectDetailResponseDto();
+        dto.setId(project.getId());
+        dto.setName(project.getName());
+        dto.setDescription(project.getDescription());
+        dto.setStartDate(project.getStartDate());
+        dto.setEndDate(project.getEndDate());
+        dto.setStatus(project.getStatus());
+        dto.setCreatedBy(project.getCreatedBy());
+        dto.setCreatedAt(project.getCreatedAt());
+        dto.setUpdatedAt(project.getUpdatedAt());
+        
+        // Get project progress
+        ProjectProgressDto progress = getProjectProgress(project.getId());
+        dto.setProgress(progress);
+        
+        return dto;
+    }
+
+    private MyProjectResponseDto mapToMyProjectResponseDto(Project project) {
+        MyProjectResponseDto dto = new MyProjectResponseDto();
+        dto.setId(project.getId());
+        dto.setName(project.getName());
+        dto.setDescription(project.getDescription());
+        dto.setStartDate(project.getStartDate());
+        dto.setEndDate(project.getEndDate());
+        dto.setStatus(project.getStatus());
+        dto.setCreatedBy(project.getCreatedBy());
+        dto.setCreatedAt(project.getCreatedAt());
+        dto.setUpdatedAt(project.getUpdatedAt());
+        
+        // Get project progress
+        ProjectProgressDto progress = getProjectProgress(project.getId());
+        dto.setProgress(progress);
+        
+        return dto;
+    }
+
     private ProjectResponseDto mapToProjectResponseDto(Project project) {
         ProjectResponseDto dto = new ProjectResponseDto();
         dto.setId(project.getId());
@@ -368,5 +441,20 @@ public class ProjectService {
             log.warn("Could not find default manager role for project {}: {}", projectId, e.getMessage());
             return null;
         }
+    }
+
+    public List<ProjectInfoResponse> getProjectsByID(ProjectIdsDto projectIds) {
+        List<ProjectInfoResponse> list = new ArrayList<>();
+        for (UUID projectId : projectIds.getIds()) {
+            Project project = projectRepository.findById(projectId).get();
+            ProjectInfoResponse response = new ProjectInfoResponse();
+            response.setId(project.getId());
+            response.setName(project.getName());
+            response.setDescription(project.getDescription());
+            response.setStartDate(project.getStartDate());
+            response.setEndDate(project.getEndDate());
+            list.add(response);
+        }
+        return list;
     }
 }

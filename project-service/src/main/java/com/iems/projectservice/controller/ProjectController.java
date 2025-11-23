@@ -1,11 +1,15 @@
 package com.iems.projectservice.controller;
 
 import com.iems.projectservice.dto.request.CreateProjectDto;
+import com.iems.projectservice.dto.request.ProjectIdsDto;
 import com.iems.projectservice.dto.request.ProjectProgressDto;
 import com.iems.projectservice.dto.request.UpdateProjectDto;
 import com.iems.projectservice.dto.response.ApiResponseDto;
+import com.iems.projectservice.dto.response.ProjectInfoResponse;
 import com.iems.projectservice.dto.response.ProjectResponseDto;
+import com.iems.projectservice.dto.response.ProjectDetailResponseDto;
 import com.iems.projectservice.dto.response.ProjectTableDto;
+import com.iems.projectservice.dto.response.MyProjectResponseDto;
 import com.iems.projectservice.service.ProjectService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -81,12 +85,12 @@ public class ProjectController {
     @GetMapping("/{projectId}")
     @Operation(summary = "Get project by ID", description = "Retrieve project details by project ID")
     @PreAuthorize("hasAuthority('PROJECT_READ')")
-    public ResponseEntity<ApiResponseDto<ProjectResponseDto>> getProject(
+    public ResponseEntity<ApiResponseDto<ProjectDetailResponseDto>> getProject(
             @Parameter(description = "Project ID", required = true)
             @PathVariable UUID projectId
 ) {
         try {
-            ProjectResponseDto project = projectService.getProjectById(projectId);
+            ProjectDetailResponseDto project = projectService.getProjectById(projectId);
             return ResponseEntity.ok(new ApiResponseDto<>("success", "Project retrieved successfully", project));
         } catch (Exception e) {
             log.error("Error getting project", e);
@@ -98,9 +102,9 @@ public class ProjectController {
     @GetMapping("/my-projects")
     @Operation(summary = "Get user's projects", description = "Get all projects where the current user is a member")
     @PreAuthorize("hasAuthority('PROJECT_READ')")
-    public ResponseEntity<ApiResponseDto<List<ProjectResponseDto>>> getMyProjects() {
+    public ResponseEntity<ApiResponseDto<List<MyProjectResponseDto>>> getMyProjects() {
         try {
-            List<ProjectResponseDto> projects = projectService.getMyProjects();
+            List<MyProjectResponseDto> projects = projectService.getMyProjects();
             return ResponseEntity.ok(new ApiResponseDto<>("success", "User projects retrieved successfully", projects));
         } catch (Exception e) {
             log.error("Error getting user projects", e);
@@ -153,6 +157,22 @@ public class ProjectController {
             return ResponseEntity.ok(new ApiResponseDto<>("success", "Project manager assigned successfully", null));
         } catch (Exception e) {
             log.error("Error assigning project manager", e);
+            return ResponseEntity.badRequest()
+                    .body(new ApiResponseDto<>("error", e.getMessage(), null));
+        }
+    }
+
+    @PostMapping("/by-ids")
+    public ResponseEntity<ApiResponseDto<List<ProjectInfoResponse>>> getProjectsByID(
+            @RequestBody ProjectIdsDto request
+            )
+    {
+        try {
+            List<ProjectInfoResponse> data = projectService.getProjectsByID(request);
+            return ResponseEntity.ok(new ApiResponseDto<>("success", "All projects retrieved successfully", data));
+        }
+        catch (Exception e) {
+            log.error("Error getting projects", e);
             return ResponseEntity.badRequest()
                     .body(new ApiResponseDto<>("error", e.getMessage(), null));
         }
