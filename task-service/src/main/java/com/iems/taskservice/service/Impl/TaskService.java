@@ -78,6 +78,7 @@ public class TaskService implements ITaskService {
         }
         task.setStartDate(createDto.getStartDate());
         task.setDueDate(createDto.getDueDate());
+        task.setPhaseId(createDto.getPhaseId());
         task.setCreatedBy(userId);
         task.setUpdatedBy(userId);
         
@@ -162,6 +163,7 @@ public class TaskService implements ITaskService {
         dto.setTaskType(task.getTaskType() != null ? task.getTaskType().name() : null);
 
         dto.setParentTaskId(task.getParentTaskId());
+        dto.setPhaseId(task.getPhaseId());
         dto.setStartDate(task.getStartDate());
         dto.setDueDate(task.getDueDate());
         dto.setCreatedAt(task.getCreatedAt());
@@ -449,6 +451,11 @@ public class TaskService implements ITaskService {
             hasChanges = true;
         }
 
+        if (updateDto.getPhaseId() != null && !updateDto.getPhaseId().equals(task.getPhaseId())) {
+            task.setPhaseId(updateDto.getPhaseId());
+            hasChanges = true;
+        }
+
         if (hasChanges) {
             task.setUpdatedBy(userId);
             Task saved = taskRepository.save(task);
@@ -549,6 +556,7 @@ public class TaskService implements ITaskService {
         dto.setPriority(task.getPriority().getDisplayName());
         dto.setTaskType(task.getTaskType() != null ? task.getTaskType().getDisplayName() : null);
         dto.setParentTaskId(task.getParentTaskId());
+        dto.setPhaseId(task.getPhaseId());
 
         // AssignedTo
         dto.setAssignedTo(task.getAssignedTo());
@@ -606,6 +614,7 @@ public class TaskService implements ITaskService {
         dto.setPriority(task.getPriority().getDisplayName());
         dto.setTaskType(task.getTaskType() != null ? task.getTaskType().getDisplayName() : null);
         dto.setParentTaskId(task.getParentTaskId());
+        dto.setPhaseId(task.getPhaseId());
 
         // AssignedTo
         dto.setAssignedTo(task.getAssignedTo());
@@ -673,6 +682,7 @@ public class TaskService implements ITaskService {
         dto.setPriority(task.getPriority().getDisplayName());
         dto.setTaskType(task.getTaskType() != null ? task.getTaskType().getDisplayName() : null);
         dto.setParentTaskId(task.getParentTaskId());
+        dto.setPhaseId(task.getPhaseId());
         dto.setStartDate(task.getStartDate());
         dto.setDueDate(task.getDueDate());
         dto.setCreatedAt(task.getCreatedAt());
@@ -738,6 +748,7 @@ public class TaskService implements ITaskService {
         dto.setPriority(task.getPriority().getDisplayName());
         dto.setTaskType(task.getTaskType() != null ? task.getTaskType().getDisplayName() : null);
         dto.setParentTaskId(task.getParentTaskId());
+        dto.setPhaseId(task.getPhaseId());
         dto.setStartDate(task.getStartDate());
         dto.setDueDate(task.getDueDate());
         dto.setCreatedAt(task.getCreatedAt());
@@ -772,4 +783,6 @@ public class TaskService implements ITaskService {
 
         return dto;
     }
+
+
 }

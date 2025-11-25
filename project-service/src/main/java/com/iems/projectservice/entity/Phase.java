@@ -1,6 +1,5 @@
 package com.iems.projectservice.entity;
 
-import com.iems.projectservice.entity.enums.MemberStatus;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -12,11 +11,11 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "project_members")
+@Table(name = "phases")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class ProjectMember {
+public class Phase {
     
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -26,21 +25,23 @@ public class ProjectMember {
     @JoinColumn(name = "project_id", nullable = false)
     private Project project;
     
-    @Column(name = "user_id", nullable = false)
-    private UUID userId;
+    @Column(nullable = false)
+    private String name;
     
-    @Column(name = "role_id", nullable = false)
-    private UUID roleId;
+    @Column(columnDefinition = "TEXT")
+    private String description;
     
-    @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false)
-    private MemberStatus status = MemberStatus.ACTIVE;
+    @Column(columnDefinition = "TEXT")
+    private String goal;
     
-    @Column(name = "joined_at", nullable = false)
-    private LocalDateTime joinedAt;
+    @Column(name = "start_date")
+    private LocalDateTime startDate;
     
-    @Column(name = "assigned_by", nullable = false)
-    private UUID assignedBy;
+    @Column(name = "end_date")
+    private LocalDateTime endDate;
+    
+    @Column(name = "sort_order", nullable = false)
+    private Integer sortOrder;
     
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -49,11 +50,4 @@ public class ProjectMember {
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
-
-    @PrePersist
-    protected void onCreate() {
-        if (status == null) {
-            status = MemberStatus.ACTIVE;
-        }
-    }
 }

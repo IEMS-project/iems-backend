@@ -37,4 +37,7 @@ public class CreateTaskDto {
 
     // Optional parent task for subtask creation
     private UUID parentTaskId;
+
+    // Optional phase this task belongs to
+    private UUID phaseId;
 }

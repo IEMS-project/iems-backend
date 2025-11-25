@@ -3,6 +3,7 @@ package com.iems.projectservice.controller;
 import com.iems.projectservice.dto.request.ProjectMemberDto;
 import com.iems.projectservice.dto.response.ApiResponseDto;
 import com.iems.projectservice.dto.response.ProjectMemberResponseDto;
+import com.iems.projectservice.entity.enums.MemberStatus;
 import com.iems.projectservice.service.ProjectMemberService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -96,6 +97,27 @@ public class ProjectMemberController {
             return ResponseEntity.ok(new ApiResponseDto<>("success", "Member role updated successfully", member));
         } catch (Exception e) {
             log.error("Error updating member role", e);
+            return ResponseEntity.badRequest()
+                    .body(new ApiResponseDto<>("error", e.getMessage(), null));
+        }
+    }
+    
+    @PutMapping("/{userId}/status")
+    @Operation(summary = "Update member status", description = "Update the status (ACTIVE/INACTIVE) of a project member")
+    @PreAuthorize("hasAuthority('PROJECT_MANAGE')")
+    public ResponseEntity<ApiResponseDto<ProjectMemberResponseDto>> updateMemberStatus(
+            @Parameter(description = "Project ID", required = true)
+            @PathVariable UUID projectId,
+            @Parameter(description = "User ID to update status for", required = true)
+            @PathVariable UUID userId,
+            @Parameter(description = "New status for the member (ACTIVE or INACTIVE)", required = true)
+            @RequestParam MemberStatus status) {
+        try {
+            ProjectMemberResponseDto member = projectMemberService.updateMemberStatus(
+                    projectId, userId, status);
+            return ResponseEntity.ok(new ApiResponseDto<>("success", "Member status updated successfully", member));
+        } catch (Exception e) {
+            log.error("Error updating member status", e);
             return ResponseEntity.badRequest()
                     .body(new ApiResponseDto<>("error", e.getMessage(), null));
         }
