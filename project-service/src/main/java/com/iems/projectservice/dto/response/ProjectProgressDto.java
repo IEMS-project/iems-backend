@@ -1,18 +1,17 @@
 
-package com.iems.projectservice.dto.request;
+package com.iems.projectservice.dto.response;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+import java.util.UUID;
+
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 public class ProjectProgressDto {
-    private int totalTasks;
-    private int completedTasks;
-    private int inProgressTasks;
-    private int pendingTasks;
-    private int overdueTasks;
-    private double completionPercentage;
+    private UUID projectId;
+    List<PhaseProgressDto> phasesProgress;
 }

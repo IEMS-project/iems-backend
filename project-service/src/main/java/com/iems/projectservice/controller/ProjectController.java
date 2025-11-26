@@ -2,7 +2,7 @@ package com.iems.projectservice.controller;
 
 import com.iems.projectservice.dto.request.CreateProjectDto;
 import com.iems.projectservice.dto.request.ProjectIdsDto;
-import com.iems.projectservice.dto.request.ProjectProgressDto;
+import com.iems.projectservice.dto.response.ProjectProgressDto;
 import com.iems.projectservice.dto.request.UpdateProjectDto;
 import com.iems.projectservice.dto.response.ApiResponseDto;
 import com.iems.projectservice.dto.response.ProjectInfoResponse;

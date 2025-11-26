@@ -25,6 +25,8 @@ public class TaskController {
     @Autowired
     private ITaskService taskService;
 
+
+
     @PostMapping
     public ResponseEntity<ApiResponseDto<TaskNestedResponseDto>> createTask(
             @Valid @RequestBody CreateTaskDto createDto) {
@@ -236,4 +238,17 @@ public class TaskController {
     }
 
 
+
+    @PostMapping("/project-completions")
+    @Operation(summary = "Calculate project completion percentages", description = "Calculate completion percentage for each project based on phases and tasks")
+    public ResponseEntity<ApiResponseDto<List<ProjectProgressDto>>> calculateProjectCompletions(
+            @RequestBody ProjectIdsDto projectIdsDto) {
+        try {
+            List<UUID> projectIds = new ArrayList<>(projectIdsDto.getIds());
+            List<ProjectProgressDto> completions = taskService.getProjectsProgress(projectIds);
+            return ResponseEntity.ok(new ApiResponseDto<>("success", "Project completions calculated successfully", completions));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(new ApiResponseDto<>("error", "Failed to calculate project completions", null));
+        }
+    }
 }

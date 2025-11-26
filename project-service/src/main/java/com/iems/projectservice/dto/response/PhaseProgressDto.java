@@ -1,4 +1,4 @@
-package com.iems.taskservice.dto;
+package com.iems.projectservice.dto.response;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

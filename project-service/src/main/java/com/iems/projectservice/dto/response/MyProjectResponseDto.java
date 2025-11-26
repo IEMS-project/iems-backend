@@ -1,6 +1,5 @@
 package com.iems.projectservice.dto.response;
 
-import com.iems.projectservice.dto.request.ProjectProgressDto;
 import com.iems.projectservice.entity.enums.ProjectStatus;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -22,7 +21,7 @@ public class MyProjectResponseDto {
     private UUID createdBy;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
-    private ProjectProgressDto progress;
+    private Double progress;
 }
 
 

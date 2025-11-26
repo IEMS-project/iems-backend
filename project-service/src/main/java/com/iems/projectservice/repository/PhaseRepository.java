@@ -15,6 +15,8 @@ public interface PhaseRepository extends JpaRepository<Phase, UUID> {
     
     List<Phase> findByProjectIdOrderBySortOrderAsc(UUID projectId);
     
+    List<Phase> findByProjectIdIn(List<UUID> projectIds);
+    
     Optional<Phase> findByIdAndProjectId(UUID id, UUID projectId);
     
     @Query("SELECT COALESCE(MAX(p.sortOrder), 0) FROM Phase p WHERE p.project.id = :projectId")
