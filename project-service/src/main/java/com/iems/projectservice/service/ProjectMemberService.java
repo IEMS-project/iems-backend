@@ -7,6 +7,7 @@ import com.iems.projectservice.dto.response.UserDetailDto;
 import com.iems.projectservice.entity.Project;
 import com.iems.projectservice.entity.ProjectAllowedRole;
 import com.iems.projectservice.entity.ProjectMember;
+import com.iems.projectservice.entity.enums.MemberStatus;
 import com.iems.projectservice.exception.AppException;
 import com.iems.projectservice.exception.ProjectErrorCode;
 import com.iems.projectservice.repository.ProjectMemberRepository;
@@ -97,30 +98,51 @@ public class ProjectMemberService {
     }
 
 
-    @Transactional
     public ProjectMemberResponseDto addMemberToProject(UUID projectId, UUID userId, UUID roleId) {
         log.info("Adding member to project: projectId={}, userId={}, roleId={}", projectId, userId, roleId);
+        
+        // Execute transaction logic separately
+        UUID savedMemberId = saveOrUpdateMember(projectId, userId, roleId);
+        
+        // Fetch and map after transaction is committed
+        ProjectMember savedMember = projectMemberRepository.findById(savedMemberId)
+                .orElseThrow(() -> new AppException(ProjectErrorCode.MEMBER_NOT_FOUND));
+        
+        return mapToProjectMemberResponseDto(savedMember, new HashMap<>());
+    }
+    
+    @Transactional
+    private UUID saveOrUpdateMember(UUID projectId, UUID userId, UUID roleId) {
         UUID assignedBy = getUserIdFromRequest();
+        
         // Validate project exists
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new AppException(ProjectErrorCode.PROJECT_NOT_FOUND));
         
         // Check if user is already a member
-        if (projectMemberRepository.existsByProjectIdAndUserId(projectId, userId)) {
-            throw new AppException(ProjectErrorCode.PROJECT_MEMBER_ALREADY_EXISTS);
+        Optional<ProjectMember> existingMember = projectMemberRepository.findMemberByProjectAndUser(projectId, userId);
+        
+        if (existingMember.isPresent()) {
+            // Update existing member
+            log.info("Member already exists, updating role: projectId={}, userId={}", projectId, userId);
+            ProjectMember member = existingMember.get();
+            member.setRoleId(roleId);
+            member.setAssignedBy(assignedBy);
+            projectMemberRepository.save(member);
+            return member.getId();
+        } else {
+            // Create new member
+            ProjectMember projectMember = new ProjectMember();
+            projectMember.setProject(project);
+            projectMember.setUserId(userId);
+            projectMember.setRoleId(roleId);
+            projectMember.setStatus(MemberStatus.ACTIVE); // Set default status
+            projectMember.setJoinedAt(LocalDateTime.now());
+            projectMember.setAssignedBy(assignedBy);
+            
+            projectMemberRepository.save(projectMember);
+            return projectMember.getId();
         }
-        
-        // Create project member
-        ProjectMember projectMember = new ProjectMember();
-        projectMember.setProject(project);
-        projectMember.setUserId(userId);
-        projectMember.setRoleId(roleId);
-        projectMember.setJoinedAt(LocalDateTime.now());
-        projectMember.setAssignedBy(assignedBy);
-        
-        ProjectMember savedMember = projectMemberRepository.save(projectMember);
-        
-        return mapToProjectMemberResponseDto(savedMember, new HashMap<>());
     }
     
     public List<ProjectMemberResponseDto> getProjectMembers(UUID projectId) {
@@ -141,6 +163,19 @@ public class ProjectMemberService {
                 .orElseThrow(() -> new AppException(ProjectErrorCode.MEMBER_NOT_FOUND));
         
         projectMember.setRoleId(newRoleId);
+        ProjectMember updatedMember = projectMemberRepository.save(projectMember);
+        
+        return mapToProjectMemberResponseDto(updatedMember, new HashMap<>());
+    }
+    
+    @Transactional
+    public ProjectMemberResponseDto updateMemberStatus(UUID projectId, UUID userId, MemberStatus newStatus) {
+        log.info("Updating member status: projectId={}, userId={}, newStatus={}", projectId, userId, newStatus);
+        
+        ProjectMember projectMember = projectMemberRepository.findMemberByProjectAndUser(projectId, userId)
+                .orElseThrow(() -> new AppException(ProjectErrorCode.MEMBER_NOT_FOUND));
+        
+        projectMember.setStatus(newStatus);
         ProjectMember updatedMember = projectMemberRepository.save(projectMember);
         
         return mapToProjectMemberResponseDto(updatedMember, new HashMap<>());
@@ -240,18 +275,26 @@ public class ProjectMemberService {
         dto.setId(projectMember.getId());
         dto.setUserId(projectMember.getUserId());
         dto.setRoleId(projectMember.getRoleId());
+        dto.setStatus(projectMember.getStatus());
         dto.setJoinedAt(projectMember.getJoinedAt());
         dto.setAssignedBy(projectMember.getAssignedBy());
         
+        // Get project ID directly to avoid lazy loading issues
+        UUID projectId = projectMember.getProject() != null ? projectMember.getProject().getId() : null;
+        
         // Get role name from ProjectAllowedRole
-        try {
-            List<ProjectAllowedRole> allowedRoles = projectAllowedRoleService.list(projectMember.getProject().getId());
-            allowedRoles.stream()
-                .filter(role -> role.getRoleId().equals(projectMember.getRoleId()))
-                .findFirst()
-                .ifPresent(role -> dto.setRoleName(role.getRoleName()));
-        } catch (Exception e) {
-            log.warn("Could not get role name for roleId {}: {}", projectMember.getRoleId(), e.getMessage());
+        if (projectId != null) {
+            try {
+                List<ProjectAllowedRole> allowedRoles = projectAllowedRoleService.list(projectId);
+                allowedRoles.stream()
+                    .filter(role -> role.getRoleId().equals(projectMember.getRoleId()))
+                    .findFirst()
+                    .ifPresent(role -> dto.setRoleName(role.getRoleName()));
+            } catch (Exception e) {
+                log.warn("Could not get role name for roleId {}: {}", projectMember.getRoleId(), e.getMessage());
+                dto.setRoleName("Unknown Role");
+            }
+        } else {
             dto.setRoleName("Unknown Role");
         }
 

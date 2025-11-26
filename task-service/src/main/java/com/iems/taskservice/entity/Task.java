@@ -26,7 +26,7 @@ public class Task {
     @Column(name = "title", nullable = false)
     private String title;
 
-    @Column(name = "description")
+    @Column(name = "description", columnDefinition = "text")
     private String description;
 
     @Column(name = "assigned_to")
@@ -65,6 +65,10 @@ public class Task {
     // Parent task for subtask relation (nullable). If set, this task is a subtask.
     @Column(name = "parent_task_id")
     private UUID parentTaskId;
+
+    // Phase this task belongs to (nullable). If set, this task is part of a specific phase.
+    @Column(name = "phase_id")
+    private UUID phaseId;
 
     @PrePersist
     protected void onCreate() {

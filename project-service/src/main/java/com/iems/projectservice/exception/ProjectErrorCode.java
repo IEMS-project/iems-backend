@@ -17,7 +17,11 @@ public enum ProjectErrorCode {
 
 
     PROJECT_MEMBER_ALREADY_EXISTS("User is already a member of this project", HttpStatus.CONFLICT),
-    PROJECT_MANAGER_CANNOT_BE_REMOVED("Cannot remove project manager from project", HttpStatus.BAD_REQUEST);
+    PROJECT_MANAGER_CANNOT_BE_REMOVED("Cannot remove project manager from project", HttpStatus.BAD_REQUEST),
+    ROLE_ALREADY_ASSIGNED("Cannot delete role that is already assigned to members", HttpStatus.CONFLICT),
+    
+    PHASE_NOT_FOUND("Phase not found", HttpStatus.NOT_FOUND),
+    PHASE_NOT_BELONG_TO_PROJECT("Phase does not belong to this project", HttpStatus.BAD_REQUEST);
 
     private final String message;
     private final HttpStatus httpStatus;

@@ -78,6 +78,7 @@ public class TaskService implements ITaskService {
         }
         task.setStartDate(createDto.getStartDate());
         task.setDueDate(createDto.getDueDate());
+        task.setPhaseId(createDto.getPhaseId());
         task.setCreatedBy(userId);
         task.setUpdatedBy(userId);
         
@@ -162,6 +163,7 @@ public class TaskService implements ITaskService {
         dto.setTaskType(task.getTaskType() != null ? task.getTaskType().name() : null);
 
         dto.setParentTaskId(task.getParentTaskId());
+        dto.setPhaseId(task.getPhaseId());
         dto.setStartDate(task.getStartDate());
         dto.setDueDate(task.getDueDate());
         dto.setCreatedAt(task.getCreatedAt());
@@ -449,6 +451,11 @@ public class TaskService implements ITaskService {
             hasChanges = true;
         }
 
+        if (updateDto.getPhaseId() != null && !updateDto.getPhaseId().equals(task.getPhaseId())) {
+            task.setPhaseId(updateDto.getPhaseId());
+            hasChanges = true;
+        }
+
         if (hasChanges) {
             task.setUpdatedBy(userId);
             Task saved = taskRepository.save(task);
@@ -549,6 +556,7 @@ public class TaskService implements ITaskService {
         dto.setPriority(task.getPriority().getDisplayName());
         dto.setTaskType(task.getTaskType() != null ? task.getTaskType().getDisplayName() : null);
         dto.setParentTaskId(task.getParentTaskId());
+        dto.setPhaseId(task.getPhaseId());
 
         // AssignedTo
         dto.setAssignedTo(task.getAssignedTo());
@@ -606,6 +614,7 @@ public class TaskService implements ITaskService {
         dto.setPriority(task.getPriority().getDisplayName());
         dto.setTaskType(task.getTaskType() != null ? task.getTaskType().getDisplayName() : null);
         dto.setParentTaskId(task.getParentTaskId());
+        dto.setPhaseId(task.getPhaseId());
 
         // AssignedTo
         dto.setAssignedTo(task.getAssignedTo());
@@ -673,6 +682,7 @@ public class TaskService implements ITaskService {
         dto.setPriority(task.getPriority().getDisplayName());
         dto.setTaskType(task.getTaskType() != null ? task.getTaskType().getDisplayName() : null);
         dto.setParentTaskId(task.getParentTaskId());
+        dto.setPhaseId(task.getPhaseId());
         dto.setStartDate(task.getStartDate());
         dto.setDueDate(task.getDueDate());
         dto.setCreatedAt(task.getCreatedAt());
@@ -738,6 +748,7 @@ public class TaskService implements ITaskService {
         dto.setPriority(task.getPriority().getDisplayName());
         dto.setTaskType(task.getTaskType() != null ? task.getTaskType().getDisplayName() : null);
         dto.setParentTaskId(task.getParentTaskId());
+        dto.setPhaseId(task.getPhaseId());
         dto.setStartDate(task.getStartDate());
         dto.setDueDate(task.getDueDate());
         dto.setCreatedAt(task.getCreatedAt());
@@ -771,5 +782,50 @@ public class TaskService implements ITaskService {
         dto.setUpdatedBy(updated);
 
         return dto;
+    }
+
+
+
+    @Override
+    public List<ProjectProgressDto> getProjectsProgress(List<UUID> projectIds) {
+        List<Task> tasks = taskRepository.findByProjectIdIn(projectIds);
+
+        Map<UUID, List<Task>> tasksByProject = tasks.stream()
+                .collect(Collectors.groupingBy(Task::getProjectId));
+
+        List<ProjectProgressDto> result = new ArrayList<>();
+
+        for (UUID projectId : projectIds) {
+            List<Task> projectTasks = tasksByProject.getOrDefault(projectId, List.of());
+
+            // Lọc chỉ task có phase
+            List<Task> tasksWithPhase = projectTasks.stream()
+                    .filter(t -> t.getPhaseId() != null)
+                    .collect(Collectors.toList());
+
+            // Group tasks theo phase
+            Map<UUID, List<Task>> tasksByPhase = tasksWithPhase.stream()
+                    .collect(Collectors.groupingBy(Task::getPhaseId));
+
+            List<PhaseProgressDto> phaseProgressList = new ArrayList<>();
+
+            for (Map.Entry<UUID, List<Task>> entry : tasksByPhase.entrySet()) {
+                UUID phaseId = entry.getKey();
+                List<Task> phaseTasks = entry.getValue();
+
+                long total = phaseTasks.size();
+                long done = phaseTasks.stream()
+                        .filter(t -> TaskStatus.COMPLETED.equals(t.getStatus()))
+                        .count();
+
+                double phaseProgress = total == 0 ? 0 : ((double) done / total) * 100;
+
+                phaseProgressList.add(new PhaseProgressDto(phaseId, phaseProgress));
+            }
+
+            result.add(new ProjectProgressDto(projectId, phaseProgressList));
+        }
+
+        return result;
     }
 }

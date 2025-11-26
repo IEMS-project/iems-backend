@@ -33,6 +33,7 @@ public class TaskResponseDto {
     private String priority;
     private String taskType;
     private UUID parentTaskId;
+    private UUID phaseId;
     private LocalDate startDate;
     private LocalDate dueDate;
     private LocalDateTime createdAt;

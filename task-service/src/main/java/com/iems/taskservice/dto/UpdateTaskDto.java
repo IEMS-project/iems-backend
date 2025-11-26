@@ -34,4 +34,6 @@ public class UpdateTaskDto {
     private String comment; // Optional comment when updating status
 
     private UUID parentTaskId; // Allow reparenting or setting as subtask
+
+    private UUID phaseId; // Allow changing phase assignment
 }

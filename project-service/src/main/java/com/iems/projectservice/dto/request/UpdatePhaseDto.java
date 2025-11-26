@@ -1,21 +1,26 @@
-package com.iems.projectservice.dto.response;
+package com.iems.projectservice.dto.request;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
-import java.util.UUID;
 
 @Data
-@Builder
-@AllArgsConstructor
 @NoArgsConstructor
-public class ProjectInfoResponse {
-    private UUID id;
+@AllArgsConstructor
+public class UpdatePhaseDto {
+    
     private String name;
+    
     private String description;
+    
+    private String goal;
+
     private LocalDateTime startDate;
+
     private LocalDateTime endDate;
+    
+    private Integer sortOrder;
 }

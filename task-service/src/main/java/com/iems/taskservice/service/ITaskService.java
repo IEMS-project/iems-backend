@@ -53,4 +53,6 @@ public interface ITaskService {
     void createStatusHistoryWithOldNew(UUID taskId, TaskStatus oldStatus, TaskStatus newStatus, UUID updatedBy);
 
     boolean isValidStatusTransition(TaskStatus currentStatus, TaskStatus newStatus);
+
+    List<ProjectProgressDto> getProjectsProgress(List<UUID> projectIds);
 }

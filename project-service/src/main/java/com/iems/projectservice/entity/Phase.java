@@ -1,6 +1,5 @@
 package com.iems.projectservice.entity;
 
-import com.iems.projectservice.entity.enums.ProjectStatus;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -10,53 +9,47 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.UUID;
 
 @Entity
-@Table(name = "projects")
+@Table(name = "phases")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class Project {
-
+public class Phase {
+    
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
-
-    @Column(nullable = false, unique = true)
+    
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "project_id", nullable = false)
+    @ToString.Exclude
+    private Project project;
+    
+    @Column(nullable = false)
     private String name;
-
+    
     @Column(columnDefinition = "TEXT")
     private String description;
-
-    @Column(name = "start_date", nullable = false)
+    
+    @Column(columnDefinition = "TEXT")
+    private String goal;
+    
+    @Column(name = "start_date")
     private LocalDateTime startDate;
-
+    
     @Column(name = "end_date")
     private LocalDateTime endDate;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false)
-    private ProjectStatus status = ProjectStatus.PLANNING;
-
-    @Column(name = "manager_id", nullable = false)
-    private UUID managerId;
-
-    @Column(name = "created_by", nullable = false)
-    private UUID createdBy;
-
+    
+    @Column(name = "sort_order", nullable = false)
+    private Integer sortOrder;
+    
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
-
+    
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
-
-    @OneToMany(mappedBy = "project", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    @ToString.Exclude
-    private List<ProjectMember> members;
-
-
 }

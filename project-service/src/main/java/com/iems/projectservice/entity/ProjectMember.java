@@ -1,5 +1,6 @@
 package com.iems.projectservice.entity;
 
+import com.iems.projectservice.entity.enums.MemberStatus;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -31,6 +32,10 @@ public class ProjectMember {
     @Column(name = "role_id", nullable = false)
     private UUID roleId;
     
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false)
+    private MemberStatus status = MemberStatus.ACTIVE;
+    
     @Column(name = "joined_at", nullable = false)
     private LocalDateTime joinedAt;
     
@@ -45,4 +50,10 @@ public class ProjectMember {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    @PrePersist
+    protected void onCreate() {
+        if (status == null) {
+            status = MemberStatus.ACTIVE;
+        }
+    }
 }

@@ -3,22 +3,23 @@ package com.iems.projectservice.service;
 import com.iems.projectservice.client.UserServiceFeignClient;
 import com.iems.projectservice.dto.request.CreateProjectDto;
 import com.iems.projectservice.dto.request.ProjectIdsDto;
-import com.iems.projectservice.dto.request.ProjectProgressDto;
+import com.iems.projectservice.dto.response.PhaseProgressDto;
+import com.iems.projectservice.dto.response.ProjectProgressDto;
 import com.iems.projectservice.dto.request.UpdateProjectDto;
 import com.iems.projectservice.dto.response.*;
+import com.iems.projectservice.entity.Phase;
 import com.iems.projectservice.entity.Project;
 import com.iems.projectservice.entity.ProjectAllowedRole;
 import com.iems.projectservice.entity.enums.ProjectStatus;
-import com.iems.projectservice.entity.ProjectMember;
 import com.iems.projectservice.exception.AppException;
 import com.iems.projectservice.exception.ProjectErrorCode;
+import com.iems.projectservice.repository.PhaseRepository;
 import com.iems.projectservice.repository.ProjectRepository;
 import com.iems.projectservice.security.JwtUserDetails;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -35,6 +36,8 @@ public class ProjectService {
     private final ProjectRepository projectRepository;
     private final ProjectMemberService projectMemberService;
     private final ProjectAllowedRoleService projectAllowedRoleService;
+    private final PhaseRepository phaseRepository;
+    private final TaskService taskService;
 
     @Autowired
     private UserServiceFeignClient userServiceFeignClient;
@@ -127,7 +130,11 @@ public class ProjectService {
                     managerRoleId);
         }
         
-        return mapToProjectResponseDto(savedProject);
+        // Calculate progress for the new project
+        Map<UUID, Double> progressMap = calculateProjectsProgress(List.of(savedProject.getId()));
+        double progress = progressMap.getOrDefault(savedProject.getId(), 0.0);
+        
+        return mapToProjectResponseDto(savedProject, progress);
     }
     
     @Transactional
@@ -180,27 +187,46 @@ public class ProjectService {
         
         Project updatedProject = projectRepository.save(project);
         
-        return mapToProjectResponseDto(updatedProject);
+        // Calculate progress for the updated project
+        Map<UUID, Double> progressMap = calculateProjectsProgress(List.of(updatedProject.getId()));
+        double progress = progressMap.getOrDefault(updatedProject.getId(), 0.0);
+        
+        return mapToProjectResponseDto(updatedProject, progress);
     }
 
     public List<MyProjectResponseDto> getMyProjects(){
         UUID userId = getUserIdFromRequest();
         List<Project> projects = projectRepository.findByMemberId(userId);
-        return projects.stream().map(this::mapToMyProjectResponseDto).toList();
+        
+        // Get project IDs
+        List<UUID> projectIds = projects.stream()
+                .map(Project::getId)
+                .collect(Collectors.toList());
+        
+        // Get progress data from task service
+        Map<UUID, Double> progressMap = calculateProjectsProgress(projectIds);
+        
+        return projects.stream()
+                .map(project -> mapToMyProjectResponseDto(project, progressMap.getOrDefault(project.getId(), 0.0)))
+                .collect(Collectors.toList());
     }
 
     public ProjectDetailResponseDto getProjectById(UUID projectId) {
         log.info("Getting project: {}", projectId);
         UUID currentUserId = getUserIdFromRequest();
+
         Project project = projectRepository.findById(projectId)
-                .orElseThrow(() -> new AppException( ProjectErrorCode.PROJECT_NOT_FOUND));
-        
-        // Check if user has access to project
+                .orElseThrow(() -> new AppException(ProjectErrorCode.PROJECT_NOT_FOUND));
+
+        // Check permission
         if (!hasAccessToProject(project, currentUserId)) {
-            throw new  AppException( ProjectErrorCode.PERMISSION_DENIED);
+            throw new AppException(ProjectErrorCode.PERMISSION_DENIED);
         }
-        
-        return mapToProjectDetailResponseDto(project);
+
+        Map<UUID, Double> progressMap = calculateProjectsProgress(List.of(projectId));
+        double progress = progressMap.getOrDefault(projectId, 0.0);
+
+        return mapToProjectDetailResponseDto(project, progress);
     }
 
     public List<ProjectTableDto> getProjectsForTable() {
@@ -270,7 +296,18 @@ public class ProjectService {
         log.info("Getting projects for member: {}", userId);
         
         List<Project> projects = projectRepository.findByMemberId(userId);
-        return projects.stream().map(this::mapToProjectResponseDto).toList();
+        
+        // Get project IDs
+        List<UUID> projectIds = projects.stream()
+                .map(Project::getId)
+                .collect(Collectors.toList());
+        
+        // Get progress data from task service
+        Map<UUID, Double> progressMap = calculateProjectsProgress(projectIds);
+        
+        return projects.stream()
+                .map(project -> mapToProjectResponseDto(project, progressMap.getOrDefault(project.getId(), 0.0)))
+                .collect(Collectors.toList());
     }
     
     public List<ProjectResponseDto> findAllProjects() {
@@ -278,23 +315,41 @@ public class ProjectService {
         log.info("Getting all projects for user: {}", currentUserId);
 
         List<Project> projects = projectRepository.findAll();
-        return projects.stream().map(this::mapToProjectResponseDto).toList();
-    }
-    
-    public ProjectProgressDto getProjectProgress(UUID projectId) {
-        log.info("Getting project progress: {}", projectId);
-        UUID currentUserId = getUserIdFromRequest();
-        Project project = projectRepository.findById(projectId)
-                .orElseThrow(() -> new  AppException( ProjectErrorCode.PROJECT_NOT_FOUND));
         
-        if (!hasAccessToProject(project, currentUserId)) {
-            throw new  AppException( ProjectErrorCode.PERMISSION_DENIED);
+        // Get project IDs
+        List<UUID> projectIds = projects.stream()
+                .map(Project::getId)
+                .collect(Collectors.toList());
+        
+        // Get progress data from task service
+        Map<UUID, Double> progressMap = calculateProjectsProgress(projectIds);
+        
+        return projects.stream()
+                .map(project -> mapToProjectResponseDto(project, progressMap.getOrDefault(project.getId(), 0.0)))
+                .collect(Collectors.toList());
+    }
+
+    public ProjectProgressDto getProjectProgress(UUID projectId) {
+        log.info("Getting detailed progress for project: {}", projectId);
+        
+        // Verify project exists
+        projectRepository.findById(projectId)
+                .orElseThrow(() -> new AppException(ProjectErrorCode.PROJECT_NOT_FOUND));
+        
+        // Get progress from task service
+        List<ProjectProgressDto> progressList = taskService.getProjectsProgress(List.of(projectId));
+        
+        if (progressList.isEmpty()) {
+            // Return empty progress if no data available
+            ProjectProgressDto emptyProgress = new ProjectProgressDto();
+            emptyProgress.setProjectId(projectId);
+            emptyProgress.setPhasesProgress(new ArrayList<>());
+            return emptyProgress;
         }
         
-        // This would typically integrate with task service to get actual task statistics
-        // For now, returning mock data
-        return new ProjectProgressDto(10, 5, 3, 2, 1, 50.0);
+        return progressList.get(0);
     }
+
     
     @Transactional
     public void assignProjectManager(UUID projectId, UUID newManagerId) {
@@ -350,7 +405,74 @@ public class ProjectService {
         }
     }
     
-    private ProjectDetailResponseDto mapToProjectDetailResponseDto(Project project) {
+    /**
+     * Calculate project progress based on phases and task completion
+     * Formula: Total Progress = Sum(Phase Progress × Phase Weight)
+     * Where Phase Weight = 100% / Number of Phases
+     */
+    private Map<UUID, Double> calculateProjectsProgress(List<UUID> projectIds) {
+        Map<UUID, Double> progressMap = new HashMap<>();
+        
+        if (projectIds.isEmpty()) {
+            return progressMap;
+        }
+        
+        try {
+            // Get phases for all projects
+            List<Phase> allPhases = phaseRepository.findByProjectIdIn(projectIds);
+            Map<UUID, List<Phase>> phasesByProject = allPhases.stream()
+                    .collect(Collectors.groupingBy(phase -> phase.getProject().getId()));
+            
+            // Get task progress from task service
+            List<ProjectProgressDto> taskProgressList = taskService.getProjectsProgress(projectIds);
+            Map<UUID, ProjectProgressDto> taskProgressMap = taskProgressList.stream()
+                    .collect(Collectors.toMap(ProjectProgressDto::getProjectId, p -> p));
+            
+            // Calculate progress for each project
+            for (UUID projectId : projectIds) {
+                List<Phase> projectPhases = phasesByProject.getOrDefault(projectId, new ArrayList<>());
+                
+                if (projectPhases.isEmpty()) {
+                    // No phases, set progress to 0
+                    progressMap.put(projectId, 0.0);
+                    continue;
+                }
+                
+                ProjectProgressDto taskProgress = taskProgressMap.get(projectId);
+                if (taskProgress == null || taskProgress.getPhasesProgress() == null) {
+                    // No task data, set progress to 0
+                    progressMap.put(projectId, 0.0);
+                    continue;
+                }
+                
+                // Create map of phase progress
+                Map<UUID, Double> phaseProgressMap = taskProgress.getPhasesProgress().stream()
+                        .collect(Collectors.toMap(PhaseProgressDto::getPhaseID, PhaseProgressDto::getProgress));
+                
+                // Calculate total progress
+                int totalPhases = projectPhases.size();
+                double phaseWeight = 100.0 / totalPhases; // Each phase has equal weight
+                
+                double totalProgress = projectPhases.stream()
+                        .mapToDouble(phase -> {
+                            double phaseProgress = phaseProgressMap.getOrDefault(phase.getId(), 0.0);
+                            return (phaseProgress / 100.0) * phaseWeight; // Convert progress to contribution
+                        })
+                        .sum();
+                
+                progressMap.put(projectId, totalProgress);
+            }
+            
+        } catch (Exception e) {
+            log.error("Error calculating project progress: {}", e.getMessage());
+            // Return empty map or 0 progress for all projects
+            projectIds.forEach(id -> progressMap.put(id, 0.0));
+        }
+        
+        return progressMap;
+    }
+
+    private ProjectDetailResponseDto mapToProjectDetailResponseDto(Project project, double progress) {
         ProjectDetailResponseDto dto = new ProjectDetailResponseDto();
         dto.setId(project.getId());
         dto.setName(project.getName());
@@ -361,15 +483,57 @@ public class ProjectService {
         dto.setCreatedBy(project.getCreatedBy());
         dto.setCreatedAt(project.getCreatedAt());
         dto.setUpdatedAt(project.getUpdatedAt());
-        
-        // Get project progress
-        ProjectProgressDto progress = getProjectProgress(project.getId());
-        dto.setProgress(progress);
-        
+
+        // progress giống MyProject
+        dto.setProgress(Math.round(progress * 100.0) / 100.0);
+
         return dto;
     }
 
-    private MyProjectResponseDto mapToMyProjectResponseDto(Project project) {
+
+    /**
+     * Calculate progress for a single project including phase details
+     */
+    private ProjectProgressDto calculateSingleProjectProgress(UUID projectId) {
+        ProjectProgressDto progressDto = new ProjectProgressDto();
+        progressDto.setProjectId(projectId);
+        
+        try {
+            // Get phases for the project
+            List<Phase> projectPhases = phaseRepository.findByProjectIdOrderBySortOrderAsc(projectId);
+            
+            if (projectPhases.isEmpty()) {
+                progressDto.setPhasesProgress(new ArrayList<>());
+                return progressDto;
+            }
+            
+            // Get task progress from task service
+            List<ProjectProgressDto> taskProgressList = taskService.getProjectsProgress(Collections.singletonList(projectId));
+            
+            if (taskProgressList.isEmpty() || taskProgressList.get(0).getPhasesProgress() == null) {
+                // No task data, set all phases to 0 progress
+                List<PhaseProgressDto> phasesProgress = projectPhases.stream()
+                        .map(phase -> PhaseProgressDto.builder()
+                                .phaseID(phase.getId())
+                                .progress(0.0)
+                                .build())
+                        .collect(Collectors.toList());
+                progressDto.setPhasesProgress(phasesProgress);
+                return progressDto;
+            }
+            
+            // Use the phases progress from task service
+            progressDto.setPhasesProgress(taskProgressList.get(0).getPhasesProgress());
+            
+        } catch (Exception e) {
+            log.error("Error calculating project progress for project {}: {}", projectId, e.getMessage());
+            progressDto.setPhasesProgress(new ArrayList<>());
+        }
+        
+        return progressDto;
+    }
+
+    private MyProjectResponseDto mapToMyProjectResponseDto(Project project, double progress) {
         MyProjectResponseDto dto = new MyProjectResponseDto();
         dto.setId(project.getId());
         dto.setName(project.getName());
@@ -380,15 +544,12 @@ public class ProjectService {
         dto.setCreatedBy(project.getCreatedBy());
         dto.setCreatedAt(project.getCreatedAt());
         dto.setUpdatedAt(project.getUpdatedAt());
-        
-        // Get project progress
-        ProjectProgressDto progress = getProjectProgress(project.getId());
-        dto.setProgress(progress);
+        dto.setProgress(Math.round(progress * 100.0) / 100.0);
         
         return dto;
     }
 
-    private ProjectResponseDto mapToProjectResponseDto(Project project) {
+    private ProjectResponseDto mapToProjectResponseDto(Project project, double progress) {
         ProjectResponseDto dto = new ProjectResponseDto();
         dto.setId(project.getId());
         dto.setName(project.getName());
@@ -415,10 +576,8 @@ public class ProjectService {
         // Get project members
         List<ProjectMemberResponseDto> members = projectMemberService.getProjectMembers(project.getId());
         dto.setMembers(members);
-        
-        // Get project progress
-        ProjectProgressDto progress = getProjectProgress(project.getId());
-        dto.setProgress(progress);
+
+        dto.setProgress(Math.round(progress * 100.0) / 100.0);
         
         return dto;
     }
