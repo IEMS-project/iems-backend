@@ -4,10 +4,14 @@ import com.iems.documentservice.dto.request.CreateFolderRequest;
 import com.iems.documentservice.dto.request.ShareRequest;
 import com.iems.documentservice.dto.request.RenameRequest;
 import com.iems.documentservice.dto.request.UpdateSharePermissionRequest;
+import com.iems.documentservice.dto.request.BatchDeleteRequest;
+import com.iems.documentservice.dto.request.BatchMoveRequest;
 import com.iems.documentservice.dto.response.ApiResponseDto;
 import com.iems.documentservice.dto.response.FileResponse;
 import com.iems.documentservice.dto.response.FolderResponse;
 import com.iems.documentservice.dto.response.SimpleFileResponse;
+import com.iems.documentservice.dto.response.BatchDeleteResponse;
+import com.iems.documentservice.dto.response.BatchMoveResponse;
 import com.iems.documentservice.service.DriveService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -127,6 +131,22 @@ public class DriveController {
     public ResponseEntity<ApiResponseDto<Object>> deleteFolder(@PathVariable UUID id) throws Exception {
         driveService.deleteFolderRecursive(id);
         return ResponseEntity.ok(new ApiResponseDto<>(200, "Folder deleted", null));
+    }
+
+    @PostMapping("/batch-delete")
+    @Operation(summary = "Delete multiple files and folders at once")
+    @PreAuthorize("hasAuthority('DOC_DELETE')")
+    public ResponseEntity<ApiResponseDto<BatchDeleteResponse>> batchDelete(@Valid @RequestBody BatchDeleteRequest request) throws Exception {
+        BatchDeleteResponse data = driveService.batchDelete(request.getFileIds(), request.getFolderIds());
+        return ResponseEntity.ok(new ApiResponseDto<>(200, "Batch delete completed", data));
+    }
+
+    @PostMapping("/batch-move")
+    @Operation(summary = "Move multiple files and folders to a destination folder")
+    @PreAuthorize("hasAuthority('DOC_UPDATE')")
+    public ResponseEntity<ApiResponseDto<BatchMoveResponse>> batchMove(@Valid @RequestBody BatchMoveRequest request) {
+        BatchMoveResponse data = driveService.batchMove(request.getFileIds(), request.getFolderIds(), request.getDestinationFolderId());
+        return ResponseEntity.ok(new ApiResponseDto<>(200, "Batch move completed", data));
     }
 
     // Search

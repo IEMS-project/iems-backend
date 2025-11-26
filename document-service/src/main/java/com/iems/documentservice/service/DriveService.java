@@ -6,6 +6,8 @@ import com.iems.documentservice.dto.request.ShareRequest;
 import com.iems.documentservice.dto.response.FileResponse;
 import com.iems.documentservice.dto.response.FolderResponse;
 import com.iems.documentservice.dto.response.SimpleFileResponse;
+import com.iems.documentservice.dto.response.BatchDeleteResponse;
+import com.iems.documentservice.dto.response.BatchMoveResponse;
 import com.iems.documentservice.entity.Folder;
 import com.iems.documentservice.entity.StoredFile;
 import com.iems.documentservice.entity.enums.Permission;
@@ -865,6 +867,168 @@ public class DriveService {
         
         file.setFolder(newFolderId != null ? folderRepository.findById(newFolderId).orElse(null) : null);
         storedFileRepository.save(file);
+    }
+
+    @Transactional
+    public BatchDeleteResponse batchDelete(List<UUID> fileIds, List<UUID> folderIds) throws Exception {
+        UUID requesterId = getCurrentUserId();
+        
+        List<UUID> successfulFileIds = new ArrayList<>();
+        List<UUID> successfulFolderIds = new ArrayList<>();
+        List<BatchDeleteResponse.FailedItem> failedItems = new ArrayList<>();
+        
+        int totalRequested = 0;
+        if (fileIds != null) totalRequested += fileIds.size();
+        if (folderIds != null) totalRequested += folderIds.size();
+        
+        // Delete files
+        if (fileIds != null && !fileIds.isEmpty()) {
+            for (UUID fileId : fileIds) {
+                try {
+                    StoredFile file = storedFileRepository.findById(fileId)
+                            .orElseThrow(() -> new AppException(DocumentErrorCode.FILE_NOT_FOUND));
+                    enforceOwner(file, requesterId);
+                    storageService.delete(file.getPath());
+                    storedFileRepository.delete(file);
+                    successfulFileIds.add(fileId);
+                } catch (Exception e) {
+                    // Log error but continue with other files
+                    System.err.println("Error deleting file " + fileId + ": " + e.getMessage());
+                    failedItems.add(BatchDeleteResponse.FailedItem.builder()
+                            .id(fileId)
+                            .type("file")
+                            .reason(e.getMessage())
+                            .build());
+                }
+            }
+        }
+        
+        // Delete folders
+        if (folderIds != null && !folderIds.isEmpty()) {
+            for (UUID folderId : folderIds) {
+                try {
+                    deleteFolderRecursive(folderId);
+                    successfulFolderIds.add(folderId);
+                } catch (Exception e) {
+                    // Log error but continue with other folders
+                    System.err.println("Error deleting folder " + folderId + ": " + e.getMessage());
+                    failedItems.add(BatchDeleteResponse.FailedItem.builder()
+                            .id(folderId)
+                            .type("folder")
+                            .reason(e.getMessage())
+                            .build());
+                }
+            }
+        }
+        
+        int successCount = successfulFileIds.size() + successfulFolderIds.size();
+        int failureCount = failedItems.size();
+        
+        return BatchDeleteResponse.builder()
+                .totalRequested(totalRequested)
+                .successCount(successCount)
+                .failureCount(failureCount)
+                .successfulFileIds(successfulFileIds)
+                .successfulFolderIds(successfulFolderIds)
+                .failedItems(failedItems)
+                .build();
+    }
+
+    @Transactional
+    public BatchMoveResponse batchMove(List<UUID> fileIds, List<UUID> folderIds, UUID destinationFolderId) {
+        UUID requesterId = getCurrentUserId();
+        
+        List<UUID> successfulFileIds = new ArrayList<>();
+        List<UUID> successfulFolderIds = new ArrayList<>();
+        List<BatchMoveResponse.FailedItem> failedItems = new ArrayList<>();
+        
+        int totalRequested = 0;
+        if (fileIds != null) totalRequested += fileIds.size();
+        if (folderIds != null) totalRequested += folderIds.size();
+        
+        // Move files
+        if (fileIds != null && !fileIds.isEmpty()) {
+            for (UUID fileId : fileIds) {
+                try {
+                    StoredFile file = storedFileRepository.findById(fileId)
+                            .orElseThrow(() -> new AppException(DocumentErrorCode.FILE_NOT_FOUND));
+                    
+                    // Check ownership
+                    if (!file.getOwnerId().equals(requesterId)) {
+                        throw new AppException(DocumentErrorCode.PERMISSION_DENIED);
+                    }
+                    
+                    // Check permission to move to destination
+                    enforceWritePermission(destinationFolderId, requesterId);
+                    
+                    file.setFolder(destinationFolderId != null ? folderRepository.findById(destinationFolderId).orElse(null) : null);
+                    storedFileRepository.save(file);
+                    successfulFileIds.add(fileId);
+                } catch (Exception e) {
+                    System.err.println("Error moving file " + fileId + ": " + e.getMessage());
+                    failedItems.add(BatchMoveResponse.FailedItem.builder()
+                            .id(fileId)
+                            .type("file")
+                            .reason(e.getMessage())
+                            .build());
+                }
+            }
+        }
+        
+        // Move folders
+        if (folderIds != null && !folderIds.isEmpty()) {
+            for (UUID folderId : folderIds) {
+                try {
+                    Folder folder = folderRepository.findById(folderId)
+                            .orElseThrow(() -> new AppException(DocumentErrorCode.FOLDER_NOT_FOUND));
+                    
+                    // Check ownership
+                    if (!folder.getOwnerId().equals(requesterId)) {
+                        throw new AppException(DocumentErrorCode.PERMISSION_DENIED);
+                    }
+                    
+                    // Check permission to move to destination
+                    enforceWritePermission(destinationFolderId, requesterId);
+                    
+                    // Check for circular reference
+                    if (destinationFolderId != null) {
+                        Folder newParent = folderRepository.findById(destinationFolderId)
+                                .orElseThrow(() -> new AppException(DocumentErrorCode.FOLDER_NOT_FOUND));
+                        
+                        Folder current = newParent;
+                        while (current != null) {
+                            if (current.getId().equals(folderId)) {
+                                throw new AppException(DocumentErrorCode.INVALID_REQUEST);
+                            }
+                            current = current.getParent();
+                        }
+                    }
+                    
+                    folder.setParent(destinationFolderId != null ? folderRepository.findById(destinationFolderId).orElse(null) : null);
+                    folderRepository.save(folder);
+                    successfulFolderIds.add(folderId);
+                } catch (Exception e) {
+                    System.err.println("Error moving folder " + folderId + ": " + e.getMessage());
+                    failedItems.add(BatchMoveResponse.FailedItem.builder()
+                            .id(folderId)
+                            .type("folder")
+                            .reason(e.getMessage())
+                            .build());
+                }
+            }
+        }
+        
+        int successCount = successfulFileIds.size() + successfulFolderIds.size();
+        int failureCount = failedItems.size();
+        
+        return BatchMoveResponse.builder()
+                .totalRequested(totalRequested)
+                .successCount(successCount)
+                .failureCount(failureCount)
+                .successfulFileIds(successfulFileIds)
+                .successfulFolderIds(successfulFolderIds)
+                .failedItems(failedItems)
+                .build();
     }
 
     private UUID getCurrentUserId() {
