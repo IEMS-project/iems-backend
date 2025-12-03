@@ -9,6 +9,7 @@ import com.iems.iamservice.exception.AppException;
 import com.iems.iamservice.exception.ErrorCode;
 import com.iems.iamservice.repository.PermissionRepository;
 import com.iems.iamservice.repository.RoleRepository;
+import com.iems.iamservice.repository.UserRoleRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -27,6 +28,7 @@ public class RoleService {
 
     private final RoleRepository roleRepository;
     private final PermissionRepository permissionRepository;
+    private final UserRoleRepository userRoleRepository;
 
     /**
      * Create new role
@@ -163,9 +165,8 @@ public class RoleService {
         try {
             Role role = findById(id);
 
-            // Check if role is in use (this should be checked through UserRolePermissionService)
-            // For now, we'll just log a warning and proceed
-            log.warn("Deleting role {} - ensure no users are assigned to this role", role.getCode());
+            // Xóa toàn bộ quan hệ user-role để tránh lỗi ràng buộc DB
+            userRoleRepository.deleteByRoleId(role.getId());
 
             // Clear all permission relationships before deletion
             role.getPermissions().forEach(permission -> permission.getRoles().remove(role));

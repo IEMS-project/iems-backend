@@ -34,11 +34,16 @@ public class UserRolePermissionService {
     private final RoleRepository roleRepository;
     private final PermissionRepository permissionRepository;
 
+
     /**
      * Assign roles to user (additive - allows multiple roles, no error for duplicates)
      */
     @Transactional
     public void assignRolesToUser(UUID userId, Set<String> roleCodes) {
+        if (roleCodes == null || roleCodes.isEmpty()) {
+            log.info("No role codes provided for userId={}, skipping assignment", userId);
+            return;
+        }
         log.info("Assigning roles {} to user ID: {}", roleCodes, userId);
 
         // Add new role assignments (skip if already exists)
@@ -79,37 +84,47 @@ public class UserRolePermissionService {
      */
     @Transactional
     public void replaceUserRoles(UUID userId, Set<String> roleCodes) {
-        log.info("Replacing roles {} for user ID: {}", roleCodes, userId);
+        log.info("Replacing roles {} for userId={}", roleCodes, userId);
 
-        // Deactivate existing role assignments
-        userRoleRepository.findByUserIdAndActiveTrue(userId)
-                .forEach(userRole -> {
-                    userRole.setActive(false);
-                    userRoleRepository.save(userRole);
-                });
+        // 1) Xóa toàn bộ quan hệ user-role cũ
+        userRoleRepository.deleteByUserId(userId);
 
-        // Add new role assignments
-        for (String roleCode : roleCodes) {
-            Role role = roleRepository.findByCode(roleCode)
-                    .orElseThrow(() -> new AppException(ErrorCode.ROLE_NOT_FOUND_BY_CODE));
-
-            UserRole userRole = UserRole.builder()
-                    .userId(userId)
-                    .role(role)
-                    .active(true)
-                    .build();
-
-            userRoleRepository.save(userRole);
+        if (roleCodes == null || roleCodes.isEmpty()) {
+            log.info("All roles removed for userId={}", userId);
+            return;
         }
 
-        log.info("Roles replaced successfully for user ID: {}", userId);
+        // 2) Lấy danh sách Role tương ứng với các code
+        List<Role> roles = roleRepository.findByCodeIn(roleCodes);
+        if (roles.size() != roleCodes.size()) {
+            throw new AppException(ErrorCode.ROLE_NOT_FOUND_BY_CODE);
+        }
+
+        // 3) Tạo list UserRole mới
+        List<UserRole> newRelations = roles.stream()
+                .map(role -> UserRole.builder()
+                        .userId(userId)
+                        .role(role)
+                        .active(true)
+                        .build())
+                .toList();
+
+        // 4) Save một lần để giảm query
+        userRoleRepository.saveAll(newRelations);
+
+        log.info("Roles replaced successfully for userId={}", userId);
     }
+
 
     /**
      * Assign permissions directly to user (additive - allows multiple permissions, no error for duplicates)
      */
     @Transactional
     public void assignPermissionsToUser(UUID userId, Set<String> permissionCodes) {
+        if (permissionCodes == null || permissionCodes.isEmpty()) {
+            log.info("No permission codes provided for userId={}, skipping direct permission assignment", userId);
+            return;
+        }
         log.info("Assigning permissions {} to user ID: {}", permissionCodes, userId);
 
         // Add new permission assignments (skip if already exists)
@@ -152,12 +167,13 @@ public class UserRolePermissionService {
     public void replaceUserPermissions(UUID userId, Set<String> permissionCodes) {
         log.info("Replacing permissions {} for user ID: {}", permissionCodes, userId);
 
-        // Deactivate existing direct permission assignments
-        userPermissionRepository.findByUserIdAndActiveTrue(userId)
-                .forEach(userPermission -> {
-                    userPermission.setActive(false);
-                    userPermissionRepository.save(userPermission);
-                });
+        // Xóa toàn bộ quan hệ user-permission hiện có của user để tránh vi phạm unique (user_id, permission_id)
+        userPermissionRepository.deleteByUserId(userId);
+
+        if (permissionCodes == null || permissionCodes.isEmpty()) {
+            log.info("All direct permissions removed for user ID: {}", userId);
+            return;
+        }
 
         // Add new permission assignments
         for (String permissionCode : permissionCodes) {

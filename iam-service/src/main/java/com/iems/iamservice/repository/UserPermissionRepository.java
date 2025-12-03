@@ -3,9 +3,11 @@ package com.iems.iamservice.repository;
 import com.iems.iamservice.entity.Permission;
 import com.iems.iamservice.entity.UserPermission;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
@@ -56,4 +58,22 @@ public interface UserPermissionRepository extends JpaRepository<UserPermission, 
      * Find user-permission assignment by user ID and permission ID
      */
     Optional<UserPermission> findByUserIdAndPermissionId(UUID userId, UUID permissionId);
+
+    /**
+     * Find all user-permission assignments by permission ID
+     */
+    List<UserPermission> findByPermissionId(UUID permissionId);
+
+    /**
+     * Hard delete all user-permission assignments by permission ID
+     */
+    void deleteByPermissionId(UUID permissionId);
+
+    /**
+     * Hard delete all user-permission assignments by user ID
+     */
+    @Modifying
+    @Transactional
+    @Query("DELETE FROM UserPermission up WHERE up.userId = :userId")
+    void deleteByUserId(UUID userId);
 }

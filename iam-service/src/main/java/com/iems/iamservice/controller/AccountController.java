@@ -6,6 +6,7 @@ import com.iems.iamservice.dto.request.UpdateUserDto;
 import com.iems.iamservice.dto.request.LockUserRequestDto;
 import com.iems.iamservice.dto.request.AssignRoleRequestDto;
 import com.iems.iamservice.dto.request.AssignPermissionRequestDto;
+import com.iems.iamservice.dto.request.ResetPasswordRequestDto;
 import com.iems.iamservice.dto.response.UserResponseDto;
 import com.iems.iamservice.dto.response.UserPermissionsResponseDto;
 import com.iems.iamservice.dto.response.UserPermissionDetails;
@@ -94,6 +95,20 @@ public class AccountController {
                 .status("success")
                 .message("User updated successfully")
                 .data(response)
+                .build());
+    }
+
+    @PutMapping("/{id}/password")
+    @Operation(summary = "Reset user password", description = "Reset password for a user account")
+    public ResponseEntity<ApiResponseDto<Void>> resetPassword(@PathVariable UUID id,
+                                                              @Valid @RequestBody ResetPasswordRequestDto dto) {
+        log.info("Resetting password for user ID: {}", id);
+
+        accountService.resetPassword(id, dto.getNewPassword());
+
+        return ResponseEntity.ok(ApiResponseDto.<Void>builder()
+                .status("success")
+                .message("Password reset successfully")
                 .build());
     }
 

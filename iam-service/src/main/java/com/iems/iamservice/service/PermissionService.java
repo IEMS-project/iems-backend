@@ -7,6 +7,7 @@ import com.iems.iamservice.entity.Permission;
 import com.iems.iamservice.exception.AppException;
 import com.iems.iamservice.exception.ErrorCode;
 import com.iems.iamservice.repository.PermissionRepository;
+import com.iems.iamservice.repository.UserPermissionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -22,6 +23,7 @@ import java.util.UUID;
 public class PermissionService {
 
     private final PermissionRepository permissionRepository;
+    private final UserPermissionRepository userPermissionRepository;
 
     /**
      * Create new permission
@@ -105,12 +107,10 @@ public class PermissionService {
 
         try {
             Permission permission = findById(id);
-            
-            // Check if permission is in use
-            if (!permission.getRoles().isEmpty()) {
-                throw new AppException(ErrorCode.PERMISSION_IN_USE);
-            }
-            
+
+            // Xóa toàn bộ quan hệ user-permission để tránh lỗi ràng buộc DB
+            userPermissionRepository.deleteByPermissionId(permission.getId());
+
             // Clear all role relationships before deletion
             permission.getRoles().forEach(role -> role.getPermissions().remove(permission));
             permission.getRoles().clear();
