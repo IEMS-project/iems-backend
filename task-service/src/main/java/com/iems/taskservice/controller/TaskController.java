@@ -32,12 +32,20 @@ public class TaskController {
 
 
 
-    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PostMapping(consumes = {MediaType.MULTIPART_FORM_DATA_VALUE, MediaType.APPLICATION_JSON_VALUE})
     @Operation(summary = "Create task with attachments", description = "Create a new task with optional file attachments")
     public ResponseEntity<ApiResponseDto<TaskNestedResponseDto>> createTask(
-            @Valid @RequestPart("task") CreateTaskDto createDto,
+            @Valid @RequestPart(value = "task", required = false) CreateTaskDto createDtoMultipart,
+            @Valid @RequestBody(required = false) CreateTaskDto createDtoJson,
             @RequestPart(value = "files", required = false) MultipartFile[] files) {
         try {
+            // Use multipart DTO if available, otherwise use JSON DTO
+            CreateTaskDto createDto = createDtoMultipart != null ? createDtoMultipart : createDtoJson;
+            
+            if (createDto == null) {
+                return ResponseEntity.badRequest().body(new ApiResponseDto<>("error", "Task data is required", null));
+            }
+            
             TaskResponseDto responseDto;
             if (files != null && files.length > 0) {
                 responseDto = taskServiceImpl.createTask(createDto, files);
@@ -55,13 +63,21 @@ public class TaskController {
         }
     }
 
-    @PatchMapping(value = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PatchMapping(value = "/{id}", consumes = {MediaType.MULTIPART_FORM_DATA_VALUE, MediaType.APPLICATION_JSON_VALUE})
     @Operation(summary = "Update task with attachments", description = "Update task fields: title, description, assignedTo, priority, dates, status with optional file attachments")
     public ResponseEntity<ApiResponseDto<TaskUpdateResultDto>> updateTask(
             @PathVariable UUID id,
-            @Valid @RequestPart("task") UpdateTaskDto updateDto,
+            @Valid @RequestPart(value = "task", required = false) UpdateTaskDto updateDtoMultipart,
+            @Valid @RequestBody(required = false) UpdateTaskDto updateDtoJson,
             @RequestPart(value = "files", required = false) MultipartFile[] files) {
         try {
+            // Use multipart DTO if available, otherwise use JSON DTO
+            UpdateTaskDto updateDto = updateDtoMultipart != null ? updateDtoMultipart : updateDtoJson;
+            
+            if (updateDto == null) {
+                return ResponseEntity.badRequest().body(new ApiResponseDto<>("error", "Task data is required", null));
+            }
+            
             TaskUpdateResultDto updated;
             if (files != null && files.length > 0) {
                 updated = taskServiceImpl.updateTask(id, updateDto, files);
