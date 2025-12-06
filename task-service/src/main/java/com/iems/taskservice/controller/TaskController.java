@@ -10,8 +10,10 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -25,13 +27,23 @@ public class TaskController {
     @Autowired
     private ITaskService taskService;
 
+    @Autowired
+    private TaskService taskServiceImpl;
 
 
-    @PostMapping
+
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Create task with attachments", description = "Create a new task with optional file attachments")
     public ResponseEntity<ApiResponseDto<TaskNestedResponseDto>> createTask(
-            @Valid @RequestBody CreateTaskDto createDto) {
+            @Valid @RequestPart("task") CreateTaskDto createDto,
+            @RequestPart(value = "files", required = false) MultipartFile[] files) {
         try {
-            TaskResponseDto responseDto = taskService.createTask(createDto);
+            TaskResponseDto responseDto;
+            if (files != null && files.length > 0) {
+                responseDto = taskServiceImpl.createTask(createDto, files);
+            } else {
+                responseDto = taskService.createTask(createDto);
+            }
             // convert to nested for consistency
             return taskService.getTaskByIdNested(responseDto.getId())
                     .map(nested -> ResponseEntity.ok(new ApiResponseDto<>("success", "Task created successfully", nested)))
@@ -42,13 +54,20 @@ public class TaskController {
             return ResponseEntity.internalServerError().body(new ApiResponseDto<>("error", "Failed to create task", null));
         }
     }
-    @PatchMapping("/{id}")
-    @Operation(summary = "Update task", description = "Update task fields: title, description, assignedTo, priority, dates, status")
+
+    @PatchMapping(value = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Update task with attachments", description = "Update task fields: title, description, assignedTo, priority, dates, status with optional file attachments")
     public ResponseEntity<ApiResponseDto<TaskUpdateResultDto>> updateTask(
             @PathVariable UUID id,
-            @Valid @RequestBody UpdateTaskDto updateDto) {
+            @Valid @RequestPart("task") UpdateTaskDto updateDto,
+            @RequestPart(value = "files", required = false) MultipartFile[] files) {
         try {
-            TaskUpdateResultDto updated = taskService.updateTask(id, updateDto);
+            TaskUpdateResultDto updated;
+            if (files != null && files.length > 0) {
+                updated = taskServiceImpl.updateTask(id, updateDto, files);
+            } else {
+                updated = taskService.updateTask(id, updateDto);
+            }
             return ResponseEntity.ok(new ApiResponseDto<>("success", "Task updated successfully", updated));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(new ApiResponseDto<>("error", e.getMessage(), null));
@@ -249,6 +268,21 @@ public class TaskController {
             return ResponseEntity.ok(new ApiResponseDto<>("success", "Project completions calculated successfully", completions));
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body(new ApiResponseDto<>("error", "Failed to calculate project completions", null));
+        }
+    }
+
+    @DeleteMapping("/{taskId}/attachments/{attachmentId}")
+    @Operation(summary = "Delete task attachment", description = "Delete a specific attachment from a task")
+    public ResponseEntity<ApiResponseDto<Void>> deleteAttachment(
+            @PathVariable UUID taskId,
+            @PathVariable UUID attachmentId) {
+        try {
+            taskServiceImpl.deleteAttachment(taskId, attachmentId);
+            return ResponseEntity.ok(new ApiResponseDto<>("success", "Attachment deleted successfully", null));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(new ApiResponseDto<>("error", e.getMessage(), null));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(new ApiResponseDto<>("error", "Failed to delete attachment", null));
         }
     }
 }

@@ -4,6 +4,7 @@ import lombok.Data;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @Data
@@ -39,6 +40,7 @@ public class TaskResponseDto {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
+    private List<TaskAttachmentDto> attachments;
 
     // Added for better UX
 }
