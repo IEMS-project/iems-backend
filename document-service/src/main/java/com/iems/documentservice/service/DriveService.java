@@ -138,6 +138,7 @@ public class DriveService {
             FileResponse fr = uploadFile(folderId, f);
             String publicUrl = storageService.buildPublicUrl(fr.getPath());
             results.add(SimpleFileResponse.builder()
+                    .id(fr.getId().toString())
                     .fileName(fr.getName())
                     .url(publicUrl)
                     .type(fr.getType())
@@ -181,6 +182,48 @@ public class DriveService {
             storedFileRepository.save(stored);
             String publicUrl = storageService.buildPublicUrl(objectKey);
             results.add(SimpleFileResponse.builder()
+                    .id(stored.getId().toString())
+                    .fileName(stored.getName())
+                    .url(publicUrl)
+                    .type(stored.getType())
+                    .build());
+        }
+        return results;
+    }
+
+    @Transactional
+    public java.util.List<SimpleFileResponse> uploadFilesToPublicFolder(MultipartFile[] files) throws Exception {
+        if (files == null || files.length == 0) return java.util.List.of();
+        UUID ownerId = getCurrentUserId();
+        java.util.List<SimpleFileResponse> results = new java.util.ArrayList<>();
+        
+        for (MultipartFile file : files) {
+            if (file.getSize() > MAX_UPLOAD_SIZE) {
+                throw new AppException(DocumentErrorCode.INVALID_REQUEST);
+            }
+            
+            // Generate object key in public folder
+            String objectKey = generatePublicObjectKey(file.getOriginalFilename());
+            
+            try (InputStream in = file.getInputStream()) {
+                storageService.upload(objectKey, in, file.getSize(), file.getContentType());
+            }
+            
+            StoredFile stored = StoredFile.builder()
+                    .name(file.getOriginalFilename())
+                    .folder(null)
+                    .ownerId(ownerId)
+                    .path(objectKey)
+                    .size(file.getSize())
+                    .type(file.getContentType())
+                    .permission(Permission.PUBLIC)
+                    .createdAt(OffsetDateTime.now())
+                    .build();
+            storedFileRepository.save(stored);
+            
+            String publicUrl = storageService.buildPublicUrl(objectKey);
+            results.add(SimpleFileResponse.builder()
+                    .id(stored.getId().toString())
                     .fileName(stored.getName())
                     .url(publicUrl)
                     .type(stored.getType())
@@ -304,6 +347,11 @@ public class DriveService {
     private String generateChatObjectKey(String conversationId, String fileName) {
         long ts = System.currentTimeMillis();
         return "conversation/" + conversationId + "/" + ts + "-" + fileName;
+    }
+
+    private String generatePublicObjectKey(String fileName) {
+        long ts = System.currentTimeMillis();
+        return "public/" + ts + "-" + fileName;
     }
 
     private FileResponse toResponse(StoredFile file, String presignedUrl) {

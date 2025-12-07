@@ -1,10 +1,13 @@
 package com.iems.taskservice.service.Impl;
 
+import com.iems.taskservice.Client.DocumentServiceFeignClient;
 import com.iems.taskservice.Client.ProjectServiceFeignClient;
 import com.iems.taskservice.dto.*;
 import com.iems.taskservice.entity.Task;
+import com.iems.taskservice.entity.TaskAttachment;
 import com.iems.taskservice.entity.TaskStatusHistory;
 import com.iems.taskservice.entity.enums.TaskStatus;
+import com.iems.taskservice.repository.TaskAttachmentRepository;
 import com.iems.taskservice.repository.TaskCommentRepository;
 import com.iems.taskservice.repository.TaskRepository;
 import com.iems.taskservice.repository.TaskStatusHistoryRepository;
@@ -14,6 +17,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
 import java.util.*;
@@ -36,7 +40,13 @@ public class TaskService implements ITaskService {
     private ProjectServiceFeignClient projectServiceFeignClient;
 
     @Autowired
+    private DocumentServiceFeignClient documentServiceFeignClient;
+
+    @Autowired
     private TaskCommentRepository taskCommentRepository;
+
+    @Autowired
+    private TaskAttachmentRepository taskAttachmentRepository;
     
     @Autowired
     private IUserService userService;
@@ -88,6 +98,116 @@ public class TaskService implements ITaskService {
         createStatusHistory(savedTask, TaskStatus.TO_DO, userId, "Task created");
         
         return convertToResponseDto(savedTask);
+    }
+
+    // UC23: Tạo Nhiệm vụ với tệp đính kèm
+    public TaskResponseDto createTask(CreateTaskDto createDto, MultipartFile[] files) {
+        // Validate dates
+        UUID userId = userService.getUserIdFromRequest();
+        if (createDto.getStartDate() != null && createDto.getDueDate() != null) {
+            if (createDto.getStartDate().isAfter(createDto.getDueDate())) {
+                throw new AppException(TaskErrorCode.INVALID_REQUEST);
+            }
+        }
+        
+        if (createDto.getDueDate() != null && createDto.getDueDate().isBefore(LocalDate.now())) {
+            throw new AppException(TaskErrorCode.INVALID_REQUEST);
+        }
+
+        Task task = new Task();
+        task.setProjectId(createDto.getProjectId());
+        task.setTitle(createDto.getTitle());
+        task.setDescription(createDto.getDescription());
+        task.setAssignedTo(createDto.getAssignedTo());
+        task.setCreatedBy(userId);
+        task.setStatus(TaskStatus.TO_DO); // Default status using enum
+        task.setPriority(createDto.getPriority()); // Using enum directly
+        task.setTaskType(createDto.getTaskType());
+        // Validate parentTaskId by business rule
+        if (createDto.getParentTaskId() != null) {
+            UUID parentId = createDto.getParentTaskId();
+            task.setParentTaskId(parentId);
+        }
+        task.setStartDate(createDto.getStartDate());
+        task.setDueDate(createDto.getDueDate());
+        task.setPhaseId(createDto.getPhaseId());
+        task.setCreatedBy(userId);
+        task.setUpdatedBy(userId);
+        
+        Task savedTask = taskRepository.save(task);
+        
+        // Create initial status history
+        createStatusHistory(savedTask, TaskStatus.TO_DO, userId, "Task created");
+        
+        // Upload files if present
+        if (files != null && files.length > 0) {
+            uploadTaskAttachments(savedTask.getId(), files, userId);
+        }
+        
+        return convertToResponseDto(savedTask);
+    }
+
+    // Helper method to upload attachments
+    private void uploadTaskAttachments(UUID taskId, MultipartFile[] files, UUID userId) {
+        try {
+            // Call document service to upload files to public folder
+            ResponseEntity<ApiResponseDto<List<SimpleFileResponse>>> response = 
+                documentServiceFeignClient.uploadFilesToPublic(files);
+            
+            if (response != null && response.getBody() != null && response.getBody().getData() != null) {
+                List<SimpleFileResponse> uploadedFiles = response.getBody().getData();
+                
+                // Save attachment info to database
+                for (SimpleFileResponse file : uploadedFiles) {
+                    TaskAttachment attachment = new TaskAttachment();
+                    attachment.setTaskId(taskId);
+                    attachment.setFileId(file.getId());
+                    attachment.setFileName(file.getFileName());
+                    attachment.setFileUrl(file.getUrl());
+                    attachment.setFileType(file.getType());
+                    attachment.setUploadedBy(userId);
+                    taskAttachmentRepository.save(attachment);
+                }
+            }
+        } catch (Exception e) {
+            // Log error but don't fail task creation
+            System.err.println("Error uploading attachments: " + e.getMessage());
+        }
+    }
+
+    public void deleteAttachment(UUID taskId, UUID attachmentId) {
+        UUID userId = userService.getUserIdFromRequest();
+        
+        // Verify task exists
+        Task task = taskRepository.findById(taskId)
+                .orElseThrow(() -> new AppException(TaskErrorCode.TASK_NOT_FOUND));
+        
+        // Check permission (creator or assigned user can delete attachments)
+        if (!task.getCreatedBy().equals(userId) && !task.getAssignedTo().equals(userId)) {
+            throw new AppException(TaskErrorCode.PERMISSION_DENIED);
+        }
+        
+        // Find attachment
+        TaskAttachment attachment = taskAttachmentRepository.findById(attachmentId)
+                .orElseThrow(() -> new IllegalArgumentException("Attachment not found"));
+        
+        // Verify attachment belongs to this task
+        if (!attachment.getTaskId().equals(taskId)) {
+            throw new IllegalArgumentException("Attachment does not belong to this task");
+        }
+        
+        // Delete from database first
+        taskAttachmentRepository.delete(attachment);
+        
+        // Delete file from document service asynchronously
+        if (attachment.getFileId() != null && !attachment.getFileId().isEmpty()) {
+            try {
+                documentServiceFeignClient.deleteFile(attachment.getFileId());
+            } catch (Exception e) {
+                // Log error but don't fail the operation since DB deletion succeeded
+                System.err.println("Error deleting file from document service: " + e.getMessage());
+            }
+        }
     }
 
     // UC24: Gán Nhiệm vụ
@@ -168,6 +288,19 @@ public class TaskService implements ITaskService {
         dto.setDueDate(task.getDueDate());
         dto.setCreatedAt(task.getCreatedAt());
         dto.setUpdatedAt(task.getUpdatedAt());
+        
+        // Add attachments
+        List<TaskAttachment> attachments = taskAttachmentRepository.findByTaskId(task.getId());
+        dto.setAttachments(attachments.stream()
+                .map(att -> TaskAttachmentDto.builder()
+                        .id(att.getId())
+                        .fileName(att.getFileName())
+                        .fileUrl(att.getFileUrl())
+                        .fileType(att.getFileType())
+                        .uploadedAt(att.getUploadedAt())
+                        .uploadedBy(att.getUploadedBy())
+                        .build())
+                .collect(Collectors.toList()));
 
         return dto;
     }
@@ -474,6 +607,107 @@ public class TaskService implements ITaskService {
         return result;
     }
 
+    // Generic update with attachments: title/description/assignedTo/priority/dates/status
+    public TaskUpdateResultDto updateTask(UUID taskId, UpdateTaskDto updateDto, MultipartFile[] files) {
+        Task task = taskRepository.findById(taskId)
+                .orElseThrow(() -> new AppException(TaskErrorCode.TASK_NOT_FOUND));
+        UUID userId = userService.getUserIdFromRequest();
+        // Permissions: creator or current assignee can update; extend with project roles as needed
+        if (!task.getCreatedBy().equals(userId) && !task.getAssignedTo().equals(userId)) {
+            throw new AppException(TaskErrorCode.PERMISSION_DENIED);
+        }
+
+        boolean hasChanges = false;
+        TaskStatus oldStatus = task.getStatus();
+
+        if (updateDto.getTitle() != null && !updateDto.getTitle().isBlank() && !updateDto.getTitle().equals(task.getTitle())) {
+            task.setTitle(updateDto.getTitle());
+            hasChanges = true;
+        }
+
+        if (updateDto.getDescription() != null && !updateDto.getDescription().equals(task.getDescription())) {
+            task.setDescription(updateDto.getDescription());
+            hasChanges = true;
+        }
+
+        if (updateDto.getAssignedTo() != null && !updateDto.getAssignedTo().equals(task.getAssignedTo())) {
+            task.setAssignedTo(updateDto.getAssignedTo());
+            hasChanges = true;
+        }
+
+        if (updateDto.getPriority() != null && !updateDto.getPriority().equals(task.getPriority())) {
+            task.setPriority(updateDto.getPriority());
+            hasChanges = true;
+        }
+
+        if (updateDto.getStartDate() != null && !updateDto.getStartDate().equals(task.getStartDate())) {
+            task.setStartDate(updateDto.getStartDate());
+            hasChanges = true;
+        }
+
+        if (updateDto.getDueDate() != null && !updateDto.getDueDate().equals(task.getDueDate())) {
+            task.setDueDate(updateDto.getDueDate());
+            hasChanges = true;
+        }
+
+        if (updateDto.getStatus() != null && !updateDto.getStatus().equals(task.getStatus())) {
+            // validate transition
+            if (!isValidStatusTransition(task.getStatus(), updateDto.getStatus())) {
+                throw new AppException(TaskErrorCode.INVALID_REQUEST);
+            }
+            task.setStatus(updateDto.getStatus());
+            hasChanges = true;
+        }
+
+        TaskUpdateResultDto result = new TaskUpdateResultDto();
+        if (updateDto.getTaskType() != null && !updateDto.getTaskType().equals(task.getTaskType())) {
+            task.setTaskType(updateDto.getTaskType());
+            hasChanges = true;
+        }
+
+        if (updateDto.getParentTaskId() != null && !updateDto.getParentTaskId().equals(task.getParentTaskId())) {
+            // Validate parent exists
+            UUID parentId = updateDto.getParentTaskId();
+            taskRepository.findById(parentId).orElseThrow(() -> new AppException(TaskErrorCode.TASK_NOT_FOUND));
+            task.setParentTaskId(parentId);
+            hasChanges = true;
+        }
+
+        if (updateDto.getPhaseId() != null && !updateDto.getPhaseId().equals(task.getPhaseId())) {
+            task.setPhaseId(updateDto.getPhaseId());
+            hasChanges = true;
+        }
+
+        if (hasChanges) {
+            task.setUpdatedBy(userId);
+            Task saved = taskRepository.save(task);
+            // Only write history if status actually changed
+            if (updateDto.getStatus() != null && !oldStatus.equals(saved.getStatus())) {
+                createStatusHistoryWithOldNew(saved.getId(), oldStatus, saved.getStatus(), userId);
+                result.setOldStatus(oldStatus.getDisplayName());
+                result.setNewStatus(saved.getStatus().getDisplayName());
+            }
+            
+            // Upload new files if present
+            if (files != null && files.length > 0) {
+                uploadTaskAttachments(saved.getId(), files, userId);
+            }
+            
+            result.setTask(convertToNestedResponse(saved));
+            return result;
+        }
+        
+        // Even if no task changes, still upload files if present
+        if (files != null && files.length > 0) {
+            uploadTaskAttachments(taskId, files, userId);
+        }
+        
+        result.setTask(convertToNestedResponse(task));
+        result.setOldStatus(null);
+        result.setNewStatus(null);
+        return result;
+    }
+
     // Get active tasks by project (excluding completed)
     @Override
     public List<TaskResponseDto> getActiveTasksByProject(UUID projectId) {
@@ -596,6 +830,19 @@ public class TaskService implements ITaskService {
         } catch (Exception ignored) {
         }
 
+        // Attachments
+        List<TaskAttachment> attachments = taskAttachmentRepository.findByTaskId(task.getId());
+        dto.setAttachments(attachments.stream()
+                .map(att -> TaskAttachmentDto.builder()
+                        .id(att.getId())
+                        .fileName(att.getFileName())
+                        .fileUrl(att.getFileUrl())
+                        .fileType(att.getFileType())
+                        .uploadedAt(att.getUploadedAt())
+                        .uploadedBy(att.getUploadedBy())
+                        .build())
+                .collect(Collectors.toList()));
+
         return dto;
     }
 
@@ -657,6 +904,19 @@ public class TaskService implements ITaskService {
         } catch (Exception ignored) {
         }
 
+        // Attachments
+        List<TaskAttachment> attachments = taskAttachmentRepository.findByTaskId(task.getId());
+        dto.setAttachments(attachments.stream()
+                .map(att -> TaskAttachmentDto.builder()
+                        .id(att.getId())
+                        .fileName(att.getFileName())
+                        .fileUrl(att.getFileUrl())
+                        .fileType(att.getFileType())
+                        .uploadedAt(att.getUploadedAt())
+                        .uploadedBy(att.getUploadedBy())
+                        .build())
+                .collect(Collectors.toList()));
+
         return dto;
     }
 
@@ -711,6 +971,19 @@ public class TaskService implements ITaskService {
             updated.setImage(u.getImage());
         });
         dto.setUpdatedBy(updated);
+
+        // Attachments
+        List<TaskAttachment> attachments = taskAttachmentRepository.findByTaskId(task.getId());
+        dto.setAttachments(attachments.stream()
+                .map(att -> TaskAttachmentDto.builder()
+                        .id(att.getId())
+                        .fileName(att.getFileName())
+                        .fileUrl(att.getFileUrl())
+                        .fileType(att.getFileType())
+                        .uploadedAt(att.getUploadedAt())
+                        .uploadedBy(att.getUploadedBy())
+                        .build())
+                .collect(Collectors.toList()));
 
         return dto;
     }
@@ -780,6 +1053,19 @@ public class TaskService implements ITaskService {
             updated.setImage(updatedUser.getImage());
         }
         dto.setUpdatedBy(updated);
+
+        // Attachments
+        List<TaskAttachment> attachments = taskAttachmentRepository.findByTaskId(task.getId());
+        dto.setAttachments(attachments.stream()
+                .map(att -> TaskAttachmentDto.builder()
+                        .id(att.getId())
+                        .fileName(att.getFileName())
+                        .fileUrl(att.getFileUrl())
+                        .fileType(att.getFileType())
+                        .uploadedAt(att.getUploadedAt())
+                        .uploadedBy(att.getUploadedBy())
+                        .build())
+                .collect(Collectors.toList()));
 
         return dto;
     }

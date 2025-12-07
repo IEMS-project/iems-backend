@@ -121,6 +121,24 @@ public class AccountService {
     }
 
     /**
+     * Reset user password
+     */
+    @Transactional
+    public Account resetPassword(UUID id, String newPassword) {
+        log.info("Resetting password for user with ID: {}", id);
+        try {
+            Account user = findById(id);
+            user.setPasswordHash(passwordEncoder.encode(newPassword));
+            Account updatedUser = accountRepository.save(user);
+            log.info("Password reset successfully for user: {}", updatedUser.getUsername());
+            return updatedUser;
+        } catch (Exception e) {
+            log.error("Failed to reset password for user with ID: {}", id, e);
+            throw new AppException(ErrorCode.USER_UPDATE_FAILED);
+        }
+    }
+
+    /**
      * Lock/Unlock user
      */
     @Transactional

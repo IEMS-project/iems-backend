@@ -1,4 +1,4 @@
-package com.iems.documentservice.dto.response;
+package com.iems.taskservice.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -15,5 +15,3 @@ public class SimpleFileResponse {
     private String url;
     private String type;
 }
-
-

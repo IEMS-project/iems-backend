@@ -91,6 +91,14 @@ public class DriveController {
         return ResponseEntity.ok(new ApiResponseDto<java.util.List<SimpleFileResponse>>(200, "Files uploaded", data));
     }
 
+    @PostMapping(value = "/files/upload-public", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Upload multiple files to public folder and return public URLs")
+    public ResponseEntity<ApiResponseDto<java.util.List<SimpleFileResponse>>> uploadFilesToPublic(
+            @RequestPart("files") MultipartFile[] files) throws Exception {
+        java.util.List<SimpleFileResponse> data = driveService.uploadFilesToPublicFolder(files);
+        return ResponseEntity.ok(new ApiResponseDto<java.util.List<SimpleFileResponse>>(200, "Files uploaded to public folder", data));
+    }
+
     @PostMapping(value = "/files/upload-chat", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "Upload chat media to conversation path and return public URLs")
     public ResponseEntity<ApiResponseDto<java.util.List<SimpleFileResponse>>> uploadChatFiles(

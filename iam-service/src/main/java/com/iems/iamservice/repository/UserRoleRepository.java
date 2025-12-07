@@ -3,9 +3,11 @@ package com.iems.iamservice.repository;
 import com.iems.iamservice.entity.Role;
 import com.iems.iamservice.entity.UserRole;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
@@ -56,4 +58,19 @@ public interface UserRoleRepository extends JpaRepository<UserRole, UUID> {
      * Find user-role assignment by user ID and role ID
      */
     Optional<UserRole> findByUserIdAndRoleId(UUID userId, UUID roleId);
+
+    /**
+     * Find all user-role assignments by role ID
+     */
+    List<UserRole> findByRoleId(UUID roleId);
+
+    /**
+     * Hard delete all user-role assignments by role ID
+     */
+    void deleteByRoleId(UUID roleId);
+
+    @Modifying
+    @Transactional
+    @Query("DELETE FROM UserRole ur WHERE ur.userId = :userId")
+    void deleteByUserId(UUID userId);
 }

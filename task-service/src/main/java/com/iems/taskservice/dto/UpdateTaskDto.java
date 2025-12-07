@@ -3,6 +3,8 @@ package com.iems.taskservice.dto;
 import com.iems.taskservice.entity.enums.TaskPriority;
 import com.iems.taskservice.entity.enums.TaskStatus;
 import com.iems.taskservice.entity.enums.TaskType;
+import jakarta.validation.constraints.AssertTrue;
+import jakarta.validation.constraints.FutureOrPresent;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
@@ -26,8 +28,10 @@ public class UpdateTaskDto {
 
     private TaskType taskType; // Allow changing task type
 
+    @FutureOrPresent(message = "Start date cannot be in the past")
     private LocalDate startDate;
 
+    @FutureOrPresent(message = "Due date cannot be in the past")
     private LocalDate dueDate;
 
     @Size(max = 500, message = "Comment must not exceed 500 characters")
@@ -36,4 +40,10 @@ public class UpdateTaskDto {
     private UUID parentTaskId; // Allow reparenting or setting as subtask
 
     private UUID phaseId; // Allow changing phase assignment
+
+    @AssertTrue(message = "Due date must not be earlier than start date")
+    public boolean isDueAfterStart() {
+        if (startDate == null || dueDate == null) return true;
+        return !dueDate.isBefore(startDate);
+    }
 }
