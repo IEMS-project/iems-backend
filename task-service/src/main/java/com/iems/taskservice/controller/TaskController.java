@@ -2,7 +2,6 @@ package com.iems.taskservice.controller;
 
 import com.iems.taskservice.dto.*;
 import com.iems.taskservice.entity.TaskStatusHistory;
-import com.iems.taskservice.entity.TaskComment;
 import com.iems.taskservice.service.ITaskService;
 import com.iems.taskservice.service.Impl.TaskService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -214,12 +213,14 @@ public class TaskController {
 
     @PostMapping("/{id}/comments")
     @Operation(summary = "Add task comment")
-    public ResponseEntity<ApiResponseDto<TaskComment>> addComment(
+    public ResponseEntity<ApiResponseDto<TaskCommentDto>> addComment(
             @PathVariable UUID id,
-            @RequestBody Map<String, String> body) {
+            @RequestBody Map<String, Object> body) {
         try {
-            String content = body.get("content");
-            TaskComment c = taskService.addComment(id, content);
+            String content = (String) body.get("content");
+            String parentIdStr = body.get("parentCommentId") != null ? body.get("parentCommentId").toString() : null;
+            UUID parentCommentId = parentIdStr != null && !parentIdStr.isEmpty() ? UUID.fromString(parentIdStr) : null;
+            TaskCommentDto c = taskService.addComment(id, content, parentCommentId);
             return ResponseEntity.ok(new ApiResponseDto<>("success", "Comment added", c));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(new ApiResponseDto<>("error", e.getMessage(), null));
@@ -230,12 +231,44 @@ public class TaskController {
 
     @GetMapping("/{id}/comments")
     @Operation(summary = "Get task comments")
-    public ResponseEntity<ApiListResponseDto<List<TaskComment>>> getComments(@PathVariable UUID id) {
+    public ResponseEntity<ApiListResponseDto<List<TaskCommentDto>>> getComments(@PathVariable UUID id) {
         try {
-            List<TaskComment> list = taskService.getComments(id);
+            List<TaskCommentDto> list = taskService.getComments(id);
             return ResponseEntity.ok(new ApiListResponseDto<>("success", "Comments retrieved", list.size(), list));
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body(new ApiListResponseDto<>("error", "Failed to get comments", 0, null));
+        }
+    }
+
+    @PutMapping("/comments/{commentId}")
+    @Operation(summary = "Update task comment")
+    public ResponseEntity<ApiResponseDto<TaskCommentDto>> updateComment(
+            @PathVariable UUID commentId,
+            @RequestBody Map<String, String> body) {
+        try {
+            String content = body.get("content");
+            TaskCommentDto c = taskService.updateComment(commentId, content);
+            return ResponseEntity.ok(new ApiResponseDto<>("success", "Comment updated", c));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(new ApiResponseDto<>("error", e.getMessage(), null));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(new ApiResponseDto<>("error", "Failed to update comment", null));
+        }
+    }
+
+    @DeleteMapping("/comments/{commentId}")
+    @Operation(summary = "Delete task comment")
+    public ResponseEntity<ApiResponseDto<Void>> deleteComment(@PathVariable UUID commentId) {
+        try {
+            taskService.deleteComment(commentId);
+            return ResponseEntity.ok(new ApiResponseDto<>("success", "Comment deleted", null));
+        } catch (com.iems.taskservice.exception.AppException e) {
+            return ResponseEntity.badRequest().body(new ApiResponseDto<>("error", e.getMessage(), null));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(new ApiResponseDto<>("error", e.getMessage(), null));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.internalServerError().body(new ApiResponseDto<>("error", "Failed to delete comment: " + e.getMessage(), null));
         }
     }
 

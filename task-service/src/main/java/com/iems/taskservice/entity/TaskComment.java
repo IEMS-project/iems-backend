@@ -22,15 +22,26 @@ public class TaskComment {
     @Column(name = "author_id", nullable = false)
     private UUID authorId;
 
-    @Column(name = "content", nullable = false, length = 2000)
+    @Column(name = "content", nullable = false, columnDefinition = "TEXT")
     private String content;
+
+    @Column(name = "parent_comment_id")
+    private UUID parentCommentId;
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
     }
 }
 

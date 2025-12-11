@@ -378,7 +378,7 @@ public class TaskService implements ITaskService {
     }
 
     @Override
-    public TaskComment addComment(UUID taskId, String content) {
+    public TaskCommentDto addComment(UUID taskId, String content, UUID parentCommentId) {
         if (content == null || content.isBlank()) {
             throw new AppException(TaskErrorCode.INVALID_REQUEST);
         }
@@ -389,12 +389,98 @@ public class TaskService implements ITaskService {
         c.setTaskId(task.getId());
         c.setAuthorId(userId);
         c.setContent(content);
-        return taskCommentRepository.save(c);
+        c.setParentCommentId(parentCommentId);
+        TaskComment saved = taskCommentRepository.save(c);
+        return convertToCommentDto(saved);
     }
 
     @Override
-    public List<TaskComment> getComments(UUID taskId) {
-        return taskCommentRepository.findByTaskIdOrderByCreatedAtAsc(taskId);
+    public List<TaskCommentDto> getComments(UUID taskId) {
+        List<TaskComment> comments = taskCommentRepository.findByTaskIdOrderByCreatedAtAsc(taskId);
+        return comments.stream().map(this::convertToCommentDto).toList();
+    }
+
+    @Override
+    public TaskCommentDto updateComment(UUID commentId, String content) {
+        if (content == null || content.isBlank()) {
+            throw new AppException(TaskErrorCode.INVALID_REQUEST);
+        }
+        TaskComment comment = taskCommentRepository.findById(commentId)
+                .orElseThrow(() -> new AppException(TaskErrorCode.TASK_NOT_FOUND));
+        UUID userId = userService.getUserIdFromRequest();
+        if (!comment.getAuthorId().equals(userId)) {
+            throw new AppException(TaskErrorCode.PERMISSION_DENIED);
+        }
+        comment.setContent(content);
+        TaskComment saved = taskCommentRepository.save(comment);
+        return convertToCommentDto(saved);
+    }
+
+    @Override
+    public void deleteComment(UUID commentId) {
+        TaskComment comment = taskCommentRepository.findById(commentId)
+                .orElseThrow(() -> new AppException(TaskErrorCode.TASK_NOT_FOUND));
+        UUID userId = userService.getUserIdFromRequest();
+        if (!comment.getAuthorId().equals(userId)) {
+            throw new AppException(TaskErrorCode.PERMISSION_DENIED);
+        }
+        taskCommentRepository.delete(comment);
+    }
+
+    private TaskCommentDto convertToCommentDto(TaskComment comment) {
+        String authorName = "";
+        String authorAvatar = "";
+        try {
+            Optional<UserDetailDto> userOpt = userService.getUserById(comment.getAuthorId());
+            if (userOpt.isPresent()) {
+                UserDetailDto user = userOpt.get();
+                String firstName = user.getFirstName() != null ? user.getFirstName() : "";
+                String lastName = user.getLastName() != null ? user.getLastName() : "";
+                authorName = (firstName + " " + lastName).trim();
+                if (authorName.isEmpty()) {
+                    authorName = user.getEmail() != null ? user.getEmail() : "Unknown";
+                }
+                authorAvatar = user.getImage();
+            }
+        } catch (Exception e) {
+            // Log error but don't fail the request
+            System.err.println("Failed to fetch user info for comment author: " + comment.getAuthorId() + " - " + e.getMessage());
+        }
+        // Get parent comment author name if this is a reply
+        String parentAuthorName = null;
+        if (comment.getParentCommentId() != null) {
+            try {
+                Optional<TaskComment> parentOpt = taskCommentRepository.findById(comment.getParentCommentId());
+                if (parentOpt.isPresent()) {
+                    TaskComment parent = parentOpt.get();
+                    Optional<UserDetailDto> parentUserOpt = userService.getUserById(parent.getAuthorId());
+                    if (parentUserOpt.isPresent()) {
+                        UserDetailDto parentUser = parentUserOpt.get();
+                        String pFirstName = parentUser.getFirstName() != null ? parentUser.getFirstName() : "";
+                        String pLastName = parentUser.getLastName() != null ? parentUser.getLastName() : "";
+                        parentAuthorName = (pFirstName + " " + pLastName).trim();
+                        if (parentAuthorName.isEmpty()) {
+                            parentAuthorName = parentUser.getEmail();
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                // Ignore
+            }
+        }
+        
+        return TaskCommentDto.builder()
+                .id(comment.getId())
+                .taskId(comment.getTaskId())
+                .authorId(comment.getAuthorId())
+                .authorName(authorName.isEmpty() ? "Unknown" : authorName)
+                .authorAvatar(authorAvatar)
+                .content(comment.getContent())
+                .parentCommentId(comment.getParentCommentId())
+                .parentAuthorName(parentAuthorName)
+                .createdAt(comment.getCreatedAt())
+                .updatedAt(comment.getUpdatedAt())
+                .build();
     }
 
     // UC27: Thiết lập Ngày và Mức ưu tiên Nhiệm vụ
