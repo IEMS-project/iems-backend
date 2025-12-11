@@ -23,9 +23,13 @@ public interface ITaskService {
 
     List<TaskBulkUpdateItemDto> bulkUpdateStatus(List<UUID> taskIds, String newStatusStr);
 
-    TaskComment addComment(UUID taskId, String content);
+    TaskCommentDto addComment(UUID taskId, String content, UUID parentCommentId);
 
-    List<TaskComment> getComments(UUID taskId);
+    List<TaskCommentDto> getComments(UUID taskId);
+
+    TaskCommentDto updateComment(UUID commentId, String content);
+
+    void deleteComment(UUID commentId);
 
     TaskResponseDto updateTaskPriorityAndDates(UUID taskId, UpdateTaskDto updateDto);
 
