@@ -262,6 +262,49 @@ public class DriveController {
         driveService.moveFile(fileId, newFolderId);
         return ResponseEntity.ok(new ApiResponseDto<>(200, "File moved successfully", null));
     }
+
+    // ==================== TRASH APIs ====================
+
+    @GetMapping("/trash")
+    @Operation(summary = "List all items in trash")
+    public ResponseEntity<ApiResponseDto<Object>> listTrash() {
+        return ResponseEntity.ok(new ApiResponseDto<>(200, "OK", driveService.listTrash()));
+    }
+
+    @PostMapping("/trash/files/{fileId}/restore")
+    @Operation(summary = "Restore file from trash")
+    public ResponseEntity<ApiResponseDto<Object>> restoreFile(@PathVariable UUID fileId) {
+        driveService.restoreFile(fileId);
+        return ResponseEntity.ok(new ApiResponseDto<>(200, "File restored successfully", null));
+    }
+
+    @PostMapping("/trash/folders/{folderId}/restore")
+    @Operation(summary = "Restore folder from trash")
+    public ResponseEntity<ApiResponseDto<Object>> restoreFolder(@PathVariable UUID folderId) {
+        driveService.restoreFolder(folderId);
+        return ResponseEntity.ok(new ApiResponseDto<>(200, "Folder restored successfully", null));
+    }
+
+    @DeleteMapping("/trash/files/{fileId}")
+    @Operation(summary = "Permanently delete file from trash")
+    public ResponseEntity<ApiResponseDto<Object>> permanentDeleteFile(@PathVariable UUID fileId) throws Exception {
+        driveService.permanentDeleteFile(fileId);
+        return ResponseEntity.ok(new ApiResponseDto<>(200, "File permanently deleted", null));
+    }
+
+    @DeleteMapping("/trash/folders/{folderId}")
+    @Operation(summary = "Permanently delete folder from trash")
+    public ResponseEntity<ApiResponseDto<Object>> permanentDeleteFolder(@PathVariable UUID folderId) throws Exception {
+        driveService.permanentDeleteFolder(folderId);
+        return ResponseEntity.ok(new ApiResponseDto<>(200, "Folder permanently deleted", null));
+    }
+
+    @DeleteMapping("/trash/empty")
+    @Operation(summary = "Empty entire trash")
+    public ResponseEntity<ApiResponseDto<Object>> emptyTrash() throws Exception {
+        driveService.emptyTrash();
+        return ResponseEntity.ok(new ApiResponseDto<>(200, "Trash emptied successfully", null));
+    }
 }
 
 

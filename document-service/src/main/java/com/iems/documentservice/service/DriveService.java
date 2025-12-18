@@ -41,6 +41,7 @@ import com.iems.documentservice.dto.response.SharedUserResponse;
 import com.iems.documentservice.dto.response.FolderContentsResponse;
 import com.iems.documentservice.dto.response.SearchResultItem;
 import com.iems.documentservice.dto.response.FavoriteItemResponse;
+import com.iems.documentservice.dto.response.TrashItemResponse;
 import com.iems.documentservice.entity.enums.SharePermission;
 
 @Service
@@ -261,34 +262,14 @@ public class DriveService {
 
     @Transactional
     public void deleteFile(UUID fileId) throws Exception {
-        UUID requesterId = getCurrentUserId();
-        StoredFile file = storedFileRepository.findById(fileId)
-                .orElseThrow(() -> new AppException(DocumentErrorCode.FILE_NOT_FOUND));
-        enforceOwner(file, requesterId);
-        storageService.delete(file.getPath());
-        storedFileRepository.delete(file);
+        // Use soft delete instead of permanent delete
+        softDeleteFile(fileId);
     }
 
     @Transactional
     public void deleteFolderRecursive(UUID folderId) throws Exception {
-        UUID requesterId = getCurrentUserId();
-        Folder folder = folderRepository.findById(folderId)
-                .orElseThrow(() -> new AppException(DocumentErrorCode.FOLDER_NOT_FOUND));
-        if (!folder.getOwnerId().equals(requesterId)) {
-            throw new AppException(DocumentErrorCode.PERMISSION_DENIED);
-        }
-        // delete files in this folder
-        List<StoredFile> files = storedFileRepository.findByFolderId(folder.getId());
-        for (StoredFile f : files) {
-            storageService.delete(f.getPath());
-        }
-        storedFileRepository.deleteAll(files);
-        // recurse children
-        List<Folder> children = folderRepository.findByParentId(folder.getId());
-        for (Folder child : children) {
-            deleteFolderRecursive(child.getId());
-        }
-        folderRepository.delete(folder);
+        // Use soft delete instead of permanent delete
+        softDeleteFolder(folderId);
     }
 
     private void enforceOwner(StoredFile file, UUID requesterId) {
@@ -377,8 +358,8 @@ public class DriveService {
     public List<FolderResponse> listFolders() {
         UUID userId = getCurrentUserId();
         
-        // Get owned folders
-        List<Folder> ownedFolders = folderRepository.findByOwnerId(userId);
+        // Get owned folders (excluding soft deleted)
+        List<Folder> ownedFolders = folderRepository.findByOwnerIdAndDeletedAtIsNull(userId);
         
         // Get shared folders
         List<UUID> sharedFolderIds = shareRepository.findBySharedWithUserId(userId).stream()
@@ -386,10 +367,12 @@ public class DriveService {
                 .map(Share::getTargetId)
                 .collect(Collectors.toList());
         List<Folder> sharedFolders = sharedFolderIds.isEmpty() ? List.of() : 
-                folderRepository.findByIdIn(sharedFolderIds);
+                folderRepository.findByIdIn(sharedFolderIds).stream()
+                        .filter(f -> f.getDeletedAt() == null)
+                        .collect(Collectors.toList());
         
-        // Get public folders
-        List<Folder> publicFolders = folderRepository.findByPermission(Permission.PUBLIC);
+        // Get public folders (excluding soft deleted)
+        List<Folder> publicFolders = folderRepository.findByPermissionAndDeletedAtIsNull(Permission.PUBLIC);
         
         // Merge and deduplicate
         Set<UUID> seen = new HashSet<>();
@@ -411,7 +394,7 @@ public class DriveService {
 
     public List<FileResponse> listFiles() {
         UUID ownerId = getCurrentUserId();
-        return storedFileRepository.findByOwnerId(ownerId).stream()
+        return storedFileRepository.findByOwnerIdAndDeletedAtIsNull(ownerId).stream()
                 .filter(f -> f.getPath() == null || !(f.getPath().startsWith("employee_avatar/") || f.getPath().startsWith("group_avatar/")))
                 .map(f -> toResponse(f, null, ownerId))
                 .collect(Collectors.toList());
@@ -424,7 +407,7 @@ public class DriveService {
 
     // Allow if owner
     if (folder.getOwnerId().equals(requesterId)) {
-        return storedFileRepository.findByFolderId(folderId).stream()
+        return storedFileRepository.findByFolderIdAndDeletedAtIsNull(folderId).stream()
             .filter(f -> f.getPath() == null || !(f.getPath().startsWith("employee_avatar/") || f.getPath().startsWith("group_avatar/")))
             .map(f -> toResponse(f, null, requesterId))
             .collect(Collectors.toList());
@@ -432,7 +415,7 @@ public class DriveService {
 
     // Allow public folder (but still check individual file permissions)
     if (folder.getPermission() == Permission.PUBLIC) {
-        return storedFileRepository.findByFolderId(folderId).stream()
+        return storedFileRepository.findByFolderIdAndDeletedAtIsNull(folderId).stream()
             .filter(f -> f.getPath() == null || !(f.getPath().startsWith("employee_avatar/") || f.getPath().startsWith("group_avatar/")))
             .filter(f -> {
                 try {
@@ -449,7 +432,7 @@ public class DriveService {
 
     // Allow if folder is shared with requester (but still need to check individual file permissions)
     if (shareRepository.existsByTargetIdAndTargetTypeAndSharedWithUserId(folderId, "FOLDER", requesterId)) {
-        return storedFileRepository.findByFolderId(folderId).stream()
+        return storedFileRepository.findByFolderIdAndDeletedAtIsNull(folderId).stream()
             .filter(f -> f.getPath() == null || !(f.getPath().startsWith("employee_avatar/") || f.getPath().startsWith("group_avatar/")))
             .filter(f -> {
                 try {
@@ -473,8 +456,8 @@ public class DriveService {
         // Get folders that user has access to
         Set<UUID> accessibleFolderIds = new HashSet<>();
         
-        // Find owned folders
-        List<Folder> ownedFolders = folderRepository.findByParentId(parentId).stream()
+        // Find owned folders (excluding soft deleted)
+        List<Folder> ownedFolders = folderRepository.findByParentIdAndDeletedAtIsNull(parentId).stream()
                 .filter(f -> f.getOwnerId().equals(userId))
                 .collect(Collectors.toList());
         accessibleFolderIds.addAll(ownedFolders.stream().map(Folder::getId).collect(Collectors.toSet()));
@@ -487,22 +470,24 @@ public class DriveService {
         .map(Share::getTargetId)
         .collect(Collectors.toSet());
         
-        // Only include folders that are in the same parent folder
+        // Only include folders that are in the same parent folder and not deleted
         List<UUID> sharedFolderIdsInParent = folderRepository.findByIdIn(new ArrayList<>(sharedFolderIds)).stream()
+                .filter(f -> f.getDeletedAt() == null)
                 .filter(f -> f.getParent() != null ? Objects.equals(f.getParent().getId(), parentId) : parentId == null)
                 .map(Folder::getId)
                 .collect(Collectors.toList());
         accessibleFolderIds.addAll(sharedFolderIdsInParent);
         
-        // Find public folders
-        List<UUID> publicFolderIds = folderRepository.findByParentId(parentId).stream()
+        // Find public folders (excluding soft deleted)
+        List<UUID> publicFolderIds = folderRepository.findByParentIdAndDeletedAtIsNull(parentId).stream()
                 .filter(f -> f.getPermission() == Permission.PUBLIC)
                 .map(Folder::getId)
                 .collect(Collectors.toList());
         accessibleFolderIds.addAll(publicFolderIds);
         
-        // Return all accessible folders
+        // Return all accessible folders (excluding soft deleted)
         return folderRepository.findByIdIn(new ArrayList<>(accessibleFolderIds)).stream()
+                .filter(f -> f.getDeletedAt() == null)
                 .map(f -> FolderResponse.builder()
                         .id(f.getId())
                         .name(f.getName())
@@ -620,33 +605,50 @@ public class DriveService {
         UUID userId = getCurrentUserId();
         return favoriteRepository.findByUserId(userId).stream()
                 .map(f -> {
-                    String name;
-                    String targetType;
-                    
                     // Check file first (as requested)
                     var file = storedFileRepository.findById(f.getTargetId());
                     if (file.isPresent()) {
-                        name = file.get().getName();
-                        targetType = "FILE";
-                    } else {
-                        // Check folder
-                        var folder = folderRepository.findById(f.getTargetId());
-                        if (folder.isPresent()) {
-                            name = folder.get().getName();
-                            targetType = "FOLDER";
-                        } else {
-                            name = "?";
-                            targetType = "UNKNOWN";
-                        }
+                        var fileEntity = file.get();
+                        return com.iems.documentservice.dto.response.FavoriteItemResponse.builder()
+                                .id(f.getId())
+                                .targetId(f.getTargetId())
+                                .name(fileEntity.getName())
+                                .targetType("FILE")
+                                .size(fileEntity.getSize())
+                                .path(fileEntity.getPath())
+                                .mimeType(fileEntity.getType())
+                                .permission(fileEntity.getPermission() != null ? fileEntity.getPermission().name() : "PRIVATE")
+                                .createdAt(fileEntity.getCreatedAt())
+                                .ownerId(fileEntity.getOwnerId())
+                                .parentId(fileEntity.getFolder() != null ? fileEntity.getFolder().getId() : null)
+                                .build();
                     }
                     
+                    // Check folder
+                    var folder = folderRepository.findById(f.getTargetId());
+                    if (folder.isPresent()) {
+                        var folderEntity = folder.get();
+                        return com.iems.documentservice.dto.response.FavoriteItemResponse.builder()
+                                .id(f.getId())
+                                .targetId(f.getTargetId())
+                                .name(folderEntity.getName())
+                                .targetType("FOLDER")
+                                .permission(folderEntity.getPermission() != null ? folderEntity.getPermission().name() : "PRIVATE")
+                                .createdAt(folderEntity.getCreatedAt())
+                                .ownerId(folderEntity.getOwnerId())
+                                .parentId(folderEntity.getParent() != null ? folderEntity.getParent().getId() : null)
+                                .build();
+                    }
+                    
+                    // Unknown/deleted item
                     return com.iems.documentservice.dto.response.FavoriteItemResponse.builder()
                             .id(f.getId())
                             .targetId(f.getTargetId())
-                            .name(name)
-                            .targetType(targetType)
+                            .name("?")
+                            .targetType("UNKNOWN")
                             .build();
                 })
+                .filter(item -> !"UNKNOWN".equals(item.getTargetType())) // Filter out deleted items
                 .collect(Collectors.toList());
     }
 
@@ -1083,6 +1085,259 @@ public class DriveService {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         JwtUserDetails userDetails = (JwtUserDetails) authentication.getPrincipal();
         return userDetails.getUserId();
+    }
+
+    // ==================== TRASH / SOFT DELETE METHODS ====================
+
+    /**
+     * Soft delete a file - moves it to trash instead of permanently deleting
+     */
+    @Transactional
+    public void softDeleteFile(UUID fileId) {
+        UUID requesterId = getCurrentUserId();
+        StoredFile file = storedFileRepository.findById(fileId)
+                .orElseThrow(() -> new AppException(DocumentErrorCode.FILE_NOT_FOUND));
+        enforceOwner(file, requesterId);
+        
+        file.setDeletedAt(OffsetDateTime.now());
+        storedFileRepository.save(file);
+    }
+
+    /**
+     * Soft delete a folder and all its contents recursively
+     */
+    @Transactional
+    public void softDeleteFolder(UUID folderId) {
+        UUID requesterId = getCurrentUserId();
+        Folder folder = folderRepository.findById(folderId)
+                .orElseThrow(() -> new AppException(DocumentErrorCode.FOLDER_NOT_FOUND));
+        if (!folder.getOwnerId().equals(requesterId)) {
+            throw new AppException(DocumentErrorCode.PERMISSION_DENIED);
+        }
+        
+        softDeleteFolderRecursive(folder);
+    }
+
+    private void softDeleteFolderRecursive(Folder folder) {
+        OffsetDateTime now = OffsetDateTime.now();
+        
+        // Soft delete all files in this folder
+        List<StoredFile> files = storedFileRepository.findByFolderIdAndDeletedAtIsNull(folder.getId());
+        for (StoredFile file : files) {
+            file.setDeletedAt(now);
+            storedFileRepository.save(file);
+        }
+        
+        // Recurse into children folders
+        List<Folder> children = folderRepository.findByParentIdAndDeletedAtIsNull(folder.getId());
+        for (Folder child : children) {
+            softDeleteFolderRecursive(child);
+        }
+        
+        // Mark folder as deleted
+        folder.setDeletedAt(now);
+        folderRepository.save(folder);
+    }
+
+    /**
+     * List all trash items (soft deleted files and folders) for current user
+     */
+    public List<TrashItemResponse> listTrash() {
+        UUID userId = getCurrentUserId();
+        List<TrashItemResponse> result = new java.util.ArrayList<>();
+        
+        // Get deleted folders
+        List<Folder> deletedFolders = folderRepository.findByOwnerIdAndDeletedAtIsNotNull(userId);
+        for (Folder folder : deletedFolders) {
+            // Only show top-level deleted folders (not children of deleted folders)
+            if (folder.getParent() == null || folder.getParent().getDeletedAt() == null) {
+                result.add(TrashItemResponse.builder()
+                        .id(folder.getId())
+                        .name(folder.getName())
+                        .itemType("FOLDER")
+                        .parentId(folder.getParent() != null ? folder.getParent().getId() : null)
+                        .deletedAt(folder.getDeletedAt())
+                        .createdAt(folder.getCreatedAt())
+                        .build());
+            }
+        }
+        
+        // Get deleted files
+        List<StoredFile> deletedFiles = storedFileRepository.findByOwnerIdAndDeletedAtIsNotNull(userId);
+        for (StoredFile file : deletedFiles) {
+            // Only show files that were directly deleted (not inside a deleted folder)
+            if (file.getFolder() == null || file.getFolder().getDeletedAt() == null) {
+                result.add(TrashItemResponse.builder()
+                        .id(file.getId())
+                        .name(file.getName())
+                        .itemType("FILE")
+                        .size(file.getSize())
+                        .mimeType(file.getType())
+                        .parentId(file.getFolder() != null ? file.getFolder().getId() : null)
+                        .deletedAt(file.getDeletedAt())
+                        .createdAt(file.getCreatedAt())
+                        .build());
+            }
+        }
+        
+        // Sort by deletedAt descending (most recent first)
+        result.sort((a, b) -> b.getDeletedAt().compareTo(a.getDeletedAt()));
+        
+        return result;
+    }
+
+    /**
+     * Restore a file from trash to its original location
+     */
+    @Transactional
+    public void restoreFile(UUID fileId) {
+        UUID requesterId = getCurrentUserId();
+        StoredFile file = storedFileRepository.findById(fileId)
+                .orElseThrow(() -> new AppException(DocumentErrorCode.FILE_NOT_FOUND));
+        
+        if (!file.getOwnerId().equals(requesterId)) {
+            throw new AppException(DocumentErrorCode.PERMISSION_DENIED);
+        }
+        
+        if (file.getDeletedAt() == null) {
+            throw new AppException(DocumentErrorCode.INVALID_REQUEST);
+        }
+        
+        // Check if original folder still exists and is not deleted
+        if (file.getFolder() != null && file.getFolder().getDeletedAt() != null) {
+            // Restore parent folder first
+            restoreFolderRecursive(file.getFolder());
+        }
+        
+        file.setDeletedAt(null);
+        storedFileRepository.save(file);
+    }
+
+    /**
+     * Restore a folder and all its contents from trash to original location
+     */
+    @Transactional
+    public void restoreFolder(UUID folderId) {
+        UUID requesterId = getCurrentUserId();
+        Folder folder = folderRepository.findById(folderId)
+                .orElseThrow(() -> new AppException(DocumentErrorCode.FOLDER_NOT_FOUND));
+        
+        if (!folder.getOwnerId().equals(requesterId)) {
+            throw new AppException(DocumentErrorCode.PERMISSION_DENIED);
+        }
+        
+        if (folder.getDeletedAt() == null) {
+            throw new AppException(DocumentErrorCode.INVALID_REQUEST);
+        }
+        
+        // If parent folder is also deleted, restore it first
+        if (folder.getParent() != null && folder.getParent().getDeletedAt() != null) {
+            restoreFolderRecursive(folder.getParent());
+        }
+        
+        restoreFolderRecursive(folder);
+    }
+
+    private void restoreFolderRecursive(Folder folder) {
+        // Restore this folder
+        folder.setDeletedAt(null);
+        folderRepository.save(folder);
+        
+        // Restore all files in this folder that were deleted at the same time or after
+        List<StoredFile> files = storedFileRepository.findByOwnerIdAndDeletedAtIsNotNull(folder.getOwnerId());
+        for (StoredFile file : files) {
+            if (file.getFolder() != null && file.getFolder().getId().equals(folder.getId())) {
+                file.setDeletedAt(null);
+                storedFileRepository.save(file);
+            }
+        }
+        
+        // Restore child folders that were deleted
+        List<Folder> deletedChildren = folderRepository.findByOwnerIdAndDeletedAtIsNotNull(folder.getOwnerId());
+        for (Folder child : deletedChildren) {
+            if (child.getParent() != null && child.getParent().getId().equals(folder.getId())) {
+                restoreFolderRecursive(child);
+            }
+        }
+    }
+
+    /**
+     * Permanently delete a file from trash
+     */
+    @Transactional
+    public void permanentDeleteFile(UUID fileId) throws Exception {
+        UUID requesterId = getCurrentUserId();
+        StoredFile file = storedFileRepository.findById(fileId)
+                .orElseThrow(() -> new AppException(DocumentErrorCode.FILE_NOT_FOUND));
+        
+        if (!file.getOwnerId().equals(requesterId)) {
+            throw new AppException(DocumentErrorCode.PERMISSION_DENIED);
+        }
+        
+        if (file.getDeletedAt() == null) {
+            throw new AppException(DocumentErrorCode.INVALID_REQUEST);
+        }
+        
+        storageService.delete(file.getPath());
+        storedFileRepository.delete(file);
+    }
+
+    /**
+     * Permanently delete a folder and all contents from trash
+     */
+    @Transactional
+    public void permanentDeleteFolder(UUID folderId) throws Exception {
+        UUID requesterId = getCurrentUserId();
+        Folder folder = folderRepository.findById(folderId)
+                .orElseThrow(() -> new AppException(DocumentErrorCode.FOLDER_NOT_FOUND));
+        
+        if (!folder.getOwnerId().equals(requesterId)) {
+            throw new AppException(DocumentErrorCode.PERMISSION_DENIED);
+        }
+        
+        if (folder.getDeletedAt() == null) {
+            throw new AppException(DocumentErrorCode.INVALID_REQUEST);
+        }
+        
+        permanentDeleteFolderRecursive(folder);
+    }
+
+    private void permanentDeleteFolderRecursive(Folder folder) throws Exception {
+        // Delete all files in this folder
+        List<StoredFile> files = storedFileRepository.findByFolderId(folder.getId());
+        for (StoredFile file : files) {
+            storageService.delete(file.getPath());
+            storedFileRepository.delete(file);
+        }
+        
+        // Recurse into children
+        List<Folder> children = folderRepository.findByParentId(folder.getId());
+        for (Folder child : children) {
+            permanentDeleteFolderRecursive(child);
+        }
+        
+        folderRepository.delete(folder);
+    }
+
+    /**
+     * Empty the entire trash - permanently delete all items
+     */
+    @Transactional
+    public void emptyTrash() throws Exception {
+        UUID userId = getCurrentUserId();
+        
+        // Delete all trashed files
+        List<StoredFile> deletedFiles = storedFileRepository.findByOwnerIdAndDeletedAtIsNotNull(userId);
+        for (StoredFile file : deletedFiles) {
+            storageService.delete(file.getPath());
+            storedFileRepository.delete(file);
+        }
+        
+        // Delete all trashed folders
+        List<Folder> deletedFolders = folderRepository.findByOwnerIdAndDeletedAtIsNotNull(userId);
+        for (Folder folder : deletedFolders) {
+            folderRepository.delete(folder);
+        }
     }
 }
 
