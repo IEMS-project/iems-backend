@@ -12,6 +12,12 @@ public interface FolderRepository extends JpaRepository<Folder, UUID> {
     List<Folder> findByOwnerId(UUID ownerId);
     List<Folder> findByPermission(Permission permission);
     List<Folder> findByIdIn(List<UUID> ids);
+    
+    // Soft delete queries
+    List<Folder> findByParentIdAndDeletedAtIsNull(UUID parentId);
+    List<Folder> findByOwnerIdAndDeletedAtIsNull(UUID ownerId);
+    List<Folder> findByPermissionAndDeletedAtIsNull(Permission permission);
+    List<Folder> findByOwnerIdAndDeletedAtIsNotNull(UUID ownerId);
 }
 
 
