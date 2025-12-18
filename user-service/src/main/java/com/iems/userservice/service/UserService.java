@@ -139,6 +139,33 @@ public class UserService {
         }
     }
 
+    public List<UserBasicInfoDto> getProjectManagerCandidates() {
+        try {
+            List<String> allowedRoles = List.of("ADMIN", "PROJECT_MANAGER");
+            
+            // Get user IDs from IAM service based on roles
+            var response = iamServiceFeignClient.getUserIdsByRoleCodes(allowedRoles);
+            List<UUID> userIds = response.getData();
+            
+            if (userIds == null || userIds.isEmpty()) {
+                return List.of();
+            }
+            
+            // Get users by IDs
+            return repository.findAllById(userIds)
+                    .stream()
+                    .map(user -> new UserBasicInfoDto(
+                            user.getId(),
+                            user.getFirstName() + " " + user.getLastName(),
+                            user.getEmail(),
+                            user.getImage()
+                    ))
+                    .toList();
+        } catch (Exception ex) {
+            throw new AppException(UserErrorCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+
 
     public Optional<UserResponseDto> getUserById(UUID id) {
         try {

@@ -81,6 +81,18 @@ public class UserController {
         }
     }
 
+    @Operation(summary = "Get project manager candidates", description = "Retrieve users who can be project managers (ADMIN or PROJECT_MANAGER roles)")
+    @GetMapping("/project-manager-candidates")
+    public ResponseEntity<ApiResponseDto<List<UserBasicInfoDto>>> getProjectManagerCandidates() {
+        try {
+            List<UserBasicInfoDto> users = service.getProjectManagerCandidates();
+            return ResponseEntity.ok(new ApiResponseDto<>(HttpStatus.OK.value(), "Project manager candidates retrieved successfully", users));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ApiResponseDto<>(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Failed to fetch users: " + e.getMessage(), null));
+        }
+    }
+
     @Operation(summary = "Get user by ID", description = "Retrieve user details by unique ID")
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponseDto<UserResponseDto>> getUserById(@PathVariable UUID id) {
