@@ -7,6 +7,7 @@ import com.iems.iamservice.dto.request.AssignPermissionRequestDto;
 import com.iems.iamservice.dto.response.RoleResponseDto;
 import com.iems.iamservice.dto.response.RolePermissionsResponseDto;
 import com.iems.iamservice.service.RoleService;
+import com.iems.iamservice.service.UserRolePermissionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -28,6 +29,7 @@ import java.util.stream.Collectors;
 public class RoleController {
 
     private final RoleService roleService;
+    private final UserRolePermissionService userRolePermissionService;
 
     /**
      * Create new role
@@ -163,6 +165,23 @@ public class RoleController {
         return ResponseEntity.ok(ApiResponseDto.<Void>builder()
                 .status("success")
                 .message("Role deleted successfully")
+                .build());
+    }
+
+    /**
+     * Get user IDs by role codes
+     */
+    @GetMapping("/users-by-roles")
+    @Operation(summary = "Get users by roles", description = "Get list of user IDs that have any of the specified roles")
+    public ResponseEntity<ApiResponseDto<List<UUID>>> getUserIdsByRoleCodes(@RequestParam List<String> roleCodes) {
+        log.info("Getting user IDs for role codes: {}", roleCodes);
+        
+        List<UUID> userIds = userRolePermissionService.getUserIdsByRoleCodes(roleCodes);
+        
+        return ResponseEntity.ok(ApiResponseDto.<List<UUID>>builder()
+                .status("success")
+                .message("User IDs retrieved successfully")
+                .data(userIds)
                 .build());
     }
 }

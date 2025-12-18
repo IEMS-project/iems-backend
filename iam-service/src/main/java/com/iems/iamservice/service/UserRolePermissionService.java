@@ -200,6 +200,16 @@ public class UserRolePermissionService {
     }
 
     /**
+     * Get all user IDs that have any of the specified roles
+     */
+    public List<UUID> getUserIdsByRoleCodes(List<String> roleCodes) {
+        if (roleCodes == null || roleCodes.isEmpty()) {
+            return List.of();
+        }
+        return userRoleRepository.findUserIdsByRoleCodes(roleCodes);
+    }
+
+    /**
      * Get all permissions assigned directly to user
      */
     public Set<Permission> getUserDirectPermissions(UUID userId) {

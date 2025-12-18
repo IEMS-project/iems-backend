@@ -65,6 +65,12 @@ public interface UserRoleRepository extends JpaRepository<UserRole, UUID> {
     List<UserRole> findByRoleId(UUID roleId);
 
     /**
+     * Find all user IDs by role codes
+     */
+    @Query("SELECT DISTINCT ur.userId FROM UserRole ur WHERE ur.role.code IN :roleCodes AND ur.active = true")
+    List<UUID> findUserIdsByRoleCodes(@Param("roleCodes") List<String> roleCodes);
+
+    /**
      * Hard delete all user-role assignments by role ID
      */
     void deleteByRoleId(UUID roleId);

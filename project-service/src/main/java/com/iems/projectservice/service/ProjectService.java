@@ -480,9 +480,21 @@ public class ProjectService {
         dto.setStartDate(project.getStartDate());
         dto.setEndDate(project.getEndDate());
         dto.setStatus(project.getStatus());
+        dto.setManagerId(project.getManagerId());
         dto.setCreatedBy(project.getCreatedBy());
         dto.setCreatedAt(project.getCreatedAt());
         dto.setUpdatedAt(project.getUpdatedAt());
+
+        // Fetch manager info
+        if (project.getManagerId() != null) {
+            Map<UUID, UserDetailDto> managerMap = fetchManagersByIds(Set.of(project.getManagerId()));
+            if (managerMap.containsKey(project.getManagerId())) {
+                UserDetailDto manager = managerMap.get(project.getManagerId());
+                dto.setManagerName(manager.getFirstName() + " " + manager.getLastName());
+                dto.setManagerEmail(manager.getEmail());
+                dto.setManagerImage(manager.getImage());
+            }
+        }
 
         // progress giống MyProject
         dto.setProgress(Math.round(progress * 100.0) / 100.0);
