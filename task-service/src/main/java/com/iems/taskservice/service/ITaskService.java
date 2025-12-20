@@ -59,4 +59,6 @@ public interface ITaskService {
     boolean isValidStatusTransition(TaskStatus currentStatus, TaskStatus newStatus);
 
     List<ProjectProgressDto> getProjectsProgress(List<UUID> projectIds);
+
+    void deleteTask(UUID taskId);
 }

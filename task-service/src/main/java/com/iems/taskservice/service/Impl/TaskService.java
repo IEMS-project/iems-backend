@@ -210,6 +210,51 @@ public class TaskService implements ITaskService {
         }
     }
 
+    @Override
+    public void deleteTask(UUID taskId) {
+        UUID userId = userService.getUserIdFromRequest();
+
+        // Verify task exists
+        Task task = taskRepository.findById(taskId)
+                .orElseThrow(() -> new AppException(TaskErrorCode.TASK_NOT_FOUND));
+
+        // Check permission (creator can delete task)
+        if (!task.getCreatedBy().equals(userId)) {
+            throw new AppException(TaskErrorCode.PERMISSION_DENIED);
+        }
+
+        // Delete all attachments first
+        List<TaskAttachment> attachments = taskAttachmentRepository.findByTaskId(taskId);
+        for (TaskAttachment attachment : attachments) {
+            if (attachment.getFileId() != null && !attachment.getFileId().isEmpty()) {
+                try {
+                    documentServiceFeignClient.deleteFile(attachment.getFileId());
+                } catch (Exception e) {
+                    System.err.println("Error deleting file from document service: " + e.getMessage());
+                }
+            }
+        }
+        taskAttachmentRepository.deleteAll(attachments);
+
+        // Delete all comments
+        List<TaskComment> comments = taskCommentRepository.findByTaskIdOrderByCreatedAtAsc(taskId);
+        taskCommentRepository.deleteAll(comments);
+
+        // Delete all status history
+        List<TaskStatusHistory> histories = statusHistoryRepository.findByTaskIdOrderByUpdatedAtDesc(taskId);
+        statusHistoryRepository.deleteAll(histories);
+
+        // Update subtasks to remove parent reference
+        List<Task> subtasks = taskRepository.findByParentTaskId(taskId);
+        for (Task subtask : subtasks) {
+            subtask.setParentTaskId(null);
+            taskRepository.save(subtask);
+        }
+
+        // Delete the task
+        taskRepository.delete(task);
+    }
+
     // UC24: Gán Nhiệm vụ
     @Override
     public TaskResponseDto assignTask(UUID taskId, UUID newAssigneeId) {

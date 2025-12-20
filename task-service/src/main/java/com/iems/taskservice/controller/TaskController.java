@@ -283,6 +283,19 @@ public class TaskController {
         }
     }
 
+    @DeleteMapping("/{id}")
+    @Operation(summary = "Delete task", description = "Delete a task and all its related data")
+    public ResponseEntity<ApiResponseDto<Void>> deleteTask(@PathVariable UUID id) {
+        try {
+            taskService.deleteTask(id);
+            return ResponseEntity.ok(new ApiResponseDto<>("success", "Task deleted successfully", null));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(new ApiResponseDto<>("error", e.getMessage(), null));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(new ApiResponseDto<>("error", "Failed to delete task", null));
+        }
+    }
+
     @GetMapping("/my-tasks/filter")
     @Operation(summary = "Get my tasks with filter", description = "Filter my tasks by status or priority")
     public ResponseEntity<ApiResponseDto<List<MyTaskResponseDto>>> getMyTasksWithFilter(
