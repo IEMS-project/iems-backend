@@ -32,6 +32,4 @@ public class CreateUserDto {
     private String username;
     private String password;
     private java.util.Set<String> roleCodes;
-
-    private UUID departmentId;
 }
