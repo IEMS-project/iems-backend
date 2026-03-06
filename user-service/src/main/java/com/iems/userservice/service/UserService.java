@@ -1,8 +1,6 @@
 package com.iems.userservice.service;
 
-import com.iems.userservice.client.DepartmentServiceFeignClient;
 import com.iems.userservice.client.IamServiceFeignClient;
-import com.iems.userservice.dto.request.AddUserToDepartmentDto;
 import com.iems.userservice.dto.request.CreateAccountRequestDto;
 import com.iems.userservice.dto.request.CreateUserDto;
 import com.iems.userservice.dto.request.UpdateUserDto;
@@ -27,8 +25,6 @@ public class UserService {
     
     @Autowired
     private IamServiceFeignClient iamServiceFeignClient;
-    @Autowired
-    private DepartmentServiceFeignClient departmentServiceFeignClient;
 
     public UserResponseDto createUser(CreateUserDto userRequest) {
         try {
@@ -51,26 +47,6 @@ public class UserService {
                     System.err.println("Failed to create account for user: " + e.getMessage());
                 }
             }
-            if (userRequest.getDepartmentId() != null) {
-                try {
-                    System.out.println("🔄 Adding user " + savedUser.getId() + " to department " + userRequest.getDepartmentId());
-                    AddUserToDepartmentDto addUserDto = new AddUserToDepartmentDto();
-                    addUserDto.setUserId(savedUser.getId());
-                    
-                    if (departmentServiceFeignClient == null) {
-                        System.err.println("❌ DepartmentServiceFeignClient is NULL!");
-                        throw new RuntimeException("DepartmentServiceFeignClient is not properly initialized");
-                    }
-                    
-                    var response = departmentServiceFeignClient.addUserToDepartment(userRequest.getDepartmentId(), addUserDto);
-                    System.out.println("✅ Successfully added user to department. Response: " + response);
-                } catch (Exception e) {
-                    // Log lỗi nhưng không rollback user đã tạo
-                    System.err.println("⚠️ Failed to add user to department: " + e.getMessage());
-                    e.printStackTrace();
-                }
-            }
-
 
             return convertToUserResponse(savedUser);
         } catch (Exception ex) {

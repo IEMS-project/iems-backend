@@ -31,36 +31,32 @@ public class TaskController {
 
 
 
-    @PostMapping(consumes = {MediaType.MULTIPART_FORM_DATA_VALUE, MediaType.APPLICATION_JSON_VALUE})
-    @Operation(summary = "Create task with attachments", description = "Create a new task with optional file attachments")
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Create task with attachments")
     public ResponseEntity<ApiResponseDto<TaskNestedResponseDto>> createTask(
-            @Valid @RequestPart(value = "task", required = false) CreateTaskDto createDtoMultipart,
-            @Valid @RequestBody(required = false) CreateTaskDto createDtoJson,
-            @RequestPart(value = "files", required = false) MultipartFile[] files) {
+            @Valid @RequestPart("task") CreateTaskDto createDto,
+            @RequestPart(value = "files", required = false) MultipartFile[] files
+    ) {
         try {
-            // Use multipart DTO if available, otherwise use JSON DTO
-            CreateTaskDto createDto = createDtoMultipart != null ? createDtoMultipart : createDtoJson;
-            
-            if (createDto == null) {
-                return ResponseEntity.badRequest().body(new ApiResponseDto<>("error", "Task data is required", null));
-            }
-            
             TaskResponseDto responseDto;
             if (files != null && files.length > 0) {
                 responseDto = taskServiceImpl.createTask(createDto, files);
             } else {
                 responseDto = taskService.createTask(createDto);
             }
-            // convert to nested for consistency
+
             return taskService.getTaskByIdNested(responseDto.getId())
-                    .map(nested -> ResponseEntity.ok(new ApiResponseDto<>("success", "Task created successfully", nested)))
-                    .orElseGet(() -> ResponseEntity.ok(new ApiResponseDto<>("success", "Task created successfully", null)));
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(new ApiResponseDto<>("error", e.getMessage(), null));
+                    .map(nested -> ResponseEntity.ok(
+                            new ApiResponseDto<>("success", "Task created successfully", nested)))
+                    .orElseGet(() -> ResponseEntity.ok(
+                            new ApiResponseDto<>("success", "Task created successfully", null)));
+
         } catch (Exception e) {
-            return ResponseEntity.internalServerError().body(new ApiResponseDto<>("error", "Failed to create task", null));
+            return ResponseEntity.internalServerError()
+                    .body(new ApiResponseDto<>("error", "Failed to create task", null));
         }
     }
+
 
     @PatchMapping(value = "/{id}", consumes = {MediaType.MULTIPART_FORM_DATA_VALUE, MediaType.APPLICATION_JSON_VALUE})
     @Operation(summary = "Update task with attachments", description = "Update task fields: title, description, assignedTo, priority, dates, status with optional file attachments")
