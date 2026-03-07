@@ -21,7 +21,12 @@ public enum ProjectErrorCode {
     ROLE_ALREADY_ASSIGNED("Cannot delete role that is already assigned to members", HttpStatus.CONFLICT),
     
     PHASE_NOT_FOUND("Phase not found", HttpStatus.NOT_FOUND),
-    PHASE_NOT_BELONG_TO_PROJECT("Phase does not belong to this project", HttpStatus.BAD_REQUEST);
+    PHASE_NOT_BELONG_TO_PROJECT("Phase does not belong to this project", HttpStatus.BAD_REQUEST),
+
+
+    TASK_NOT_FOUND("Task not found", HttpStatus.NOT_FOUND),
+    USER_NOT_FOUND("User not found", HttpStatus.NOT_FOUND),
+    INVALID_STATUS_TRANSITION("Invalid status transition", HttpStatus.BAD_REQUEST);
 
     private final String message;
     private final HttpStatus httpStatus;

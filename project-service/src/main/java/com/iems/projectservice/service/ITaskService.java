@@ -1,10 +1,11 @@
-package com.iems.taskservice.service;
+package com.iems.projectservice.service;
 
-import com.iems.taskservice.dto.*;
-import com.iems.taskservice.entity.Task;
-import com.iems.taskservice.entity.TaskComment;
-import com.iems.taskservice.entity.TaskStatusHistory;
-import com.iems.taskservice.entity.enums.TaskStatus;
+import com.iems.projectservice.dto.*;
+import com.iems.projectservice.dto.response.ProjectProgressDto;
+import com.iems.projectservice.entity.Task;
+import com.iems.projectservice.entity.TaskComment;
+import com.iems.projectservice.entity.TaskStatusHistory;
+import com.iems.projectservice.entity.enums.TaskStatus;
 
 import java.util.List;
 import java.util.Optional;
@@ -52,9 +53,9 @@ public interface ITaskService {
     List<TaskStatusHistory> getTaskStatusHistory(UUID taskId);
 
     // Helper methods
-    void createStatusHistory(Task task, TaskStatus newStatus, UUID updated ByAccountId, String _comment);
+    void createStatusHistory(Task task, TaskStatus newStatus, UUID updatedBy, String _comment);
 
-    void createStatusHistoryWithOldNew(UUID taskId, TaskStatus oldStatus, TaskStatus newStatus, UUID updatedByAccountId);
+    void createStatusHistoryWithOldNew(UUID taskId, TaskStatus oldStatus, TaskStatus newStatus, UUID updatedBy);
 
     boolean isValidStatusTransition(TaskStatus currentStatus, TaskStatus newStatus);
 
@@ -62,4 +63,3 @@ public interface ITaskService {
 
     void deleteTask(UUID taskId);
 }
-

@@ -18,7 +18,7 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class ProjectRepository {
+public class GithubRepository {
 
     @Id
     @GeneratedValue(generator = "UUID")

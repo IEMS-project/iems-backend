@@ -19,7 +19,7 @@ public interface ProjectRepository extends JpaRepository<Project, UUID> {
     
     Optional<Project> findByName(String name);
     
-    List<Project> findByManagerId(UUID managerId);
+    List<Project> findByManagerAccountId(UUID managerAccountId);
     
     List<Project> findByStatus(ProjectStatus status);
     
@@ -27,8 +27,8 @@ public interface ProjectRepository extends JpaRepository<Project, UUID> {
     List<Project> findByDateRange(@Param("startDate") LocalDateTime startDate, 
                                   @Param("endDate") LocalDateTime endDate);
     
-    @Query("SELECT p FROM Project p JOIN p.members pm WHERE pm.userId = :userId")
-    List<Project> findByMemberId(@Param("userId") UUID userId);
+    @Query("SELECT p FROM Project p JOIN p.members pm WHERE pm.accountId = :accountId")
+    List<Project> findByMemberAccountId(@Param("accountId") UUID accountId);
     
     boolean existsByName(String name);
 

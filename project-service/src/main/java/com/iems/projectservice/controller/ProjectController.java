@@ -36,7 +36,6 @@ public class ProjectController {
     
     @PostMapping
     @Operation(summary = "Create a new project", description = "Create a new project with the provided details")
-    @PreAuthorize("hasAuthority('PROJECT_CREATE')")
     public ResponseEntity<ApiResponseDto<ProjectResponseDto>> createProject(
             @Valid @RequestBody CreateProjectDto createProjectDto) {
         try {
@@ -52,7 +51,6 @@ public class ProjectController {
     
     @PatchMapping("/{projectId}")
     @Operation(summary = "Update an existing project", description = "Update project details by project ID")
-    @PreAuthorize("hasAuthority('PROJECT_UPDATE')")
     public ResponseEntity<ApiResponseDto<ProjectResponseDto>> updateProject(
             @Parameter(description = "Project ID", required = true)
             @PathVariable UUID projectId,
@@ -69,7 +67,6 @@ public class ProjectController {
 
     @GetMapping("/table")
     @Operation(summary = "Get projects for table", description = "Get basic project info for table display")
-    @PreAuthorize("hasAuthority('PROJECT_READ')")
     public ResponseEntity<ApiResponseDto<List<ProjectTableDto>>> getProjectsForTable() {
         try {
             List<ProjectTableDto> projects = projectService.getProjectsForTable();
@@ -84,7 +81,6 @@ public class ProjectController {
 
     @GetMapping("/{projectId}")
     @Operation(summary = "Get project by ID", description = "Retrieve project details by project ID")
-    @PreAuthorize("hasAuthority('PROJECT_READ')")
     public ResponseEntity<ApiResponseDto<ProjectDetailResponseDto>> getProject(
             @Parameter(description = "Project ID", required = true)
             @PathVariable UUID projectId
@@ -101,7 +97,6 @@ public class ProjectController {
     
     @GetMapping("/my-projects")
     @Operation(summary = "Get user's projects", description = "Get all projects where the current user is a member")
-    @PreAuthorize("hasAuthority('PROJECT_READ')")
     public ResponseEntity<ApiResponseDto<List<MyProjectResponseDto>>> getMyProjects() {
         try {
             List<MyProjectResponseDto> projects = projectService.getMyProjects();
@@ -115,7 +110,6 @@ public class ProjectController {
     
     @GetMapping("/all")
     @Operation(summary = "Get all projects", description = "Get all projects in the system")
-    @PreAuthorize("hasAuthority('PROJECT_READ')")
     public ResponseEntity<ApiResponseDto<List<ProjectResponseDto>>> getAllProjects(
     ) {
         try {
@@ -130,7 +124,6 @@ public class ProjectController {
     
     @GetMapping("/{projectId}/progress")
     @Operation(summary = "Get project progress", description = "Get project progress and task statistics")
-    @PreAuthorize("hasAuthority('PROJECT_READ')")
     public ResponseEntity<ApiResponseDto<ProjectProgressDto>> getProjectProgress(
             @Parameter(description = "Project ID", required = true)
             @PathVariable UUID projectId){
@@ -146,7 +139,6 @@ public class ProjectController {
     
     @PutMapping("/{projectId}/assign-manager")
     @Operation(summary = "Assign project manager", description = "Assign a new project manager to the project (Admin only)")
-    @PreAuthorize("hasAuthority('PROJECT_MANAGE')")
     public ResponseEntity<ApiResponseDto<Void>> assignProjectManager(
             @Parameter(description = "Project ID", required = true)
             @PathVariable UUID projectId,

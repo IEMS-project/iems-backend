@@ -40,11 +40,11 @@ public class Project {
     @Column(name = "status", nullable = false)
     private ProjectStatus status = ProjectStatus.PLANNING;
 
-    @Column(name = "manager_id", nullable = false)
-    private UUID managerId;
+    @Column(name = "manager_account_id", nullable = false)
+    private UUID managerAccountId;
 
-    @Column(name = "created_by", nullable = false)
-    private UUID createdBy;
+    @Column(name = "created_by_account_id", nullable = false)
+    private UUID createdByAccountId;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -53,6 +53,8 @@ public class Project {
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+
 
     @OneToMany(mappedBy = "project", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @ToString.Exclude

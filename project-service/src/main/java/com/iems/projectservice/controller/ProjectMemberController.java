@@ -30,7 +30,6 @@ public class ProjectMemberController {
     
     @PostMapping
     @Operation(summary = "Add member to project", description = "Add a new member to the project with specified role")
-    @PreAuthorize("hasAuthority('PROJECT_MANAGE')")
     public ResponseEntity<ApiResponseDto<ProjectMemberResponseDto>> addMember(
             @Parameter(description = "Project ID", required = true)
             @PathVariable UUID projectId,
@@ -49,7 +48,6 @@ public class ProjectMemberController {
     
     @GetMapping
     @Operation(summary = "Get project members", description = "Get all members of the project")
-    @PreAuthorize("hasAuthority('PROJECT_READ')")
     public ResponseEntity<ApiResponseDto<List<ProjectMemberResponseDto>>> getProjectMembers(
             @Parameter(description = "Project ID", required = true)
             @PathVariable UUID projectId) {
@@ -65,7 +63,6 @@ public class ProjectMemberController {
     
     @GetMapping("/role/{roleId}")
     @Operation(summary = "Get members by role", description = "Get project members filtered by specific role")
-    @PreAuthorize("hasAuthority('PROJECT_READ')")
     public ResponseEntity<ApiResponseDto<List<ProjectMemberResponseDto>>> getMembersByRole(
             @Parameter(description = "Project ID", required = true)
             @PathVariable UUID projectId,
@@ -83,7 +80,6 @@ public class ProjectMemberController {
     
     @PutMapping("/{userId}/role")
     @Operation(summary = "Update member role", description = "Update the role of a project member")
-    @PreAuthorize("hasAuthority('PROJECT_MANAGE')")
     public ResponseEntity<ApiResponseDto<ProjectMemberResponseDto>> updateMemberRole(
             @Parameter(description = "Project ID", required = true)
             @PathVariable UUID projectId,
@@ -104,7 +100,6 @@ public class ProjectMemberController {
     
     @PutMapping("/{userId}/status")
     @Operation(summary = "Update member status", description = "Update the status (ACTIVE/INACTIVE) of a project member")
-    @PreAuthorize("hasAuthority('PROJECT_MANAGE')")
     public ResponseEntity<ApiResponseDto<ProjectMemberResponseDto>> updateMemberStatus(
             @Parameter(description = "Project ID", required = true)
             @PathVariable UUID projectId,
@@ -125,7 +120,6 @@ public class ProjectMemberController {
     
     @DeleteMapping("/{userId}")
     @Operation(summary = "Remove member from project", description = "Remove a member from the project")
-    @PreAuthorize("hasAuthority('PROJECT_MANAGE')")
     public ResponseEntity<ApiResponseDto<Void>> removeMember(
             @Parameter(description = "Project ID", required = true)
             @PathVariable UUID projectId,

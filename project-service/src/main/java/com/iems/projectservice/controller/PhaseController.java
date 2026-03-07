@@ -30,7 +30,6 @@ public class PhaseController {
     
     @PostMapping
     @Operation(summary = "Create a new phase", description = "Create a new phase for a project")
-    @PreAuthorize("hasAuthority('PROJECT_UPDATE')")
     public ResponseEntity<ApiResponseDto<PhaseResponseDto>> createPhase(
             @Parameter(description = "Project ID", required = true)
             @PathVariable UUID projectId,
@@ -50,7 +49,6 @@ public class PhaseController {
     
     @GetMapping
     @Operation(summary = "Get all phases of a project", description = "Get all phases ordered by sort order")
-    @PreAuthorize("hasAuthority('PROJECT_READ')")
     public ResponseEntity<ApiResponseDto<List<PhaseResponseDto>>> getPhasesByProject(
             @Parameter(description = "Project ID", required = true)
             @PathVariable UUID projectId) {
@@ -66,7 +64,6 @@ public class PhaseController {
     
     @GetMapping("/{phaseId}")
     @Operation(summary = "Get a phase by ID", description = "Get details of a specific phase")
-    @PreAuthorize("hasAuthority('PROJECT_READ')")
     public ResponseEntity<ApiResponseDto<PhaseResponseDto>> getPhaseById(
             @Parameter(description = "Project ID", required = true)
             @PathVariable UUID projectId,
@@ -84,7 +81,6 @@ public class PhaseController {
     
     @PatchMapping("/{phaseId}")
     @Operation(summary = "Update a phase", description = "Update details of a specific phase")
-    @PreAuthorize("hasAuthority('PROJECT_UPDATE')")
     public ResponseEntity<ApiResponseDto<PhaseResponseDto>> updatePhase(
             @Parameter(description = "Project ID", required = true)
             @PathVariable UUID projectId,
@@ -103,7 +99,6 @@ public class PhaseController {
     
     @DeleteMapping("/{phaseId}")
     @Operation(summary = "Delete a phase", description = "Delete a specific phase")
-    @PreAuthorize("hasAuthority('PROJECT_UPDATE')")
     public ResponseEntity<ApiResponseDto<Void>> deletePhase(
             @Parameter(description = "Project ID", required = true)
             @PathVariable UUID projectId,

@@ -3,7 +3,7 @@ package com.iems.projectservice.service;
 import com.iems.projectservice.dto.request.CreateProjectRepositoryDto;
 import com.iems.projectservice.dto.request.UpdateProjectRepositoryDto;
 import com.iems.projectservice.dto.response.ProjectRepositoryDto;
-import com.iems.projectservice.entity.ProjectRepository;
+import com.iems.projectservice.entity.GithubRepository;
 import com.iems.projectservice.exception.AppException;
 import com.iems.projectservice.exception.ProjectErrorCode;
 import com.iems.projectservice.repository.ProjectRepositoryRepository;
@@ -27,13 +27,13 @@ public class ProjectRepositoryService {
     public ProjectRepositoryDto createRepository(CreateProjectRepositoryDto dto) {
         log.info("Creating repository for project: {}", dto.getProjectId());
         
-        ProjectRepository repository = ProjectRepository.builder()
+        GithubRepository repository = GithubRepository.builder()
                 .projectId(dto.getProjectId())
                 .name(dto.getName())
                 .repoLink(dto.getRepoLink())
                 .build();
 
-        ProjectRepository savedRepository = projectRepositoryRepository.save(repository);
+        GithubRepository savedRepository = projectRepositoryRepository.save(repository);
         
         return mapToDto(savedRepository);
     }
@@ -41,7 +41,7 @@ public class ProjectRepositoryService {
     public List<ProjectRepositoryDto> getRepositoriesByProjectId(UUID projectId) {
         log.info("Getting repositories for project: {}", projectId);
         
-        List<ProjectRepository> repositories = projectRepositoryRepository.findByProjectId(projectId);
+        List<GithubRepository> repositories = projectRepositoryRepository.findByProjectId(projectId);
         
         return repositories.stream()
                 .map(this::mapToDto)
@@ -51,7 +51,7 @@ public class ProjectRepositoryService {
     public ProjectRepositoryDto getRepositoryById(UUID id) {
         log.info("Getting repository by id: {}", id);
         
-        ProjectRepository repository = projectRepositoryRepository.findById(id)
+        GithubRepository repository = projectRepositoryRepository.findById(id)
                 .orElseThrow(() -> new AppException(ProjectErrorCode.PROJECT_NOT_FOUND));
         
         return mapToDto(repository);
@@ -61,13 +61,13 @@ public class ProjectRepositoryService {
     public ProjectRepositoryDto updateRepository(UUID id, UpdateProjectRepositoryDto dto) {
         log.info("Updating repository: {}", id);
         
-        ProjectRepository repository = projectRepositoryRepository.findById(id)
+        GithubRepository repository = projectRepositoryRepository.findById(id)
                 .orElseThrow(() -> new AppException(ProjectErrorCode.PROJECT_NOT_FOUND));
         
         repository.setName(dto.getName());
         repository.setRepoLink(dto.getRepoLink());
         
-        ProjectRepository updatedRepository = projectRepositoryRepository.save(repository);
+        GithubRepository updatedRepository = projectRepositoryRepository.save(repository);
         
         return mapToDto(updatedRepository);
     }
@@ -89,7 +89,7 @@ public class ProjectRepositoryService {
         projectRepositoryRepository.deleteByProjectId(projectId);
     }
 
-    private ProjectRepositoryDto mapToDto(ProjectRepository repository) {
+    private ProjectRepositoryDto mapToDto(GithubRepository repository) {
         return ProjectRepositoryDto.builder()
                 .id(repository.getId())
                 .projectId(repository.getProjectId())

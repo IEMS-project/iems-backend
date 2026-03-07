@@ -1,6 +1,6 @@
-package com.iems.taskservice.entity;
+package com.iems.projectservice.entity;
 
-import com.iems.taskservice.entity.enums.TaskStatus;
+import com.iems.projectservice.entity.enums.TaskStatus;
 import jakarta.persistence.*;
 import lombok.Data;
 import org.hibernate.annotations.UuidGenerator;
@@ -28,8 +28,8 @@ public class TaskStatusHistory {
     @Column(name = "new_status", nullable = false)
     private TaskStatus newStatus;
 
-    @Column(name = "updated_by_account_id", nullable = false)
-    private UUID updatedByAccountId;
+    @Column(name = "updated_by", nullable = false)
+    private UUID updatedBy;
 
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;

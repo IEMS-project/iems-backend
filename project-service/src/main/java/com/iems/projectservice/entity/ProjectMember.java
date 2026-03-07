@@ -26,8 +26,8 @@ public class ProjectMember {
     @JoinColumn(name = "project_id", nullable = false)
     private Project project;
     
-    @Column(name = "user_id", nullable = false)
-    private UUID userId;
+    @Column(name = "account_id", nullable = false)
+    private UUID accountId;
     
     @Column(name = "role_id", nullable = false)
     private UUID roleId;
@@ -39,8 +39,8 @@ public class ProjectMember {
     @Column(name = "joined_at", nullable = false)
     private LocalDateTime joinedAt;
     
-    @Column(name = "assigned_by", nullable = false)
-    private UUID assignedBy;
+    @Column(name = "assigned_by_account_id", nullable = false)
+    private UUID assignedByAccountId;
     
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
