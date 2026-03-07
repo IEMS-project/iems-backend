@@ -28,7 +28,7 @@ public class ProjectRoleController {
     public ResponseEntity<ApiResponseDto<List<ProjectAllowedRoleDto>>> list(@PathVariable UUID projectId) {
         List<ProjectAllowedRole> list = service.list(projectId);
         List<ProjectAllowedRoleDto> dto = list.stream()
-                .map(r -> new ProjectAllowedRoleDto(r.getId(), r.getRoleId(), r.getRoleName()))
+                .map(r -> new ProjectAllowedRoleDto(r.getId(), r.getRoleName()))
                 .toList();
         return ResponseEntity.ok(new ApiResponseDto<>("success", "OK", dto));
     }
@@ -37,11 +37,13 @@ public class ProjectRoleController {
     @Operation(summary = "Add role to project")
     public ResponseEntity<ApiResponseDto<ProjectAllowedRoleDto>> add(@PathVariable UUID projectId,
                                                                   @RequestBody Map<String, String> payload) {
-        UUID roleId = UUID.fromString(payload.get("roleId"));
-        String roleName = payload.getOrDefault("roleName", "");
-        ProjectAllowedRole saved = service.add(projectId, roleId, roleName);
+        String roleName = payload.getOrDefault("roleName", "").trim();
+        if (roleName.isEmpty()) {
+            return ResponseEntity.badRequest().body(new ApiResponseDto<>("error", "Role name is required", null));
+        }
+        ProjectAllowedRole saved = service.add(projectId, roleName);
         return ResponseEntity.ok(new ApiResponseDto<>("success", "Created",
-                new ProjectAllowedRoleDto(saved.getId(), saved.getRoleId(), saved.getRoleName())));
+                new ProjectAllowedRoleDto(saved.getId(), saved.getRoleName())));
     }
 
     @DeleteMapping("/{id}")

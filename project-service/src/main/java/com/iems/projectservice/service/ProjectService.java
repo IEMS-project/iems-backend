@@ -50,9 +50,9 @@ public class ProjectService {
         return userId;
     }
 
-    private Optional<UserDetailDto> getUserById(UUID userId) {
+    private Optional<UserDetailDto> getUserById(UUID accountId) {
         try {
-            ResponseEntity<Map<String, Object>> response = userServiceFeignClient.getUserById(userId);
+            ResponseEntity<Map<String, Object>> response = userServiceFeignClient.getUserByAccountId(accountId);
 
             if (response.getBody() != null && response.getBody().containsKey("data")) {
                 @SuppressWarnings("unchecked")
@@ -63,7 +63,7 @@ public class ProjectService {
             return Optional.empty();
         } catch (Exception e) {
             // Log error and return empty
-            System.err.println("Error fetching user " + userId + " from User Service: " + e.getMessage());
+            System.err.println("Error fetching user by accountId " + accountId + " from User Service: " + e.getMessage());
             return Optional.empty();
         }
     }
@@ -97,15 +97,22 @@ public class ProjectService {
             throw new AppException( ProjectErrorCode.PROJECT_NAME_EXISTS);
         }
         UUID currentUserId = getUserIdFromRequest();
-        // Create project
+        
+        // Validate status: only PLANNING and IN_PROGRESS allowed
+        ProjectStatus status = createProjectDto.getStatus() != null ? createProjectDto.getStatus() : ProjectStatus.PLANNING;
+        if (status != ProjectStatus.PLANNING && status != ProjectStatus.IN_PROGRESS) {
+            throw new AppException(ProjectErrorCode.INVALID_REQUEST);
+        }
+        
+        // Create project - creator is automatically the PM
         Project project = new Project();
         project.setName(createProjectDto.getName());
         project.setDescription(createProjectDto.getDescription());
         project.setStartDate(createProjectDto.getStartDate());
         project.setEndDate(createProjectDto.getEndDate());
-        project.setManagerAccountId(createProjectDto.getManagerId());
+        project.setManagerAccountId(currentUserId);
         project.setCreatedByAccountId(currentUserId);
-        project.setStatus(ProjectStatus.PLANNING);
+        project.setStatus(status);
         
         Project savedProject = projectRepository.save(project);
         
@@ -113,7 +120,7 @@ public class ProjectService {
         UUID managerRoleId = getDefaultManagerRoleId(savedProject.getId());
         if (managerRoleId != null) {
             projectMemberService.addMemberToProject(savedProject.getId(), 
-                    createProjectDto.getManagerId(),
+                    currentUserId,
                     managerRoleId);
         }
         
@@ -256,10 +263,10 @@ public class ProjectService {
         }
 
         try {
-            com.iems.projectservice.dto.request.UserIdsDto userIdsDto = new com.iems.projectservice.dto.request.UserIdsDto();
-            userIdsDto.setIds(managerIds);
+            com.iems.projectservice.dto.request.AccountIdsDto accountIdsDto = new com.iems.projectservice.dto.request.AccountIdsDto();
+            accountIdsDto.setAccountIds(managerIds);
 
-            ResponseEntity<Map<String, Object>> response = userServiceFeignClient.getUsersByID(userIdsDto);
+            ResponseEntity<Map<String, Object>> response = userServiceFeignClient.getUsersByAccountIds(accountIdsDto);
 
             if (response.getBody() != null && response.getBody().containsKey("data")) {
                 Object dataObj = response.getBody().get("data");
@@ -590,9 +597,9 @@ public class ProjectService {
                 return allowedRoles.stream()
                     .filter(role -> role.getRoleName().toLowerCase().contains("manager") || 
                                    role.getRoleName().toLowerCase().contains("quản lý"))
-                    .map(ProjectAllowedRole::getRoleId)
+                    .map(ProjectAllowedRole::getId)
                     .findFirst()
-                    .orElse(allowedRoles.get(0).getRoleId());
+                    .orElse(allowedRoles.get(0).getId());
             }
             return null;
         } catch (Exception e) {

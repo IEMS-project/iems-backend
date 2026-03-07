@@ -11,7 +11,6 @@ import java.util.UUID;
 @AllArgsConstructor
 public class ProjectAllowedRoleDto {
     private UUID id;
-    private UUID roleId;
     private String roleName;
 }
 

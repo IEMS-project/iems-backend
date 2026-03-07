@@ -100,6 +100,38 @@ public class UserController {
                 .build());
     }
 
+    @Operation(summary = "Get user by Account ID", description = "Retrieve user details by account ID")
+    @GetMapping("/by-account/{accountId}")
+    public ResponseEntity<ApiResponseDto<UserResponseDto>> getUserByAccountId(@PathVariable UUID accountId) {
+        log.info("Getting user with Account ID: {}", accountId);
+        try {
+            return service.getUserByAccountId(accountId)
+                    .map(userResponse -> ResponseEntity.ok(
+                            ApiResponseDto.<UserResponseDto>builder()
+                                    .status("success")
+                                    .message("User found")
+                                    .data(userResponse)
+                                    .build()
+                    ))
+                    .orElseGet(() -> ResponseEntity.ok(
+                            ApiResponseDto.<UserResponseDto>builder()
+                                    .status("error")
+                                    .message("User not found")
+                                    .data(null)
+                                    .build()
+                    ));
+        } catch (Exception e) {
+            log.warn("Error fetching user by accountId {}: {}", accountId, e.getMessage());
+            return ResponseEntity.ok(
+                    ApiResponseDto.<UserResponseDto>builder()
+                            .status("error")
+                            .message("User not found")
+                            .data(null)
+                            .build()
+            );
+        }
+    }
+
     @Operation(summary = "Get user by ID", description = "Retrieve user details by unique ID")
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponseDto<UserResponseDto>> getUserById(@PathVariable UUID id) {

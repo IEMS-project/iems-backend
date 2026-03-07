@@ -1,6 +1,7 @@
 package com.iems.projectservice.service.Impl;
 
 import com.iems.projectservice.client.UserServiceFeignClient;
+import com.iems.projectservice.dto.request.AccountIdsDto;
 import com.iems.projectservice.dto.response.UserDetailDto;
 import com.iems.projectservice.dto.request.UserIdsDto;
 import com.iems.projectservice.exception.AppException;
@@ -26,9 +27,9 @@ public class UserService implements IUserService {
     private UserServiceFeignClient userServiceFeignClient;
 
     @Override
-    public Optional<UserDetailDto> getUserById(UUID userId) {
+    public Optional<UserDetailDto> getUserById(UUID accountId) {
         try {
-            ResponseEntity<Map<String, Object>> response = userServiceFeignClient.getUserById(userId);
+            ResponseEntity<Map<String, Object>> response = userServiceFeignClient.getUserByAccountId(accountId);
 
             if (response.getBody() != null && response.getBody().containsKey("data")) {
                 @SuppressWarnings("unchecked")
@@ -39,7 +40,7 @@ public class UserService implements IUserService {
             return Optional.empty();
         } catch (Exception e) {
             // Log error and return empty
-            System.err.println("Error fetching user " + userId + " from User Service: " + e.getMessage());
+            System.err.println("Error fetching user by accountId " + accountId + " from User Service: " + e.getMessage());
             return Optional.empty();
         }
     }
@@ -50,7 +51,9 @@ public class UserService implements IUserService {
             if (request == null || request.getIds() == null || request.getIds().isEmpty()) {
                 return new ArrayList<>();
             }
-            ResponseEntity<Map<String, Object>> response = userServiceFeignClient.getUsersByID(request);
+            AccountIdsDto accountIdsDto = new AccountIdsDto();
+            accountIdsDto.setAccountIds(request.getIds());
+            ResponseEntity<Map<String, Object>> response = userServiceFeignClient.getUsersByAccountIds(accountIdsDto);
             if (response.getBody() != null && response.getBody().containsKey("data")) {
                 @SuppressWarnings("unchecked")
                 List<Map<String, Object>> usersData = (List<Map<String, Object>>) response.getBody().get("data");

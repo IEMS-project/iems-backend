@@ -46,9 +46,9 @@ public class ProjectMemberService {
         return userId;
     }
 
-    private Optional<UserDetailDto> getUserById(UUID userId) {
+    private Optional<UserDetailDto> getUserById(UUID accountId) {
         try {
-            ResponseEntity<Map<String, Object>> response = userServiceFeignClient.getUserById(userId);
+            ResponseEntity<Map<String, Object>> response = userServiceFeignClient.getUserByAccountId(accountId);
 
             if (response.getBody() != null && response.getBody().containsKey("data")) {
                 @SuppressWarnings("unchecked")
@@ -59,7 +59,7 @@ public class ProjectMemberService {
             return Optional.empty();
         } catch (Exception e) {
             // Log error and return empty
-            System.err.println("Error fetching user " + userId + " from User Service: " + e.getMessage());
+            System.err.println("Error fetching user by accountId " + accountId + " from User Service: " + e.getMessage());
             return Optional.empty();
         }
     }
@@ -112,7 +112,7 @@ public class ProjectMemberService {
     }
     
     @Transactional
-    private UUID saveOrUpdateMember(UUID projectId, UUID accountId, UUID roleId) {
+    public UUID saveOrUpdateMember(UUID projectId, UUID accountId, UUID roleId) {
         UUID assignedByAccountId = getUserIdFromRequest();
         
         // Validate project exists
@@ -288,7 +288,7 @@ public class ProjectMemberService {
             try {
                 List<ProjectAllowedRole> allowedRoles = projectAllowedRoleService.list(projectId);
                 allowedRoles.stream()
-                    .filter(role -> role.getRoleId().equals(projectMember.getRoleId()))
+                    .filter(role -> role.getId().equals(projectMember.getRoleId()))
                     .findFirst()
                     .ifPresent(role -> dto.setRoleName(role.getRoleName()));
             } catch (Exception e) {
