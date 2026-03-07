@@ -25,9 +25,6 @@ public class Account {
     @Column(name = "id", updatable = false, nullable = false)
     private UUID id;
 
-    @Column(nullable = false, unique = true)
-    private UUID userId;
-
     @Column(nullable = false, unique = true, length = 100)
     private String username;
 

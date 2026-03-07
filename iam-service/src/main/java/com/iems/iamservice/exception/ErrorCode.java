@@ -43,6 +43,7 @@ public enum ErrorCode {
 
     // Authentication Service Errors
     LOGIN_FAILED("Login failed", HttpStatus.UNAUTHORIZED),
+    REGISTRATION_FAILED("Registration failed", HttpStatus.INTERNAL_SERVER_ERROR),
     ACCOUNT_LOCKED("Account is locked", HttpStatus.FORBIDDEN),
     INVALID_CREDENTIALS("Invalid credentials", HttpStatus.UNAUTHORIZED),
     TOKEN_VALIDATION_FAILED("Token validation failed", HttpStatus.UNAUTHORIZED),

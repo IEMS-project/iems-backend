@@ -20,6 +20,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * JWT Authentication Filter
@@ -42,6 +43,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         final String authHeader = request.getHeader("Authorization");
         final String jwt;
         final String username;
+        final UUID userId;
 
         // Check Authorization header
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
@@ -55,23 +57,26 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
             // Get username from token
             username = jwtService.extractUsername(jwt);
+            
+            // Get userId from token
+            userId = jwtService.extractUserId(jwt);
 
             // Check if user is already authenticated
             if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                 // Get user information
                 List<GrantedAuthority> authorities = new ArrayList<>();
 
-// Add roles (prefix ROLE_)
+                // Add roles (prefix ROLE_)
                 jwtService.extractRoles(jwt).forEach(role ->
                         authorities.add(new SimpleGrantedAuthority("ROLE_" + role))
                 );
 
-// Add permissions (no prefix, hoặc bạn có thể dùng PERM_)
+                // Add permissions (no prefix, hoặc bạn có thể dùng PERM_)
                 jwtService.extractPermissions(jwt).forEach(perm ->
                         authorities.add(new SimpleGrantedAuthority(perm))
                 );
 
-                UserDetails userDetails = new JwtUserDetails(username, authorities);
+                UserDetails userDetails = new JwtUserDetails(userId, username, authorities);
 
 
                 // Validate token

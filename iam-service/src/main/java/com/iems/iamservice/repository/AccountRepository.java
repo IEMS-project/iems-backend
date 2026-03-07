@@ -12,11 +12,9 @@ public interface AccountRepository extends JpaRepository<Account, UUID> {
     
     Optional<Account> findByUsername(String username);
     Optional<Account> findByEmail(String email);
-    Optional<Account> findByUserId(UUID userId);
     
     boolean existsByUsername(String username);
     boolean existsByEmail(String email);
-    boolean existsByUserId(UUID userId);
     
     /**
      * Find user by username or email

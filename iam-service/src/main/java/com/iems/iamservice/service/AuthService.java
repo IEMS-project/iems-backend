@@ -2,18 +2,23 @@ package com.iems.iamservice.service;
 
 import com.iems.iamservice.dto.request.LoginRequestDto;
 import com.iems.iamservice.dto.request.RefreshTokenRequestDto;
+import com.iems.iamservice.dto.request.RegisterRequestDto;
 import com.iems.iamservice.dto.response.LoginResponseDto;
+import com.iems.iamservice.dto.response.RegisterResponseDto;
 import com.iems.iamservice.entity.Account;
+import com.iems.iamservice.entity.User;
 import com.iems.iamservice.exception.AppException;
 import com.iems.iamservice.exception.ErrorCode;
 
 import com.iems.iamservice.entity.Permission;
 import com.iems.iamservice.entity.Role;
+import com.iems.iamservice.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,6 +38,8 @@ public class AuthService {
     private final AccountService accountService;
     private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
 
     @Autowired
     private UserRolePermissionService userRolePermissionService;
@@ -68,22 +75,22 @@ public class AuthService {
             accountService.save(user);
 
             // Get roles and permissions information
-            Set<String> roles = userRolePermissionService.getUserRoles(user.getUserId()).stream()
+            Set<String> roles = userRolePermissionService.getUserRoles(user.getId()).stream()
                     .map(Role::getCode)
                     .collect(Collectors.toSet());
 
-            Set<String> permissions = userRolePermissionService.getAllUserPermissions(user.getUserId()).stream()
+            Set<String> permissions = userRolePermissionService.getAllUserPermissions(user.getId()).stream()
                     .map(Permission::getCode)
                     .collect(Collectors.toSet());
 
             // Create tokens with roles and permissions
             String accessToken = jwtService.generateTokenWithUserInfo(
-                    user.getUserId(), user.getUsername(), user.getEmail(), roles, permissions);
+                    user.getId(), user.getUsername(), user.getEmail(), roles, permissions);
             String refreshToken = jwtService.generateRefreshTokenWithUserId(
-                    user.getUserId(), user.getUsername());
+                    user.getId(), user.getUsername());
 
 
-            log.info("Successful login for user: {} with userId: {}", user.getUsername(), user.getUserId());
+            log.info("Successful login for user: {} with accountId: {}", user.getUsername(), user.getId());
 
             return LoginResponseDto.builder()
                     .accessToken(accessToken)
@@ -92,7 +99,7 @@ public class AuthService {
                     .expiresIn(jwtService.getAccessTokenExpiration())
                     .expiresAt(Instant.now().plusSeconds(jwtService.getAccessTokenExpiration()))
                     .userInfo(LoginResponseDto.UserInfoDto.builder()
-                            .userId(user.getUserId())
+                            .userId(user.getId())
                             .username(user.getUsername())
                             .email(user.getEmail())
                             .roles(roles)
@@ -137,21 +144,21 @@ public class AuthService {
             }
 
             // Get roles and permissions information
-            Set<String> roles = userRolePermissionService.getUserRoles(user.getUserId()).stream()
+            Set<String> roles = userRolePermissionService.getUserRoles(user.getId()).stream()
                     .map(Role::getCode)
                     .collect(Collectors.toSet());
 
-            Set<String> permissions = userRolePermissionService.getAllUserPermissions(user.getUserId()).stream()
+            Set<String> permissions = userRolePermissionService.getAllUserPermissions(user.getId()).stream()
                     .map(Permission::getCode)
                     .collect(Collectors.toSet());
 
             // Create new access token with roles and permissions
             String newAccessToken = jwtService.generateTokenWithUserInfo(
-                    user.getUserId(), user.getUsername(), user.getEmail(), roles, permissions);
+                    user.getId(), user.getUsername(), user.getEmail(), roles, permissions);
 
             // Create new refresh token
             String newRefreshToken = jwtService.generateRefreshTokenWithUserId(
-                    user.getUserId(), user.getUsername());
+                    user.getId(), user.getUsername());
 
             log.info("Successful token refresh for user: {}", username);
 
@@ -162,7 +169,7 @@ public class AuthService {
                     .expiresIn(jwtService.getAccessTokenExpiration())
                     .expiresAt(Instant.now().plusSeconds(jwtService.getAccessTokenExpiration()))
                     .userInfo(LoginResponseDto.UserInfoDto.builder()
-                            .userId(user.getUserId())
+                            .userId(user.getId())
                             .username(user.getUsername())
                             .email(user.getEmail())
                             .roles(roles)
@@ -248,6 +255,72 @@ public class AuthService {
         } catch (Exception e) {
             log.warn("Failed to get user info from token: {}", e.getMessage());
             throw new AppException(ErrorCode.TOKEN_VALIDATION_FAILED);
+        }
+    }
+
+    /**
+     * User registration
+     */
+    @Transactional
+    public RegisterResponseDto register(RegisterRequestDto registerRequest) {
+        log.info("Attempting registration for user: {}", registerRequest.getUsername());
+
+        try {
+            // Check if username already exists
+            if (accountService.existsByUsername(registerRequest.getUsername())) {
+                throw new AppException(ErrorCode.USERNAME_ALREADY_EXISTS);
+            }
+
+            // Check if email already exists
+            if (accountService.existsByEmail(registerRequest.getEmail())) {
+                throw new AppException(ErrorCode.EMAIL_ALREADY_EXISTS);
+            }
+
+            // Create Account
+            Account account = Account.builder()
+                    .username(registerRequest.getUsername())
+                    .email(registerRequest.getEmail())
+                    .passwordHash(passwordEncoder.encode(registerRequest.getPassword()))
+                    .enabled(true)
+                    .createdAt(Instant.now())
+                    .build();
+
+            Account savedAccount = accountService.save(account);
+
+            // Create User Profile
+            User user = User.builder()
+                    .accountId(savedAccount.getId())
+                    .firstName(registerRequest.getFirstName())
+                    .lastName(registerRequest.getLastName())
+                    .email(registerRequest.getEmail())
+                    .address(registerRequest.getAddress())
+                    .phone(registerRequest.getPhone())
+                    .dob(registerRequest.getDob())
+                    .gender(registerRequest.getGender())
+                    .image(registerRequest.getImage())
+                    .createdAt(Instant.now())
+                    .build();
+
+            User savedUser = userRepository.save(user);
+
+            log.info("Successfully registered user: {} with accountId: {}", savedAccount.getUsername(), savedAccount.getId());
+
+            return RegisterResponseDto.builder()
+                    .accountId(savedAccount.getId())
+                    .userId(savedUser.getId())
+                    .username(savedAccount.getUsername())
+                    .email(savedAccount.getEmail())
+                    .firstName(savedUser.getFirstName())
+                    .lastName(savedUser.getLastName())
+                    .message("Registration successful. You can now login.")
+                    .build();
+
+        } catch (AppException e) {
+            log.warn("Registration failed for user {}: {}", registerRequest.getUsername(), e.getMessage());
+            throw e;
+        } catch (Exception e) {
+            log.error("Unexpected error during registration for user {}: {}", registerRequest.getUsername(), e.getMessage(), e);
+            throw new AppException(ErrorCode.REGISTRATION_FAILED);
         }
     }
 }
