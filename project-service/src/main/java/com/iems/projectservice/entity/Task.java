@@ -1,8 +1,8 @@
-package com.iems.taskservice.entity;
+package com.iems.projectservice.entity;
 
-import com.iems.taskservice.entity.enums.TaskPriority;
-import com.iems.taskservice.entity.enums.TaskStatus;
-import com.iems.taskservice.entity.enums.TaskType;
+import com.iems.projectservice.entity.enums.TaskPriority;
+import com.iems.projectservice.entity.enums.TaskStatus;
+import com.iems.projectservice.entity.enums.TaskType;
 import jakarta.persistence.*;
 import lombok.Data;
 import org.hibernate.annotations.UuidGenerator;
@@ -29,11 +29,11 @@ public class Task {
     @Column(name = "description", columnDefinition = "text")
     private String description;
 
-    @Column(name = "assigned_to_account_id")
-    private UUID assignedToAccountId;
+    @Column(name = "assigned_to")
+    private UUID assignedTo;
 
-    @Column(name = "created_by_account_id")
-    private UUID createdByAccountId;
+    @Column(name = "created_by")
+    private UUID createdBy;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status")
@@ -59,8 +59,8 @@ public class Task {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    @Column(name = "updated_by_account_id")
-    private UUID updatedByAccountId;
+    @Column(name = "updated_by")
+    private UUID updatedBy;
 
     // Parent task for subtask relation (nullable). If set, this task is a subtask.
     @Column(name = "parent_task_id")

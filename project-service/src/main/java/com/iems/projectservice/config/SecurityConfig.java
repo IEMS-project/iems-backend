@@ -1,7 +1,6 @@
 package com.iems.projectservice.config;
 
 import com.iems.projectservice.security.JwtAuthenticationFilter;
-
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;

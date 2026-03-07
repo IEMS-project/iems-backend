@@ -1,6 +1,8 @@
 package com.iems.projectservice.client;
 
+
 import com.iems.projectservice.config.FeignClientConfig;
+import com.iems.projectservice.dto.request.AccountIdsDto;
 import com.iems.projectservice.dto.request.UserIdsDto;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.http.ResponseEntity;
@@ -24,5 +26,10 @@ public interface UserServiceFeignClient {
     @PostMapping("/users/by-ids")
     ResponseEntity<Map<String, Object>> getUsersByID(
             @RequestBody UserIdsDto request
+    );
+
+    @PostMapping("/users/by-account-ids")
+    ResponseEntity<Map<String, Object>> getUsersByAccountIds(
+            @RequestBody AccountIdsDto request
     );
 }

@@ -117,7 +117,7 @@ public class UserService {
             return repository.findAll()
                     .stream()
                     .map(user -> new UserBasicInfoDto(
-                            user.getId(),
+                            user.getAccountId(),
                             user.getFirstName() + " " + user.getLastName(),
                             user.getEmail(),
                             user.getImage()
@@ -149,7 +149,7 @@ public class UserService {
                     .stream()
                     .filter(user -> accountIds.contains(user.getAccountId()))
                     .map(user -> new UserBasicInfoDto(
-                            user.getId(),
+                            user.getAccountId(),
                             user.getFirstName() + " " + user.getLastName(),
                             user.getEmail(),
                             user.getImage()
@@ -202,6 +202,20 @@ public class UserService {
         }
     }
 
+    public List<UserResponseDto> getUsersByAccountIds(com.iems.iamservice.dto.request.AccountIdsDto request) {
+        try {
+            if (request == null || request.getAccountIds() == null || request.getAccountIds().isEmpty()) {
+                return List.of();
+            }
+            return repository.findByAccountIdIn(request.getAccountIds())
+                    .stream()
+                    .map(this::convertToUserResponse)
+                    .toList();
+        } catch (Exception ex) {
+            throw new AppException(ErrorCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+
     public void deleteUser(UUID id) {
         try {
             if (!repository.existsById(id)) {
@@ -232,7 +246,7 @@ public class UserService {
     public UserResponseDto convertToUserResponse(User user) {
         if (user == null) return null;
         return new UserResponseDto(
-                user.getId(),
+                user.getAccountId(),
                 user.getFirstName(),
                 user.getLastName(),
                 user.getEmail(),

@@ -194,4 +194,18 @@ public class UserController {
                 .data(users)
                 .build());
     }
+
+    @Operation(summary = "Get users by Account IDs", description = "Retrieve multiple users by their Account IDs")
+    @PostMapping("/by-account-ids")
+    public ResponseEntity<ApiResponseDto<List<UserResponseDto>>> getUsersByAccountIds(
+            @RequestBody com.iems.iamservice.dto.request.AccountIdsDto request
+    ) {
+        log.info("Getting users by Account IDs: {}", request.getAccountIds().size());
+        List<UserResponseDto> users = service.getUsersByAccountIds(request);
+        return ResponseEntity.ok(ApiResponseDto.<List<UserResponseDto>>builder()
+                .status("success")
+                .message("Users retrieved successfully")
+                .data(users)
+                .build());
+    }
 }

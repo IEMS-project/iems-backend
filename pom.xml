@@ -37,7 +37,6 @@
 	<modules>
 		<module>eureka-server</module>
 		<module>api-gateway</module>
-        <module>task-service</module>
         <module>iam-service</module>
         <module>document-service</module>
 		<module>project-service</module>

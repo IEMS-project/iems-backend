@@ -1,19 +1,24 @@
-package com.iems.taskservice.service.Impl;
+package com.iems.projectservice.service.Impl;
 
-import com.iems.taskservice.Client.DocumentServiceFeignClient;
-import com.iems.taskservice.Client.ProjectServiceFeignClient;
-import com.iems.taskservice.dto.*;
-import com.iems.taskservice.entity.Task;
-import com.iems.taskservice.entity.TaskAttachment;
-import com.iems.taskservice.entity.TaskStatusHistory;
-import com.iems.taskservice.entity.enums.TaskStatus;
-import com.iems.taskservice.repository.TaskAttachmentRepository;
-import com.iems.taskservice.repository.TaskCommentRepository;
-import com.iems.taskservice.repository.TaskRepository;
-import com.iems.taskservice.repository.TaskStatusHistoryRepository;
-import com.iems.taskservice.service.ITaskService;
-import com.iems.taskservice.service.IUserService;
+import com.iems.projectservice.client.DocumentServiceFeignClient;
+import com.iems.projectservice.dto.request.UserIdsDto;
+import com.iems.projectservice.dto.response.*;
+import com.iems.projectservice.exception.ProjectErrorCode;
+import com.iems.projectservice.service.ProjectService;
+import com.iems.projectservice.dto.*;
+import com.iems.projectservice.dto.request.ProjectIdsDto;
+import com.iems.projectservice.entity.Task;
+import com.iems.projectservice.entity.TaskAttachment;
+import com.iems.projectservice.entity.TaskStatusHistory;
+import com.iems.projectservice.entity.enums.TaskStatus;
+import com.iems.projectservice.repository.TaskAttachmentRepository;
+import com.iems.projectservice.repository.TaskCommentRepository;
+import com.iems.projectservice.repository.TaskRepository;
+import com.iems.projectservice.repository.TaskStatusHistoryRepository;
+import com.iems.projectservice.service.ITaskService;
+import com.iems.projectservice.service.IUserService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,9 +28,8 @@ import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import com.iems.taskservice.exception.AppException;
-import com.iems.taskservice.exception.TaskErrorCode;
-import com.iems.taskservice.entity.TaskComment;
+import com.iems.projectservice.exception.AppException;
+import com.iems.projectservice.entity.TaskComment;
 
 @Service
 @Transactional
@@ -37,7 +41,8 @@ public class TaskService implements ITaskService {
     private TaskStatusHistoryRepository statusHistoryRepository;
     
     @Autowired
-    private ProjectServiceFeignClient projectServiceFeignClient;
+    @Lazy
+    private ProjectService projectService;
 
     @Autowired
     private DocumentServiceFeignClient documentServiceFeignClient;
@@ -59,20 +64,20 @@ public class TaskService implements ITaskService {
         UUID userId = userService.getUserIdFromRequest();
         if (createDto.getStartDate() != null && createDto.getDueDate() != null) {
             if (createDto.getStartDate().isAfter(createDto.getDueDate())) {
-                throw new AppException(TaskErrorCode.INVALID_REQUEST);
+                throw new AppException(ProjectErrorCode.INVALID_REQUEST);
             }
         }
         
         if (createDto.getDueDate() != null && createDto.getDueDate().isBefore(LocalDate.now())) {
-            throw new AppException(TaskErrorCode.INVALID_REQUEST);
+            throw new AppException(ProjectErrorCode.INVALID_REQUEST);
         }
 
         Task task = new Task();
         task.setProjectId(createDto.getProjectId());
         task.setTitle(createDto.getTitle());
         task.setDescription(createDto.getDescription());
-        task.setAssignedToAccountId(createDto.getAssignedToAccountId());
-        task.setCreatedByAccountId(userId);
+        task.setAssignedTo(createDto.getAssignedTo());
+        task.setCreatedBy(userId);
         task.setStatus(TaskStatus.TO_DO); // Default status using enum
         task.setPriority(createDto.getPriority()); // Using enum directly
         task.setTaskType(createDto.getTaskType());
@@ -80,7 +85,7 @@ public class TaskService implements ITaskService {
         if (createDto.getParentTaskId() != null) {
             UUID parentId = createDto.getParentTaskId();
 //            Task parent = taskRepository.findById(parentId)
-//                    .orElseThrow(() -> new AppException(TaskErrorCode.TASK_NOT_FOUND));
+//                    .orElseThrow(() -> new AppException(ProjectErrorCode.TASK_NOT_FOUND));
 //            if (TaskType.EPIC.equals(parent.getTaskType()) || TaskType.TASK.equals(parent.getTaskType()) || TaskType.STORY.equals(parent.getTaskType()) || TaskType.BUG.equals(parent.getTaskType())) {
 //                // Allow any type to be a parent for now; customize if needed
 //            }
@@ -89,8 +94,8 @@ public class TaskService implements ITaskService {
         task.setStartDate(createDto.getStartDate());
         task.setDueDate(createDto.getDueDate());
         task.setPhaseId(createDto.getPhaseId());
-        task.setCreatedByAccountId(userId);
-        task.setUpdatedByAccountId(userId);
+        task.setCreatedBy(userId);
+        task.setUpdatedBy(userId);
         
         Task savedTask = taskRepository.save(task);
         
@@ -106,20 +111,20 @@ public class TaskService implements ITaskService {
         UUID userId = userService.getUserIdFromRequest();
         if (createDto.getStartDate() != null && createDto.getDueDate() != null) {
             if (createDto.getStartDate().isAfter(createDto.getDueDate())) {
-                throw new AppException(TaskErrorCode.INVALID_REQUEST);
+                throw new AppException(ProjectErrorCode.INVALID_REQUEST);
             }
         }
         
         if (createDto.getDueDate() != null && createDto.getDueDate().isBefore(LocalDate.now())) {
-            throw new AppException(TaskErrorCode.INVALID_REQUEST);
+            throw new AppException(ProjectErrorCode.INVALID_REQUEST);
         }
 
         Task task = new Task();
         task.setProjectId(createDto.getProjectId());
         task.setTitle(createDto.getTitle());
         task.setDescription(createDto.getDescription());
-        task.setAssignedToAccountId(createDto.getAssignedToAccountId());
-        task.setCreatedByAccountId(userId);
+        task.setAssignedTo(createDto.getAssignedTo());
+        task.setCreatedBy(userId);
         task.setStatus(TaskStatus.TO_DO); // Default status using enum
         task.setPriority(createDto.getPriority()); // Using enum directly
         task.setTaskType(createDto.getTaskType());
@@ -131,8 +136,8 @@ public class TaskService implements ITaskService {
         task.setStartDate(createDto.getStartDate());
         task.setDueDate(createDto.getDueDate());
         task.setPhaseId(createDto.getPhaseId());
-        task.setCreatedByAccountId(userId);
-        task.setUpdatedByAccountId(userId);
+        task.setCreatedBy(userId);
+        task.setUpdatedBy(userId);
         
         Task savedTask = taskRepository.save(task);
         
@@ -151,7 +156,7 @@ public class TaskService implements ITaskService {
     private void uploadTaskAttachments(UUID taskId, MultipartFile[] files, UUID userId) {
         try {
             // Call document service to upload files to public folder
-            ResponseEntity<ApiResponseDto<List<SimpleFileResponse>>> response = 
+            ResponseEntity<ApiResponseDto<List<SimpleFileResponse>>> response =
                 documentServiceFeignClient.uploadFilesToPublic(files);
             
             if (response != null && response.getBody() != null && response.getBody().getData() != null) {
@@ -180,11 +185,11 @@ public class TaskService implements ITaskService {
         
         // Verify task exists
         Task task = taskRepository.findById(taskId)
-                .orElseThrow(() -> new AppException(TaskErrorCode.TASK_NOT_FOUND));
+                .orElseThrow(() -> new AppException(ProjectErrorCode.TASK_NOT_FOUND));
         
         // Check permission (creator or assigned user can delete attachments)
-        if (!task.getCreatedByAccountId().equals(userId) && !task.getAssignedToAccountId().equals(userId)) {
-            throw new AppException(TaskErrorCode.PERMISSION_DENIED);
+        if (!task.getCreatedBy().equals(userId) && !task.getAssignedTo().equals(userId)) {
+            throw new AppException(ProjectErrorCode.PERMISSION_DENIED);
         }
         
         // Find attachment
@@ -216,11 +221,11 @@ public class TaskService implements ITaskService {
 
         // Verify task exists
         Task task = taskRepository.findById(taskId)
-                .orElseThrow(() -> new AppException(TaskErrorCode.TASK_NOT_FOUND));
+                .orElseThrow(() -> new AppException(ProjectErrorCode.TASK_NOT_FOUND));
 
         // Check permission (creator can delete task)
-        if (!task.getCreatedByAccountId().equals(userId)) {
-            throw new AppException(TaskErrorCode.PERMISSION_DENIED);
+        if (!task.getCreatedBy().equals(userId)) {
+            throw new AppException(ProjectErrorCode.PERMISSION_DENIED);
         }
 
         // Delete all attachments first
@@ -259,17 +264,17 @@ public class TaskService implements ITaskService {
     @Override
     public TaskResponseDto assignTask(UUID taskId, UUID newAssigneeId) {
         Task task = taskRepository.findById(taskId)
-                .orElseThrow(() -> new AppException(TaskErrorCode.TASK_NOT_FOUND));
+                .orElseThrow(() -> new AppException(ProjectErrorCode.TASK_NOT_FOUND));
         UUID userId = userService.getUserIdFromRequest();
         // Check if user has permission to reassign (project manager or task creator)
-        if (!task.getCreatedByAccountId().equals(userId)) {
+        if (!task.getCreatedBy().equals(userId)) {
             // TODO: Add project role check here
-            throw new AppException(TaskErrorCode.PERMISSION_DENIED);
+            throw new AppException(ProjectErrorCode.PERMISSION_DENIED);
         }
         
-        UUID oldAssignee = task.getAssignedToAccountId();
-        task.setAssignedToAccountId(newAssigneeId);
-        task.setUpdatedByAccountId(userId);
+        UUID oldAssignee = task.getAssignedTo();
+        task.setAssignedTo(newAssigneeId);
+        task.setUpdatedBy(userId);
         
         Task savedTask = taskRepository.save(task);
         
@@ -286,7 +291,7 @@ public class TaskService implements ITaskService {
         UUID userId = userService.getUserIdFromRequest();
 
         // Lấy danh sách task của user
-        List<Task> tasks = taskRepository.findByAssignedToAccountId(userId);
+        List<Task> tasks = taskRepository.findByAssignedTo(userId);
 
         // 1. Lấy tất cả projectId không trùng
         Set<UUID> projectIds = tasks.stream()
@@ -298,10 +303,7 @@ public class TaskService implements ITaskService {
         projectIdsDto.setIds(projectIds);
         System.out.println(projectIdsDto);
         // 2. Gọi project-service lấy projectName 1 lần
-        ResponseEntity<ApiResponseDto<List<ProjectInfoResponse>>> response = projectServiceFeignClient.getProjectsByID(projectIdsDto);
-        List<ProjectInfoResponse> projectNameList = response != null && response.getBody() != null && response.getBody().getData() != null
-                ? response.getBody().getData()
-                : new ArrayList<>();
+        List<ProjectInfoResponse> projectNameList = projectService.getProjectsByID(projectIdsDto);
 
         // 3. Map projectId → projectName
         Map<UUID, String> projectNameMap = projectNameList.stream()
@@ -355,12 +357,12 @@ public class TaskService implements ITaskService {
     @Override
     public TaskResponseDto updateTaskStatus(UUID taskId, String newStatusStr, String comment) {
         Task task = taskRepository.findById(taskId)
-                .orElseThrow(() -> new AppException(TaskErrorCode.TASK_NOT_FOUND));
+                .orElseThrow(() -> new AppException(ProjectErrorCode.TASK_NOT_FOUND));
         UUID userId = userService.getUserIdFromRequest();
         // Check if user is assigned to this task or has permission
-        if (!task.getAssignedToAccountId().equals(userId)) {
+        if (!task.getAssignedTo().equals(userId)) {
             // TODO: Add project role check here
-            throw new AppException(TaskErrorCode.PERMISSION_DENIED);
+            throw new AppException(ProjectErrorCode.PERMISSION_DENIED);
         }
         
         // Convert string to enum
@@ -368,17 +370,17 @@ public class TaskService implements ITaskService {
         try {
             newStatus = TaskStatus.valueOf(newStatusStr);
         } catch (IllegalArgumentException e) {
-            throw new AppException(TaskErrorCode.INVALID_REQUEST);
+            throw new AppException(ProjectErrorCode.INVALID_REQUEST);
         }
         
         // Validate status transition
         if (!isValidStatusTransition(task.getStatus(), newStatus)) {
-            throw new AppException(TaskErrorCode.INVALID_REQUEST);
+            throw new AppException(ProjectErrorCode.INVALID_REQUEST);
         }
         
         TaskStatus oldStatus = task.getStatus();
         task.setStatus(newStatus);
-        task.setUpdatedByAccountId(userId);
+        task.setUpdatedBy(userId);
         
         Task savedTask = taskRepository.save(task);
         
@@ -394,7 +396,7 @@ public class TaskService implements ITaskService {
         try {
             newStatus = TaskStatus.valueOf(newStatusStr);
         } catch (IllegalArgumentException e) {
-            throw new AppException(TaskErrorCode.INVALID_REQUEST);
+            throw new AppException(ProjectErrorCode.INVALID_REQUEST);
         }
         UUID userId = userService.getUserIdFromRequest();
         List<TaskBulkUpdateItemDto> updated = new ArrayList<>();
@@ -402,7 +404,7 @@ public class TaskService implements ITaskService {
             Task task = taskRepository.findById(id).orElse(null);
             if (task == null) continue;
             // Permissions: creator or assignee
-            if (!task.getCreatedByAccountId().equals(userId) && !task.getAssignedToAccountId().equals(userId)) {
+            if (!task.getCreatedBy().equals(userId) && !task.getAssignedTo().equals(userId)) {
                 continue;
             }
             TaskStatus oldStatus = task.getStatus();
@@ -410,7 +412,7 @@ public class TaskService implements ITaskService {
                 continue;
             }
             task.setStatus(newStatus);
-            task.setUpdatedByAccountId(userId);
+            task.setUpdatedBy(userId);
             Task saved = taskRepository.save(task);
             createStatusHistoryWithOldNew(saved.getId(), oldStatus, newStatus, userId);
             TaskBulkUpdateItemDto item = new TaskBulkUpdateItemDto();
@@ -425,10 +427,10 @@ public class TaskService implements ITaskService {
     @Override
     public TaskCommentDto addComment(UUID taskId, String content, UUID parentCommentId) {
         if (content == null || content.isBlank()) {
-            throw new AppException(TaskErrorCode.INVALID_REQUEST);
+            throw new AppException(ProjectErrorCode.INVALID_REQUEST);
         }
         Task task = taskRepository.findById(taskId)
-                .orElseThrow(() -> new AppException(TaskErrorCode.TASK_NOT_FOUND));
+                .orElseThrow(() -> new AppException(ProjectErrorCode.TASK_NOT_FOUND));
         UUID userId = userService.getUserIdFromRequest();
         TaskComment c = new TaskComment();
         c.setTaskId(task.getId());
@@ -448,13 +450,13 @@ public class TaskService implements ITaskService {
     @Override
     public TaskCommentDto updateComment(UUID commentId, String content) {
         if (content == null || content.isBlank()) {
-            throw new AppException(TaskErrorCode.INVALID_REQUEST);
+            throw new AppException(ProjectErrorCode.INVALID_REQUEST);
         }
         TaskComment comment = taskCommentRepository.findById(commentId)
-                .orElseThrow(() -> new AppException(TaskErrorCode.TASK_NOT_FOUND));
+                .orElseThrow(() -> new AppException(ProjectErrorCode.TASK_NOT_FOUND));
         UUID userId = userService.getUserIdFromRequest();
         if (!comment.getAuthorId().equals(userId)) {
-            throw new AppException(TaskErrorCode.PERMISSION_DENIED);
+            throw new AppException(ProjectErrorCode.PERMISSION_DENIED);
         }
         comment.setContent(content);
         TaskComment saved = taskCommentRepository.save(comment);
@@ -464,10 +466,10 @@ public class TaskService implements ITaskService {
     @Override
     public void deleteComment(UUID commentId) {
         TaskComment comment = taskCommentRepository.findById(commentId)
-                .orElseThrow(() -> new AppException(TaskErrorCode.TASK_NOT_FOUND));
+                .orElseThrow(() -> new AppException(ProjectErrorCode.TASK_NOT_FOUND));
         UUID userId = userService.getUserIdFromRequest();
         if (!comment.getAuthorId().equals(userId)) {
-            throw new AppException(TaskErrorCode.PERMISSION_DENIED);
+            throw new AppException(ProjectErrorCode.PERMISSION_DENIED);
         }
         taskCommentRepository.delete(comment);
     }
@@ -532,23 +534,23 @@ public class TaskService implements ITaskService {
     @Override
     public TaskResponseDto updateTaskPriorityAndDates(UUID taskId, UpdateTaskDto updateDto) {
         Task task = taskRepository.findById(taskId)
-                .orElseThrow(() -> new AppException(TaskErrorCode.TASK_NOT_FOUND));
+                .orElseThrow(() -> new AppException(ProjectErrorCode.TASK_NOT_FOUND));
         UUID userId = userService.getUserIdFromRequest();
         // Check permissions
-        if (!task.getCreatedByAccountId().equals(userId) && !task.getAssignedToAccountId().equals(userId)) {
+        if (!task.getCreatedBy().equals(userId) && !task.getAssignedTo().equals(userId)) {
             // TODO: Add project role check here
-            throw new AppException(TaskErrorCode.PERMISSION_DENIED);
+            throw new AppException(ProjectErrorCode.PERMISSION_DENIED);
         }
         
         // Validate dates
         if (updateDto.getStartDate() != null && updateDto.getDueDate() != null) {
             if (updateDto.getStartDate().isAfter(updateDto.getDueDate())) {
-                throw new AppException(TaskErrorCode.INVALID_REQUEST);
+                throw new AppException(ProjectErrorCode.INVALID_REQUEST);
             }
         }
         
         if (updateDto.getDueDate() != null && updateDto.getDueDate().isBefore(LocalDate.now())) {
-            throw new AppException(TaskErrorCode.INVALID_REQUEST);
+            throw new AppException(ProjectErrorCode.INVALID_REQUEST);
         }
         
         boolean hasChanges = false;
@@ -569,7 +571,7 @@ public class TaskService implements ITaskService {
         }
         
         if (hasChanges) {
-            task.setUpdatedByAccountId(userId);
+            task.setUpdatedBy(userId);
             Task savedTask = taskRepository.save(task);
             
             // Create status history for the change
@@ -625,12 +627,9 @@ public class TaskService implements ITaskService {
         // Get project info ONCE instead of calling FeignClient for each task
         String projectName = null;
         try {
-            ResponseEntity<Map<String, Object>> res = projectServiceFeignClient.getProjectById(projectId);
-            if (res.getBody() != null && res.getBody().containsKey("data")) {
-                @SuppressWarnings("unchecked")
-                Map<String, Object> p = (Map<String, Object>) res.getBody().get("data");
-                Object name = p.get("name");
-                projectName = name != null ? name.toString() : null;
+            ProjectDetailResponseDto projectDetail = projectService.getProjectById(projectId);
+            if (projectDetail != null) {
+                projectName = projectDetail.getName();
             }
         } catch (Exception ignored) {}
         
@@ -652,11 +651,11 @@ public class TaskService implements ITaskService {
     @Override
     public TaskUpdateResultDto updateTask(UUID taskId, UpdateTaskDto updateDto) {
         Task task = taskRepository.findById(taskId)
-                .orElseThrow(() -> new AppException(TaskErrorCode.TASK_NOT_FOUND));
+                .orElseThrow(() -> new AppException(ProjectErrorCode.TASK_NOT_FOUND));
         UUID userId = userService.getUserIdFromRequest();
         // Permissions: creator or current assignee can update; extend with project roles as needed
-        if (!task.getCreatedByAccountId().equals(userId) && !task.getAssignedToAccountId().equals(userId)) {
-            throw new AppException(TaskErrorCode.PERMISSION_DENIED);
+        if (!task.getCreatedBy().equals(userId) && !task.getAssignedTo().equals(userId)) {
+            throw new AppException(ProjectErrorCode.PERMISSION_DENIED);
         }
 
         boolean hasChanges = false;
@@ -672,8 +671,8 @@ public class TaskService implements ITaskService {
             hasChanges = true;
         }
 
-        if (updateDto.getAssignedToAccountId() != null && !updateDto.getAssignedToAccountId().equals(task.getAssignedToAccountId())) {
-            task.setAssignedToAccountId(updateDto.getAssignedToAccountId());
+        if (updateDto.getAssignedTo() != null && !updateDto.getAssignedTo().equals(task.getAssignedTo())) {
+            task.setAssignedTo(updateDto.getAssignedTo());
             hasChanges = true;
         }
 
@@ -695,7 +694,7 @@ public class TaskService implements ITaskService {
         if (updateDto.getStatus() != null && !updateDto.getStatus().equals(task.getStatus())) {
             // validate transition
             if (!isValidStatusTransition(task.getStatus(), updateDto.getStatus())) {
-                throw new AppException(TaskErrorCode.INVALID_REQUEST);
+                throw new AppException(ProjectErrorCode.INVALID_REQUEST);
             }
             task.setStatus(updateDto.getStatus());
             hasChanges = true;
@@ -710,7 +709,7 @@ public class TaskService implements ITaskService {
         if (updateDto.getParentTaskId() != null && !updateDto.getParentTaskId().equals(task.getParentTaskId())) {
             // Validate parent exists
             UUID parentId = updateDto.getParentTaskId();
-            taskRepository.findById(parentId).orElseThrow(() -> new AppException(TaskErrorCode.TASK_NOT_FOUND));
+            taskRepository.findById(parentId).orElseThrow(() -> new AppException(ProjectErrorCode.TASK_NOT_FOUND));
             task.setParentTaskId(parentId);
             hasChanges = true;
         }
@@ -721,7 +720,7 @@ public class TaskService implements ITaskService {
         }
 
         if (hasChanges) {
-            task.setUpdatedByAccountId(userId);
+            task.setUpdatedBy(userId);
             Task saved = taskRepository.save(task);
             // Only write history if status actually changed
             if (updateDto.getStatus() != null && !oldStatus.equals(saved.getStatus())) {
@@ -741,11 +740,11 @@ public class TaskService implements ITaskService {
     // Generic update with attachments: title/description/assignedTo/priority/dates/status
     public TaskUpdateResultDto updateTask(UUID taskId, UpdateTaskDto updateDto, MultipartFile[] files) {
         Task task = taskRepository.findById(taskId)
-                .orElseThrow(() -> new AppException(TaskErrorCode.TASK_NOT_FOUND));
+                .orElseThrow(() -> new AppException(ProjectErrorCode.TASK_NOT_FOUND));
         UUID userId = userService.getUserIdFromRequest();
         // Permissions: creator or current assignee can update; extend with project roles as needed
-        if (!task.getCreatedByAccountId().equals(userId) && !task.getAssignedToAccountId().equals(userId)) {
-            throw new AppException(TaskErrorCode.PERMISSION_DENIED);
+        if (!task.getCreatedBy().equals(userId) && !task.getAssignedTo().equals(userId)) {
+            throw new AppException(ProjectErrorCode.PERMISSION_DENIED);
         }
 
         boolean hasChanges = false;
@@ -761,8 +760,8 @@ public class TaskService implements ITaskService {
             hasChanges = true;
         }
 
-        if (updateDto.getAssignedToAccountId() != null && !updateDto.getAssignedToAccountId().equals(task.getAssignedToAccountId())) {
-            task.setAssignedToAccountId(updateDto.getAssignedToAccountId());
+        if (updateDto.getAssignedTo() != null && !updateDto.getAssignedTo().equals(task.getAssignedTo())) {
+            task.setAssignedTo(updateDto.getAssignedTo());
             hasChanges = true;
         }
 
@@ -784,7 +783,7 @@ public class TaskService implements ITaskService {
         if (updateDto.getStatus() != null && !updateDto.getStatus().equals(task.getStatus())) {
             // validate transition
             if (!isValidStatusTransition(task.getStatus(), updateDto.getStatus())) {
-                throw new AppException(TaskErrorCode.INVALID_REQUEST);
+                throw new AppException(ProjectErrorCode.INVALID_REQUEST);
             }
             task.setStatus(updateDto.getStatus());
             hasChanges = true;
@@ -799,7 +798,7 @@ public class TaskService implements ITaskService {
         if (updateDto.getParentTaskId() != null && !updateDto.getParentTaskId().equals(task.getParentTaskId())) {
             // Validate parent exists
             UUID parentId = updateDto.getParentTaskId();
-            taskRepository.findById(parentId).orElseThrow(() -> new AppException(TaskErrorCode.TASK_NOT_FOUND));
+            taskRepository.findById(parentId).orElseThrow(() -> new AppException(ProjectErrorCode.TASK_NOT_FOUND));
             task.setParentTaskId(parentId);
             hasChanges = true;
         }
@@ -810,7 +809,7 @@ public class TaskService implements ITaskService {
         }
 
         if (hasChanges) {
-            task.setUpdatedByAccountId(userId);
+            task.setUpdatedBy(userId);
             Task saved = taskRepository.save(task);
             // Only write history if status actually changed
             if (updateDto.getStatus() != null && !oldStatus.equals(saved.getStatus())) {
@@ -857,17 +856,17 @@ public class TaskService implements ITaskService {
 
     // Helper methods
     @Override
-    public void createStatusHistory(Task task, TaskStatus newStatus, UUID updatedByAccountId, String _comment) {
+    public void createStatusHistory(Task task, TaskStatus newStatus, UUID updatedBy, String _comment) {
         createStatusHistoryWithOldNew(task.getId(), task.getStatus(), newStatus, updatedBy);
     }
 
     @Override
-    public void createStatusHistoryWithOldNew(UUID taskId, TaskStatus oldStatus, TaskStatus newStatus, UUID updatedByAccountId) {
+    public void createStatusHistoryWithOldNew(UUID taskId, TaskStatus oldStatus, TaskStatus newStatus, UUID updatedBy) {
         TaskStatusHistory history = new TaskStatusHistory();
         history.setTaskId(taskId);
         history.setOldStatus(oldStatus);
         history.setNewStatus(newStatus);
-        history.setUpdatedByAccountId(updatedBy);
+        history.setUpdatedBy(updatedBy);
         statusHistoryRepository.save(history);
     }
 
@@ -889,9 +888,9 @@ public class TaskService implements ITaskService {
     private Map<UUID, UserDetailDto> getUserMapFromTasks(List<Task> tasks) {
         Set<UUID> userIds = tasks.stream()
                 .flatMap(task -> Stream.of(
-                        task.getAssignedToAccountId(),
-                        task.getCreatedByAccountId(),
-                        task.getUpdatedByAccountId()
+                        task.getAssignedTo(),
+                        task.getCreatedBy(),
+                        task.getUpdatedBy()
                 ))
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
@@ -924,24 +923,24 @@ public class TaskService implements ITaskService {
         dto.setPhaseId(task.getPhaseId());
 
         // AssignedTo
-        dto.setAssignedToAccountId(task.getAssignedToAccountId());
-        userService.getUserById(task.getAssignedToAccountId()).ifPresent(user -> {
+        dto.setAssignedTo(task.getAssignedTo());
+        userService.getUserById(task.getAssignedTo()).ifPresent(user -> {
             dto.setAssignedToName(user.getFirstName() + " " + user.getLastName());
             dto.setAssignedToEmail(user.getEmail());
             dto.setAssignedToImage(user.getImage());
         });
 
         // CreatedBy
-        dto.setCreatedByAccountId(task.getCreatedByAccountId());
-        userService.getUserById(task.getCreatedByAccountId()).ifPresent(user -> {
+        dto.setCreatedBy(task.getCreatedBy());
+        userService.getUserById(task.getCreatedBy()).ifPresent(user -> {
             dto.setCreatedByName(user.getFirstName() + " " + user.getLastName());
             dto.setCreatedByEmail(user.getEmail());
             dto.setCreatedByImage(user.getImage());
         });
 
         // UpdatedBy
-        dto.setUpdatedByAccountId(task.getUpdatedByAccountId());
-        userService.getUserById(task.getUpdatedByAccountId()).ifPresent(user -> {
+        dto.setUpdatedBy(task.getUpdatedBy());
+        userService.getUserById(task.getUpdatedBy()).ifPresent(user -> {
             dto.setUpdatedByName(user.getFirstName() + " " + user.getLastName());
             dto.setUpdatedByEmail(user.getEmail());
             dto.setUpdatedByImage(user.getImage());
@@ -949,14 +948,9 @@ public class TaskService implements ITaskService {
 
         // Project name via PROJECT-SERVICE
         try {
-            ResponseEntity<Map<String, Object>> res = projectServiceFeignClient.getProjectById(task.getProjectId());
-            if (res.getBody() != null && res.getBody().containsKey("data")) {
-                @SuppressWarnings("unchecked")
-                Map<String, Object> project = (Map<String, Object>) res.getBody().get("data");
-                Object name = project.get("name");
-                if (name != null) {
-                    dto.setProjectName(name.toString());
-                }
+            ProjectDetailResponseDto projectDetail = projectService.getProjectById(task.getProjectId());
+            if (projectDetail != null && projectDetail.getName() != null) {
+                dto.setProjectName(projectDetail.getName());
             }
         } catch (Exception ignored) {
         }
@@ -995,8 +989,8 @@ public class TaskService implements ITaskService {
         dto.setPhaseId(task.getPhaseId());
 
         // AssignedTo
-        dto.setAssignedToAccountId(task.getAssignedToAccountId());
-        UserDetailDto assignedUser = userMap.get(task.getAssignedToAccountId());
+        dto.setAssignedTo(task.getAssignedTo());
+        UserDetailDto assignedUser = userMap.get(task.getAssignedTo());
         if (assignedUser != null) {
             dto.setAssignedToName(assignedUser.getFirstName() + " " + assignedUser.getLastName());
             dto.setAssignedToEmail(assignedUser.getEmail());
@@ -1004,8 +998,8 @@ public class TaskService implements ITaskService {
         }
 
         // CreatedBy
-        dto.setCreatedByAccountId(task.getCreatedByAccountId());
-        UserDetailDto createdUser = userMap.get(task.getCreatedByAccountId());
+        dto.setCreatedBy(task.getCreatedBy());
+        UserDetailDto createdUser = userMap.get(task.getCreatedBy());
         if (createdUser != null) {
             dto.setCreatedByName(createdUser.getFirstName() + " " + createdUser.getLastName());
             dto.setCreatedByEmail(createdUser.getEmail());
@@ -1013,8 +1007,8 @@ public class TaskService implements ITaskService {
         }
 
         // UpdatedBy
-        dto.setUpdatedByAccountId(task.getUpdatedByAccountId());
-        UserDetailDto updatedUser = userMap.get(task.getUpdatedByAccountId());
+        dto.setUpdatedBy(task.getUpdatedBy());
+        UserDetailDto updatedUser = userMap.get(task.getUpdatedBy());
         if (updatedUser != null) {
             dto.setUpdatedByName(updatedUser.getFirstName() + " " + updatedUser.getLastName());
             dto.setUpdatedByEmail(updatedUser.getEmail());
@@ -1023,11 +1017,10 @@ public class TaskService implements ITaskService {
 
         // Project name via PROJECT-SERVICE
         try {
-            ResponseEntity<Map<String, Object>> res = projectServiceFeignClient.getProjectById(task.getProjectId());
-            if (res.getBody() != null && res.getBody().containsKey("data")) {
+            ProjectDetailResponseDto res = projectService.getProjectById(task.getProjectId());
+            if (res != null && res.getName() != null) {
                 @SuppressWarnings("unchecked")
-                Map<String, Object> project = (Map<String, Object>) res.getBody().get("data");
-                Object name = project.get("name");
+                Object name = res.getName();
                 if (name != null) {
                     dto.setProjectName(name.toString());
                 }
@@ -1057,12 +1050,9 @@ public class TaskService implements ITaskService {
         TaskNestedResponseDto.ProjectInfo project = new TaskNestedResponseDto.ProjectInfo();
         project.setId(task.getProjectId());
         try {
-            ResponseEntity<Map<String, Object>> res = projectServiceFeignClient.getProjectById(task.getProjectId());
-            if (res.getBody() != null && res.getBody().containsKey("data")) {
-                @SuppressWarnings("unchecked")
-                Map<String, Object> p = (Map<String, Object>) res.getBody().get("data");
-                Object name = p.get("name");
-                project.setName(name != null ? name.toString() : null);
+            ProjectDetailResponseDto projectDetail = projectService.getProjectById(task.getProjectId());
+            if (projectDetail != null) {
+                project.setName(projectDetail.getName());
             }
         } catch (Exception ignored) {}
         dto.setProject(project);
@@ -1080,28 +1070,28 @@ public class TaskService implements ITaskService {
         dto.setUpdatedAt(task.getUpdatedAt());
 
         TaskNestedResponseDto.UserInfo assigned = new TaskNestedResponseDto.UserInfo();
-        assigned.setId(task.getAssignedToAccountId());
-        userService.getUserById(task.getAssignedToAccountId()).ifPresent(u -> {
+        assigned.setId(task.getAssignedTo());
+        userService.getUserById(task.getAssignedTo()).ifPresent(u -> {
             assigned.setName(u.getFirstName() + " " + u.getLastName());
             assigned.setImage(u.getImage());
         });
-        dto.setAssignedToAccountId(assigned);
+        dto.setAssignedTo(assigned);
 
         TaskNestedResponseDto.UserInfo created = new TaskNestedResponseDto.UserInfo();
-        created.setId(task.getCreatedByAccountId());
-        userService.getUserById(task.getCreatedByAccountId()).ifPresent(u -> {
+        created.setId(task.getCreatedBy());
+        userService.getUserById(task.getCreatedBy()).ifPresent(u -> {
             created.setName(u.getFirstName() + " " + u.getLastName());
             created.setImage(u.getImage());
         });
-        dto.setCreatedByAccountId(created);
+        dto.setCreatedBy(created);
 
         TaskNestedResponseDto.UserInfo updated = new TaskNestedResponseDto.UserInfo();
-        updated.setId(task.getUpdatedByAccountId());
-        userService.getUserById(task.getUpdatedByAccountId()).ifPresent(u -> {
+        updated.setId(task.getUpdatedBy());
+        userService.getUserById(task.getUpdatedBy()).ifPresent(u -> {
             updated.setName(u.getFirstName() + " " + u.getLastName());
             updated.setImage(u.getImage());
         });
-        dto.setUpdatedByAccountId(updated);
+        dto.setUpdatedBy(updated);
 
         // Attachments
         List<TaskAttachment> attachments = taskAttachmentRepository.findByTaskId(task.getId());
@@ -1130,17 +1120,14 @@ public class TaskService implements ITaskService {
         dto.setId(task.getId());
         TaskNestedResponseDto.ProjectInfo project = new TaskNestedResponseDto.ProjectInfo();
         project.setId(task.getProjectId());
-        // Use provided projectName if available, otherwise fallback to FeignClient call
+        // Use provided projectName if available, otherwise fallback to ProjectService call
         if (projectName != null) {
             project.setName(projectName);
         } else {
             try {
-                ResponseEntity<Map<String, Object>> res = projectServiceFeignClient.getProjectById(task.getProjectId());
-                if (res.getBody() != null && res.getBody().containsKey("data")) {
-                    @SuppressWarnings("unchecked")
-                    Map<String, Object> p = (Map<String, Object>) res.getBody().get("data");
-                    Object name = p.get("name");
-                    project.setName(name != null ? name.toString() : null);
+                ProjectDetailResponseDto projectDetail = projectService.getProjectById(task.getProjectId());
+                if (projectDetail != null) {
+                    project.setName(projectDetail.getName());
                 }
             } catch (Exception ignored) {}
         }
@@ -1159,31 +1146,31 @@ public class TaskService implements ITaskService {
         dto.setUpdatedAt(task.getUpdatedAt());
 
         TaskNestedResponseDto.UserInfo assigned = new TaskNestedResponseDto.UserInfo();
-        assigned.setId(task.getAssignedToAccountId());
-        UserDetailDto assignedUser = userMap.get(task.getAssignedToAccountId());
+        assigned.setId(task.getAssignedTo());
+        UserDetailDto assignedUser = userMap.get(task.getAssignedTo());
         if (assignedUser != null) {
             assigned.setName(assignedUser.getFirstName() + " " + assignedUser.getLastName());
             assigned.setImage(assignedUser.getImage());
         }
-        dto.setAssignedToAccountId(assigned);
+        dto.setAssignedTo(assigned);
 
         TaskNestedResponseDto.UserInfo created = new TaskNestedResponseDto.UserInfo();
-        created.setId(task.getCreatedByAccountId());
-        UserDetailDto createdUser = userMap.get(task.getCreatedByAccountId());
+        created.setId(task.getCreatedBy());
+        UserDetailDto createdUser = userMap.get(task.getCreatedBy());
         if (createdUser != null) {
             created.setName(createdUser.getFirstName() + " " + createdUser.getLastName());
             created.setImage(createdUser.getImage());
         }
-        dto.setCreatedByAccountId(created);
+        dto.setCreatedBy(created);
 
         TaskNestedResponseDto.UserInfo updated = new TaskNestedResponseDto.UserInfo();
-        updated.setId(task.getUpdatedByAccountId());
-        UserDetailDto updatedUser = userMap.get(task.getUpdatedByAccountId());
+        updated.setId(task.getUpdatedBy());
+        UserDetailDto updatedUser = userMap.get(task.getUpdatedBy());
         if (updatedUser != null) {
             updated.setName(updatedUser.getFirstName() + " " + updatedUser.getLastName());
             updated.setImage(updatedUser.getImage());
         }
-        dto.setUpdatedByAccountId(updated);
+        dto.setUpdatedBy(updated);
 
         // Attachments
         List<TaskAttachment> attachments = taskAttachmentRepository.findByTaskId(task.getId());
@@ -1246,5 +1233,3 @@ public class TaskService implements ITaskService {
         return result;
     }
 }
-
-

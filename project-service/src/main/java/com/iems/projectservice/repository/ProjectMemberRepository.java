@@ -16,32 +16,32 @@ public interface ProjectMemberRepository extends JpaRepository<ProjectMember, UU
     
     List<ProjectMember> findByProject(Project project);
     
-    Optional<ProjectMember> findByProjectAndUserId(Project project, UUID userId);
+    Optional<ProjectMember> findByProjectAndAccountId(Project project, UUID accountId);
     
-    List<ProjectMember> findByUserId(UUID userId);
+    List<ProjectMember> findByAccountId(UUID accountId);
     
     List<ProjectMember> findByProjectAndRoleId(Project project, UUID roleId);
     
-    @Query("SELECT pm FROM ProjectMember pm WHERE pm.project.id = :projectId AND pm.userId = :userId")
-    Optional<ProjectMember> findMemberByProjectAndUser(@Param("projectId") UUID projectId, 
-                                                       @Param("userId") UUID userId);
+    @Query("SELECT pm FROM ProjectMember pm WHERE pm.project.id = :projectId AND pm.accountId = :accountId")
+    Optional<ProjectMember> findMemberByProjectAndAccount(@Param("projectId") UUID projectId, 
+                                                          @Param("accountId") UUID accountId);
     
     @Query("SELECT pm FROM ProjectMember pm WHERE pm.project.id = :projectId")
     List<ProjectMember> findByProjectId(@Param("projectId") UUID projectId);
     
-    @Query("SELECT pm FROM ProjectMember pm WHERE pm.project.id = :projectId AND pm.userId = :userId")
-    Optional<ProjectMember> findByProjectIdAndUserId(@Param("projectId") UUID projectId, 
-                                                     @Param("userId") UUID userId);
+    @Query("SELECT pm FROM ProjectMember pm WHERE pm.project.id = :projectId AND pm.accountId = :accountId")
+    Optional<ProjectMember> findByProjectIdAndAccountId(@Param("projectId") UUID projectId, 
+                                                        @Param("accountId") UUID accountId);
     
     @Query("SELECT pm FROM ProjectMember pm WHERE pm.project.id = :projectId AND pm.roleId = :roleId")
     List<ProjectMember> findByProjectIdAndRoleId(@Param("projectId") UUID projectId, 
                                                  @Param("roleId") UUID roleId);
     
-    @Query("SELECT CASE WHEN COUNT(pm) > 0 THEN true ELSE false END FROM ProjectMember pm WHERE pm.project.id = :projectId AND pm.userId = :userId")
-    boolean existsByProjectIdAndUserId(@Param("projectId") UUID projectId, 
-                                       @Param("userId") UUID userId);
+    @Query("SELECT CASE WHEN COUNT(pm) > 0 THEN true ELSE false END FROM ProjectMember pm WHERE pm.project.id = :projectId AND pm.accountId = :accountId")
+    boolean existsByProjectIdAndAccountId(@Param("projectId") UUID projectId, 
+                                          @Param("accountId") UUID accountId);
     
-    @Query("DELETE FROM ProjectMember pm WHERE pm.project.id = :projectId AND pm.userId = :userId")
-    void deleteByProjectIdAndUserId(@Param("projectId") UUID projectId, 
-                                    @Param("userId") UUID userId);
+    @Query("DELETE FROM ProjectMember pm WHERE pm.project.id = :projectId AND pm.accountId = :accountId")
+    void deleteByProjectIdAndAccountId(@Param("projectId") UUID projectId, 
+                                       @Param("accountId") UUID accountId);
 }
