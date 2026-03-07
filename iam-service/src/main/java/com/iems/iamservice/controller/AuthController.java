@@ -3,7 +3,9 @@ package com.iems.iamservice.controller;
 import com.iems.iamservice.dto.ApiResponseDto;
 import com.iems.iamservice.dto.request.LoginRequestDto;
 import com.iems.iamservice.dto.request.RefreshTokenRequestDto;
+import com.iems.iamservice.dto.request.RegisterRequestDto;
 import com.iems.iamservice.dto.response.LoginResponseDto;
+import com.iems.iamservice.dto.response.RegisterResponseDto;
 import com.iems.iamservice.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -28,6 +30,25 @@ import jakarta.servlet.http.HttpServletResponse;
 public class AuthController {
 
     private final AuthService authService;
+
+    /**
+     * User Registration
+     */
+    @PostMapping("/register")
+    @Operation(summary = "Register new user", description = "Register a new user account with profile information")
+    public ResponseEntity<ApiResponseDto<RegisterResponseDto>> register(@Valid @RequestBody RegisterRequestDto registerRequest) {
+        log.info("Registration request for username: {}", registerRequest.getUsername());
+        
+        RegisterResponseDto response = authService.register(registerRequest);
+
+        return ResponseEntity.ok(
+                ApiResponseDto.<RegisterResponseDto>builder()
+                        .status("success")
+                        .message("Registration successful")
+                        .data(response)
+                        .build()
+        );
+    }
 
     /**
      * Login

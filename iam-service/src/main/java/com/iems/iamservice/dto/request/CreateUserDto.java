@@ -1,30 +1,30 @@
 package com.iems.iamservice.dto.request;
 
-import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
+import com.iems.iamservice.entity.enums.ContractType;
+import com.iems.iamservice.entity.enums.Gender;
+import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
-import java.util.Set;
-import java.util.UUID;
+import java.util.Date;
 
 @Data
+@AllArgsConstructor
+@NoArgsConstructor
 public class CreateUserDto {
-    
-    @NotNull(message = "User ID cannot be null")
-    private UUID userId; // ID from user-service
-    
-    @NotBlank(message = "Username cannot be blank")
-    private String username;
-    
-    @NotBlank(message = "Email cannot be blank")
-    @Email(message = "Email is not valid")
+    private String firstName;
+    private String lastName;
     private String email;
+    private String address;
+    private String phone;
+    private Date dob;
+    private Gender gender;
+    private String image;
     
-    @NotBlank(message = "Password cannot be blank")
+    // Thêm các trường cho việc tạo account
+    private String username;
     private String password;
-    
-    private Set<String> roleCodes;
+    private java.util.Set<String> roleCodes;
 }
 
 

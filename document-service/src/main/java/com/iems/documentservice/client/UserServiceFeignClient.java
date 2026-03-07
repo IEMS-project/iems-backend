@@ -15,7 +15,7 @@ import java.util.Map;
 import java.util.UUID;
 
 @FeignClient(
-        name = "USER-SERVICE",
+        name = "IAM-SERVICE",
         configuration = FeignClientConfig.class
 )
 public interface UserServiceFeignClient {

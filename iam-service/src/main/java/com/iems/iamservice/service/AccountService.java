@@ -1,14 +1,15 @@
 package com.iems.iamservice.service;
 
-import com.iems.iamservice.dto.request.CreateUserDto;
-import com.iems.iamservice.dto.request.UpdateUserDto;
-import com.iems.iamservice.dto.response.UserResponseDto;
+import com.iems.iamservice.dto.request.CreateAccountDto;
+import com.iems.iamservice.dto.request.UpdateAccountDto;
+import com.iems.iamservice.dto.response.AccountResponseDto;
 import com.iems.iamservice.entity.Account;
-import com.iems.iamservice.exception.AppException;
-import com.iems.iamservice.exception.ErrorCode;
+
 
 import com.iems.iamservice.entity.Permission;
 import com.iems.iamservice.entity.Role;
+import com.iems.iamservice.exception.AppException;
+import com.iems.iamservice.exception.ErrorCode;
 import com.iems.iamservice.repository.AccountRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -40,7 +41,7 @@ public class AccountService {
      * Create new user
      */
     @Transactional
-    public Account create(CreateUserDto dto) {
+    public Account createUser(CreateAccountDto dto) {
         log.info("Creating new user: {}", dto.getUsername());
 
         if (accountRepository.existsByUsername(dto.getUsername())) {
@@ -51,7 +52,6 @@ public class AccountService {
         }
 
         Account user = Account.builder()
-                .userId(dto.getUserId())
                 .username(dto.getUsername())
                 .email(dto.getEmail())
                 .passwordHash(passwordEncoder.encode(dto.getPassword()))
@@ -59,8 +59,13 @@ public class AccountService {
                 .createdAt(Instant.now())
                 .build();
 
-        userRolePermissionService.assignRolesToUser(user.getUserId(),dto.getRoleCodes());
         Account savedUser = accountRepository.save(user);
+        
+        // Assign roles after saving account to get the ID
+        if (dto.getRoleCodes() != null && !dto.getRoleCodes().isEmpty()) {
+            userRolePermissionService.assignRolesToUser(savedUser.getId(), dto.getRoleCodes());
+        }
+        
         log.info("User created successfully: {} with ID: {}", savedUser.getUsername(), savedUser.getId());
         return savedUser;
     }
@@ -76,7 +81,7 @@ public class AccountService {
      * Find user by ID
      */
     public Account findById(UUID id) {
-        return accountRepository.findByUserId(id)
+        return accountRepository.findById(id)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND_BY_ID));
     }
 
@@ -88,17 +93,18 @@ public class AccountService {
     }
 
     /**
-     * Find user by userId from user-service
+     * Find user by userId (deprecated - for backward compatibility)
      */
+    @Deprecated
     public Optional<Account> findByUserId(UUID userId) {
-        return accountRepository.findByUserId(userId);
+        return accountRepository.findById(userId);
     }
 
     /**
      * Update user
      */
     @Transactional
-    public Account update(UUID id, UpdateUserDto dto) {
+    public Account update(UUID id, UpdateAccountDto dto) {
         log.info("Updating user with ID: {}", id);
 
         Account user = findById(id);
@@ -146,10 +152,10 @@ public class AccountService {
         log.info("{} user with ID: {}, reason: {}", locked ? "Locking" : "Unlocking", id, reason);
 
         try {
-            Optional<Account> user = Optional.of(findByUserId(id).get());
-            user.get().setEnabled(!locked);
+            Account user = findById(id);
+            user.setEnabled(!locked);
             
-            Account updatedUser = accountRepository.save(user.get());
+            Account updatedUser = accountRepository.save(user);
             log.info("User {} successfully: {}", locked ? "locked" : "unlocked", updatedUser.getUsername());
             return updatedUser;
         } catch (Exception e) {
@@ -185,20 +191,34 @@ public class AccountService {
     }
 
     /**
-     * Convert Account entity to UserResponseDto
+     * Check if username exists
      */
-    public UserResponseDto toUserResponse(Account user) {
-        UserResponseDto dto = new UserResponseDto();
+    public boolean existsByUsername(String username) {
+        return accountRepository.existsByUsername(username);
+    }
+
+    /**
+     * Check if email exists
+     */
+    public boolean existsByEmail(String email) {
+        return accountRepository.existsByEmail(email);
+    }
+
+    /**
+     * Convert Account entity to AccountResponseDto
+     */
+    public AccountResponseDto toUserResponse(Account user) {
+        AccountResponseDto dto = new AccountResponseDto();
         dto.setId(user.getId());
-        dto.setUserId(user.getUserId());
+        dto.setUserId(user.getId()); // accountId
         dto.setUsername(user.getUsername());
         dto.setEmail(user.getEmail());
         dto.setEnabled(user.getEnabled());
         dto.setCreatedAt(user.getCreatedAt());
-        dto.setRoles(userRolePermissionService.getUserRoles(user.getUserId()).stream()
-                .map(Role::getCode)   // hoặc getName() tuỳ bạn muốn hiển thị gì
+        dto.setRoles(userRolePermissionService.getUserRoles(user.getId()).stream()
+                .map(Role::getCode)
                 .collect(Collectors.toSet()));
-        dto.setPermissions(userRolePermissionService.getAllUserPermissions(user.getUserId()).stream()
+        dto.setPermissions(userRolePermissionService.getAllUserPermissions(user.getId()).stream()
         .map(Permission::getCode)
                 .collect(Collectors.toSet()));
         return dto;
