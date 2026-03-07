@@ -17,6 +17,7 @@ import com.iems.projectservice.repository.TaskRepository;
 import com.iems.projectservice.repository.TaskStatusHistoryRepository;
 import com.iems.projectservice.service.ITaskService;
 import com.iems.projectservice.service.IUserService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.http.ResponseEntity;
@@ -31,6 +32,7 @@ import java.util.stream.Stream;
 import com.iems.projectservice.exception.AppException;
 import com.iems.projectservice.entity.TaskComment;
 
+@Slf4j
 @Service
 @Transactional
 public class TaskService implements ITaskService {
@@ -156,7 +158,7 @@ public class TaskService implements ITaskService {
     private void uploadTaskAttachments(UUID taskId, MultipartFile[] files, UUID userId) {
         try {
             // Call document service to upload files to public folder
-            ResponseEntity<ApiResponseDto<List<SimpleFileResponse>>> response =
+            ResponseEntity<com.iems.projectservice.dto.response.DocumentApiResponseDto<List<SimpleFileResponse>>> response =
                 documentServiceFeignClient.uploadFilesToPublic(files);
             
             if (response != null && response.getBody() != null && response.getBody().getData() != null) {
@@ -176,7 +178,7 @@ public class TaskService implements ITaskService {
             }
         } catch (Exception e) {
             // Log error but don't fail task creation
-            System.err.println("Error uploading attachments: " + e.getMessage());
+            log.error("Error uploading attachments for task {}: {}", taskId, e.getMessage(), e);
         }
     }
 

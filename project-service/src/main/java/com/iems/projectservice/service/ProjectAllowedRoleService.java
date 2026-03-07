@@ -32,25 +32,33 @@ public class ProjectAllowedRoleService {
     }
 
     @Transactional
-    public ProjectAllowedRole add(UUID projectId, UUID roleId, String roleName) {
+    public ProjectAllowedRole add(UUID projectId, String roleName) {
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new IllegalArgumentException("Project not found"));
-        return allowedRoleRepository.findByProjectAndRoleId(project, roleId)
-                .orElseGet(() -> allowedRoleRepository.save(new ProjectAllowedRole(null, project, roleId, roleName)));
+        
+        // Case-insensitive duplicate check
+        if (allowedRoleRepository.findByProjectAndRoleNameIgnoreCase(project, roleName).isPresent()) {
+            throw new AppException(ProjectErrorCode.INVALID_REQUEST);
+        }
+        
+        ProjectAllowedRole role = new ProjectAllowedRole();
+        role.setProject(project);
+        role.setRoleName(roleName);
+        return allowedRoleRepository.save(role);
     }
 
     @Transactional
     public void delete(UUID projectId, UUID allowedRoleId) {
         log.info("Attempting to delete role with id: {} from project: {}", allowedRoleId, projectId);
         
-        // Get the allowed role to check roleId
+        // Get the allowed role
         ProjectAllowedRole allowedRole = allowedRoleRepository.findById(allowedRoleId)
                 .orElseThrow(() -> new IllegalArgumentException("Role not found"));
         
-        log.info("Found role: {} (roleId: {})", allowedRole.getRoleName(), allowedRole.getRoleId());
+        log.info("Found role: {}", allowedRole.getRoleName());
         
-        // Check if any member is using this role
-        List<ProjectMember> members = projectMemberRepository.findByProjectIdAndRoleId(projectId, allowedRole.getRoleId());
+        // Check if any member is using this role (roleId in project_members references allowedRole.id)
+        List<ProjectMember> members = projectMemberRepository.findByProjectIdAndRoleId(projectId, allowedRole.getId());
         log.info("Found {} members using this role", members.size());
         
         if (!members.isEmpty()) {

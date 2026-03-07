@@ -9,7 +9,7 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "project_allowed_roles",
-        uniqueConstraints = @UniqueConstraint(columnNames = {"project_id", "role_id"}))
+        uniqueConstraints = @UniqueConstraint(columnNames = {"project_id", "role_name"}))
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -23,11 +23,8 @@ public class ProjectAllowedRole {
     @JoinColumn(name = "project_id", nullable = false)
     private Project project;
 
-    @Column(name = "role_id", nullable = false)
-    private UUID roleId; // from user-service Role.id
-
     @Column(name = "role_name", nullable = false, length = 150)
-    private String roleName; // snapshot of Role.name for display
+    private String roleName;
 }
 
 

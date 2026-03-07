@@ -1,7 +1,7 @@
 package com.iems.projectservice.client;
 
 import com.iems.projectservice.config.FeignClientConfig;
-import com.iems.projectservice.dto.response.ApiResponseDto;
+import com.iems.projectservice.dto.response.DocumentApiResponseDto;
 import com.iems.projectservice.dto.SimpleFileResponse;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.http.MediaType;
@@ -23,18 +23,18 @@ import java.util.UUID;
 public interface DocumentServiceFeignClient {
 
     @PostMapping(value = "/api/files/upload-batch", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    ResponseEntity<ApiResponseDto<List<SimpleFileResponse>>> uploadFiles(
+    ResponseEntity<DocumentApiResponseDto<List<SimpleFileResponse>>> uploadFiles(
             @RequestParam(required = false) UUID folderId,
             @RequestPart("files") MultipartFile[] files
     );
 
     @PostMapping(value = "/api/files/upload-public", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    ResponseEntity<ApiResponseDto<List<SimpleFileResponse>>> uploadFilesToPublic(
+    ResponseEntity<DocumentApiResponseDto<List<SimpleFileResponse>>> uploadFilesToPublic(
             @RequestPart("files") MultipartFile[] files
     );
 
     @DeleteMapping("/api/files/{id}")
-    ResponseEntity<ApiResponseDto<Object>> deleteFile(@PathVariable("id") String fileId);
+    ResponseEntity<DocumentApiResponseDto<Object>> deleteFile(@PathVariable("id") String fileId);
 
 
 }

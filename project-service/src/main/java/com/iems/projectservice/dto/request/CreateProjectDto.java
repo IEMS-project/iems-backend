@@ -1,5 +1,6 @@
 package com.iems.projectservice.dto.request;
 
+import com.iems.projectservice.entity.enums.ProjectStatus;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
@@ -7,7 +8,6 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
-import java.util.UUID;
 
 @Data
 @NoArgsConstructor
@@ -24,6 +24,5 @@ public class CreateProjectDto {
     
     private LocalDateTime endDate;
     
-    @NotNull(message = "Manager ID is required")
-    private UUID managerId;
+    private ProjectStatus status;
 }

@@ -12,7 +12,7 @@ import java.util.UUID;
 @Repository
 public interface ProjectAllowedRoleRepository extends JpaRepository<ProjectAllowedRole, UUID> {
     List<ProjectAllowedRole> findByProject(Project project);
-    Optional<ProjectAllowedRole> findByProjectAndRoleId(Project project, UUID roleId);
+    Optional<ProjectAllowedRole> findByProjectAndRoleNameIgnoreCase(Project project, String roleName);
 }
 
 
