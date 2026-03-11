@@ -27,36 +27,36 @@ public class MessageReadService implements IMessageReadService {
     private final SimpMessagingTemplate messagingTemplate;
 
     @Override
-    public void markAsRead(String conversationId, String userId) {
-        if (conversationId == null || userId == null || conversationId.isBlank() || userId.isBlank()) return;
+    public void markAsRead(String conversationId, String accountId) {
+        if (conversationId == null || accountId == null || conversationId.isBlank() || accountId.isBlank()) return;
 
         Criteria markCriteria = new Criteria().andOperator(
             Criteria.where("conversationId").is(conversationId),
-            Criteria.where("senderId").ne(userId),
+            Criteria.where("senderId").ne(accountId),
             new Criteria().orOperator(
                 Criteria.where("readBy").exists(false),
-                Criteria.where("readBy").nin(userId)
+                Criteria.where("readBy").nin(accountId)
             )
         );
         Query q = new Query(markCriteria);
-        Update up = new Update().addToSet("readBy", userId);
+        Update up = new Update().addToSet("readBy", accountId);
         mongoTemplate.updateMulti(q, up, Message.class);
     }
 
     @Override
-    public Map<String, Integer> getUnreadCountsByUser(String userId) {
-        if (userId == null || userId.isBlank()) return Map.of();
+    public Map<String, Integer> getUnreadCountsByUser(String accountId) {
+        if (accountId == null || accountId.isBlank()) return Map.of();
         Aggregation agg = Aggregation.newAggregation(
                 Aggregation.match(new Criteria().andOperator(
-                        Criteria.where("senderId").ne(userId),
+                        Criteria.where("senderId").ne(accountId),
                         Criteria.where("recalled").ne(true),
                         new Criteria().orOperator(
                                 Criteria.where("deletedForUsers").exists(false),
-                                Criteria.where("deletedForUsers").nin(userId)
+                                Criteria.where("deletedForUsers").nin(accountId)
                         ),
                         new Criteria().orOperator(
                                 Criteria.where("readBy").exists(false),
-                                Criteria.where("readBy").nin(userId)
+                                Criteria.where("readBy").nin(accountId)
                         )
                 )),
                 Aggregation.group("conversationId").count().as("count")
@@ -72,22 +72,22 @@ public class MessageReadService implements IMessageReadService {
     }
 
     @Override
-    public int getUnreadCountForConversation(String conversationId, String userId) {
-        if (userId == null || userId.isBlank() || conversationId == null || conversationId.isBlank()) {
+    public int getUnreadCountForConversation(String conversationId, String accountId) {
+        if (accountId == null || accountId.isBlank() || conversationId == null || conversationId.isBlank()) {
             return 0;
         }
 
         Criteria combinedCriteria = new Criteria().andOperator(
             Criteria.where("conversationId").is(conversationId),
-            Criteria.where("senderId").ne(userId),
+            Criteria.where("senderId").ne(accountId),
             Criteria.where("recalled").ne(true),
             new Criteria().orOperator(
                 Criteria.where("deletedForUsers").exists(false),
-                Criteria.where("deletedForUsers").nin(userId)
+                Criteria.where("deletedForUsers").nin(accountId)
             ),
             new Criteria().orOperator(
                 Criteria.where("readBy").exists(false),
-                Criteria.where("readBy").nin(userId)
+                Criteria.where("readBy").nin(accountId)
             )
         );
 
@@ -96,36 +96,36 @@ public class MessageReadService implements IMessageReadService {
     }
 
     @Override
-    public void markAsReadWithLastMessage(String conversationId, String userId, String lastMessageId) {
-        markAsRead(conversationId, userId);
+    public void markAsReadWithLastMessage(String conversationId, String accountId, String lastMessageId) {
+        markAsRead(conversationId, accountId);
 
         if (lastMessageId != null) {
             Query convQuery = new Query(Criteria.where("id").is(conversationId));
-            Update convUpdate = new Update().set("lastReadMessageId." + userId, lastMessageId);
+            Update convUpdate = new Update().set("lastReadMessageId." + accountId, lastMessageId);
             mongoTemplate.updateFirst(convQuery, convUpdate, Conversation.class);
         }
 
-        broadcastReadStatusUpdate(conversationId, userId, lastMessageId);
+        broadcastReadStatusUpdate(conversationId, accountId, lastMessageId);
     }
 
     @Override
-    public boolean markConversationAsRead(String conversationId, String userId) {
+    public boolean markConversationAsRead(String conversationId, String accountId) {
         Conversation conversation = conversationRepository.findById(conversationId).orElse(null);
-        if (conversation == null || !conversation.getMembers().contains(userId)) {
+        if (conversation == null || !conversation.getMembers().contains(accountId)) {
             return false;
         }
 
         Criteria markReadCriteria = new Criteria().andOperator(
             Criteria.where("conversationId").is(conversationId),
-            Criteria.where("senderId").ne(userId),
+            Criteria.where("senderId").ne(accountId),
             new Criteria().orOperator(
                 Criteria.where("readBy").exists(false),
-                Criteria.where("readBy").nin(userId)
+                Criteria.where("readBy").nin(accountId)
             )
         );
         Query query = new Query(markReadCriteria);
 
-        Update update = new Update().addToSet("readBy", userId);
+        Update update = new Update().addToSet("readBy", accountId);
         mongoTemplate.updateMulti(query, update, Message.class);
 
         Query latestQuery = new Query();
@@ -136,29 +136,29 @@ public class MessageReadService implements IMessageReadService {
         Message latestMessage = mongoTemplate.findOne(latestQuery, Message.class);
         if (latestMessage != null) {
             Query convQuery = new Query(Criteria.where("id").is(conversationId));
-            Update convUpdate = new Update().set("lastReadMessageId." + userId, latestMessage.getId());
+            Update convUpdate = new Update().set("lastReadMessageId." + accountId, latestMessage.getId());
             mongoTemplate.updateFirst(convQuery, convUpdate, Conversation.class);
         }
 
         // Clear manual unread mark when user reads messages
-        if (conversation.getManuallyMarkedAsUnread() != null && conversation.getManuallyMarkedAsUnread().contains(userId)) {
+        if (conversation.getManuallyMarkedAsUnread() != null && conversation.getManuallyMarkedAsUnread().contains(accountId)) {
             Query clearManualQuery = new Query(Criteria.where("id").is(conversationId));
-            Update clearManualUpdate = new Update().pull("manuallyMarkedAsUnread", userId);
+            Update clearManualUpdate = new Update().pull("manuallyMarkedAsUnread", accountId);
             mongoTemplate.updateFirst(clearManualQuery, clearManualUpdate, Conversation.class);
         }
 
-        broadcastReadStatusUpdate(conversationId, userId, latestMessage != null ? latestMessage.getId() : null);
+        broadcastReadStatusUpdate(conversationId, accountId, latestMessage != null ? latestMessage.getId() : null);
         return true;
     }
 
     @Override
-    public void broadcastReadStatusUpdate(String conversationId, String userId, String lastMessageId) {
+    public void broadcastReadStatusUpdate(String conversationId, String accountId, String lastMessageId) {
         Conversation conv = conversationRepository.findById(conversationId).orElse(null);
         if (conv != null) {
             Map<String, Object> payload = Map.of(
                 "event", "messages_read",
                 "conversationId", conversationId,
-                "userId", userId,
+                "accountId", accountId,
                 "lastMessageId", lastMessageId != null ? lastMessageId : "",
                 "unreadCount", 0
             );

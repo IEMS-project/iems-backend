@@ -21,10 +21,10 @@ public class UserService implements IUserService {
     private UserServiceFeignClient userServiceFeignClient;
 
     @Override
-    public UUID getUserIdFromRequest() {
+    public UUID getAccountIdFromRequest() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         JwtUserDetails userDetails = (JwtUserDetails) authentication.getPrincipal();
-        UUID userId = userDetails.getUserId();
+        UUID userId = userDetails.getAccountId();
         return userId;
     }
 
@@ -45,6 +45,8 @@ public class UserService implements IUserService {
             return Optional.empty();
         }
     }
+
+
     public UserDetailDto convertToUserDetailDto(Map<String, Object> userData) {
         UserDetailDto dto = new UserDetailDto();
         dto.setId(UUID.fromString(userData.get("id").toString()));

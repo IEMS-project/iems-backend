@@ -8,7 +8,7 @@ import java.util.List;
 public interface IConversationService {
 
     //Lay tin nhan cuoi cung cua cuoc hoi thoai cua user
-    Message getLastMessageForConversation(String conversationId, String userId);
+    Message getLastMessageForConversation(String conversationId, String accountId);
 
     //Tim hoi thoai bang id
     Conversation findById(String conversationId);
@@ -17,7 +17,7 @@ public interface IConversationService {
     Conversation save(Conversation conversation);
 
     //Tim xem user do co trong hoi thoai nao
-    List<Conversation> findByMembersContaining(String userId);
+    List<Conversation> findByMembersContaining(String accountId);
 
     //Ghim hoi thoai
     boolean pinConversation(String conversationId);
@@ -31,5 +31,5 @@ public interface IConversationService {
     //Tat bat thong bao
     boolean toggleNotificationSettings(String conversationId);
 
-    boolean clearManualUnreadMark(String conversationId, String userId);
+    boolean clearManualUnreadMark(String conversationId, String accountId);
 }

@@ -35,30 +35,30 @@ public class MessageDeletionService implements IMessageDeletionService {
     private IMessageBroadcastService messageBroadcastService;
 
     @Override
-    public boolean deleteForMe(String messageId, String userId) {
+    public boolean deleteForMe(String messageId, String accountId) {
         Message message = messageRepository.findById(messageId).orElse(null);
         if (message == null) {
             return false;
         }
 
         Conversation conversation = conversationRepository.findById(message.getConversationId()).orElse(null);
-        if (conversation == null || !conversation.getMembers().contains(userId)) {
+        if (conversation == null || !conversation.getMembers().contains(accountId)) {
             return false;
         }
 
-        if (message.getDeletedForUsers() != null && message.getDeletedForUsers().contains(userId)) {
+        if (message.getDeletedForUsers() != null && message.getDeletedForUsers().contains(accountId)) {
             return true;
         }
 
         Query query = new Query(Criteria.where("id").is(messageId));
-        Update update = new Update().addToSet("deletedForUsers", userId);
+        Update update = new Update().addToSet("deletedForUsers", accountId);
         mongoTemplate.updateFirst(query, update, Message.class);
 
         try {
             Map<String, Object> payload = Map.of(
                 "event", "message_deleted_for_user",
                 "messageId", messageId,
-                "userId", userId,
+                "accountId", accountId,
                 "conversationId", message.getConversationId()
             );
 
@@ -66,7 +66,7 @@ public class MessageDeletionService implements IMessageDeletionService {
                 messagingTemplate.convertAndSend("/topic/user-updates/" + memberId, payload);
             }
 
-            Message latestVisible = messageBroadcastService.getLatestVisibleMessageForUser(message.getConversationId(), userId);
+            Message latestVisible = messageBroadcastService.getLatestVisibleMessageForUser(message.getConversationId(), accountId);
             Map<String, Object> convUpdate = new HashMap<>();
             convUpdate.put("event", "conversation_updated");
             convUpdate.put("conversationId", message.getConversationId());
@@ -82,7 +82,7 @@ public class MessageDeletionService implements IMessageDeletionService {
                 ));
                 convUpdate.put("updatedAt", latestVisible.getSentAt());
             }
-            messagingTemplate.convertAndSend("/topic/user-updates/" + userId, convUpdate);
+            messagingTemplate.convertAndSend("/topic/user-updates/" + accountId, convUpdate);
         } catch (Exception e) {
             System.err.println("Failed to broadcast delete event: " + e.getMessage());
         }
@@ -91,11 +91,11 @@ public class MessageDeletionService implements IMessageDeletionService {
     }
 
     @Override
-    public Message recallMessage(String messageId, String userId) {
+    public Message recallMessage(String messageId, String accountId) {
         Message message = messageRepository.findById(messageId).orElse(null);
         if (message == null) return null;
 
-        if (!message.getSenderId().equals(userId)) {
+        if (!message.getSenderId().equals(accountId)) {
             throw new RuntimeException("Only sender can recall message");
         }
 
@@ -103,7 +103,7 @@ public class MessageDeletionService implements IMessageDeletionService {
         message.setRecalledAt(LocalDateTime.now());
         Message saved = messageRepository.save(message);
 
-        messageBroadcastService.broadcastMessageUpdate(saved, "message_recalled", Map.of("recalledBy", userId));
+        messageBroadcastService.broadcastMessageUpdate(saved, "message_recalled", Map.of("recalledBy", accountId));
 
         Conversation conv = conversationRepository.findById(saved.getConversationId()).orElse(null);
         if (conv != null) {

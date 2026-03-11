@@ -38,7 +38,7 @@ public class GroupsController {
             return ResponseEntity.badRequest().build();
         }
 
-        String currentUserId = getCurrentUserId();
+        String currentAccountId = getcurrentAccountId();
 
         Conversation group = new Conversation();
         group.setType("GROUP");
@@ -46,7 +46,7 @@ public class GroupsController {
         group.setAvatarUrl(null); // image default null
         group.setCreatedAt(LocalDateTime.now());
         group.setUpdatedAt(LocalDateTime.now());
-        group.setCreatedBy(currentUserId);
+        group.setCreatedBy(currentAccountId);
 
         List<String> finalMembers = new ArrayList<>();
         if (members != null) {
@@ -56,8 +56,8 @@ public class GroupsController {
                 }
             }
         }
-        if (currentUserId != null && !currentUserId.isBlank() && !finalMembers.contains(currentUserId)) {
-            finalMembers.add(currentUserId);
+        if (currentAccountId != null && !currentAccountId.isBlank() && !finalMembers.contains(currentAccountId)) {
+            finalMembers.add(currentAccountId);
         }
         group.setMembers(finalMembers);
 
@@ -109,7 +109,7 @@ public class GroupsController {
         group.setUpdatedAt(LocalDateTime.now());
         Conversation saved = conversationRepository.save(group);
         try {
-            String actor = resolveUserNameSafe(getCurrentUserId());
+            String actor = resolveUserNameSafe(getcurrentAccountId());
             Message log = new Message();
             log.setConversationId(saved.getId());
             log.setSenderId("SYSTEM");
@@ -145,7 +145,7 @@ public class GroupsController {
         group.setUpdatedAt(LocalDateTime.now());
         Conversation saved = conversationRepository.save(group);
         try {
-            String actor = resolveUserNameSafe(getCurrentUserId());
+            String actor = resolveUserNameSafe(getcurrentAccountId());
             Message log = new Message();
             log.setConversationId(saved.getId());
             log.setSenderId("SYSTEM");
@@ -161,11 +161,11 @@ public class GroupsController {
         return ResponseEntity.ok(saved);
     }
 
-    private String getCurrentUserId() {
+    private String getcurrentAccountId() {
         try {
             Authentication auth = SecurityContextHolder.getContext().getAuthentication();
             if (auth != null && auth.getPrincipal() instanceof JwtUserDetails jwt) {
-                return jwt.getUserId().toString();
+                return jwt.getAccountId().toString();
             }
         } catch (Exception ignored) { }
         return null;
@@ -187,16 +187,16 @@ public class GroupsController {
     }
 
     private boolean canManageGroup(Conversation group) {
-        String uid = getCurrentUserId();
+        String uid = getcurrentAccountId();
         if (uid == null) return false;
         if (hasAdminRole()) return true;
         return uid.equals(group.getCreatedBy());
     }
 
-    private String resolveUserNameSafe(String userIdStr) {
+    private String resolveUserNameSafe(String accountIdStr) {
         try {
-            if (userIdStr == null) return "Ai đó";
-            java.util.UUID uid = java.util.UUID.fromString(userIdStr);
+            if (accountIdStr == null) return "Ai đó";
+            java.util.UUID uid = java.util.UUID.fromString(accountIdStr);
             var resp = userServiceFeignClient.getUserById(uid);
             var body = resp.getBody();
             if (body != null) {

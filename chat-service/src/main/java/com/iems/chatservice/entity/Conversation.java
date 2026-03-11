@@ -24,7 +24,7 @@ public class Conversation {
     private List<String> members;
 
     //Xem tin nhan duoc doc cuoi cung cua moi nguoi
-    private Map<String, String> lastReadMessageId; // userId -> messageId
+    private Map<String, String> lastReadMessageId; // accountId -> messageId
 
     //Danh sach nhung tin nhan duoc ghim
     private List<String> pinnedMessageIds;

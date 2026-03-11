@@ -11,12 +11,13 @@ import java.util.UUID;
 
 public interface IUserService {
 
+
     //Lay tat ca thong tin ve user thong qua id
-    Optional<UserDetailDto> getUserById(UUID userId);
+    Optional<UserDetailDto> getUserById(UUID accountId);
 
-    //Lay userid hien tai
-    UUID getUserIdFromRequest();
+    //Lay accountId hien tai
+    UUID getAccountIdFromRequest();
 
-    //Lay fullname cua userid
-    String resolveUserName(String userId);
+    //Lay fullname cua accountId
+    String resolveUserName(String accountId);
 }

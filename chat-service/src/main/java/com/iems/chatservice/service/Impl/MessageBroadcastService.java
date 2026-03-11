@@ -140,13 +140,13 @@ public class MessageBroadcastService implements IMessageBroadcastService {
     }
 
     @Override
-    public Message getLatestVisibleMessageForUser(String conversationId, String userId) {
+    public Message getLatestVisibleMessageForUser(String conversationId, String accountId) {
         Criteria criteria = new Criteria().andOperator(
                 Criteria.where("conversationId").is(conversationId),
                 Criteria.where("recalled").ne(true),
                 new Criteria().orOperator(
                         Criteria.where("deletedForUsers").exists(false),
-                        Criteria.where("deletedForUsers").nin(userId)
+                        Criteria.where("deletedForUsers").nin(accountId)
                 )
         );
         Query query = new Query(criteria);

@@ -14,5 +14,5 @@ public interface IMessageBroadcastService {
 
     void broadcastConversationMetaUpdate(Conversation conversation, Map<String, Object> changedFields);
 
-    Message getLatestVisibleMessageForUser(String conversationId, String userId);
+    Message getLatestVisibleMessageForUser(String conversationId, String accountId);
 }

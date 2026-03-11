@@ -70,11 +70,11 @@ public class JwtService {
     }
 
     /**
-     * Create access token with userId from user-service
+     * Create access token with accountId from iam-service
      */
-    public String generateTokenWithUserId(UUID userId, String username, String email) {
+    public String generateTokenWithAccountId(UUID accountId, String username, String email) {
         Map<String, Object> claims = new HashMap<>();
-        claims.put("userId", userId.toString());
+        claims.put("accountId", accountId.toString());
         claims.put("email", email);
         claims.put("type", "access");
 
@@ -91,11 +91,11 @@ public class JwtService {
     }
 
     /**
-     * Create access token with userId, roles and permissions
+     * Create access token with accountId, roles and permissions
      */
-    public String generateTokenWithUserInfo(UUID userId, String username, String email, Set<String> roles, Set<String> permissions) {
+    public String generateTokenWithAccountInfo(UUID accountId, String username, String email, Set<String> roles, Set<String> permissions) {
         Map<String, Object> claims = new HashMap<>();
-        claims.put("userId", userId.toString());
+        claims.put("accountId", accountId.toString());
         claims.put("email", email);
         claims.put("roles", roles);
         claims.put("permissions", permissions);
@@ -114,11 +114,11 @@ public class JwtService {
     }
 
     /**
-     * Create refresh token with userId from user-service
+     * Create refresh token with accountId from iam-service
      */
-    public String generateRefreshTokenWithUserId(UUID userId, String username) {
+    public String generateRefreshTokenWithAccountId(UUID accountId, String username) {
         Map<String, Object> claims = new HashMap<>();
-        claims.put("userId", userId.toString());
+        claims.put("accountId", accountId.toString());
         claims.put("type", "refresh");
 
         Instant now = Instant.now();
@@ -141,12 +141,17 @@ public class JwtService {
     }
 
     /**
-     * Get userId from token
+     * Get accountId from token (with fallback to userId for backward compatibility)
      */
-    public UUID extractUserId(String token) {
+    public UUID extractAccountId(String token) {
         Claims claims = extractAllClaims(token);
-        String userIdStr = claims.get("userId", String.class);
-        return userIdStr != null ? UUID.fromString(userIdStr) : null;
+        // Try accountId first (new format)
+        String accountIdStr = claims.get("accountId", String.class);
+        if (accountIdStr == null) {
+            // Fallback to userId for backward compatibility with old tokens
+            accountIdStr = claims.get("userId", String.class);
+        }
+        return accountIdStr != null ? UUID.fromString(accountIdStr) : null;
     }
 
     /**

@@ -39,9 +39,9 @@ public class GroupMemberService implements IGroupMemberService {
     private IUserService userService;
 
     @Override
-    public Conversation addMember(String conversationId, String userId) {
-        UUID actorUserId = userService.getUserIdFromRequest();
-        String actorUserIdStr = actorUserId.toString();
+    public Conversation addMember(String conversationId, String accountId) {
+        UUID actorAccountId = userService.getAccountIdFromRequest();
+        String actorAccountIdStr = actorAccountId.toString();
         
         Conversation conv = conversationRepository.findById(conversationId).orElse(null);
         if (conv == null) return null;
@@ -50,31 +50,31 @@ public class GroupMemberService implements IGroupMemberService {
             members = new ArrayList<>();
             conv.setMembers(members);
         }
-        if (!members.contains(userId)) {
-            members.add(userId);
+        if (!members.contains(accountId)) {
+            members.add(accountId);
         }
         Conversation updated = conversationRepository.save(conv);
 
         // Create system log message
-        String content = String.format("%s đã tham gia nhóm", userService.resolveUserName(userId));
+        String content = String.format("%s đã tham gia nhóm", userService.resolveUserName(accountId));
         createAndBroadcastSystemLog(updated.getId(), content);
 
         // Broadcast member-added event to all participants
-        broadcastMemberEvent(updated, "member_added", userId, actorUserIdStr);
+        broadcastMemberEvent(updated, "member_added", accountId, actorAccountIdStr);
         return updated;
     }
 
     @Override
-    public Conversation removeMember(String conversationId, String userId) {
-        UUID actorUserId = userService.getUserIdFromRequest();
-        String actorUserIdStr = actorUserId.toString();
+    public Conversation removeMember(String conversationId, String accountId) {
+        UUID actorAccountId = userService.getAccountIdFromRequest();
+        String actorAccountIdStr = actorAccountId.toString();
         
         Conversation conv = conversationRepository.findById(conversationId).orElse(null);
         if (conv == null) return null;
         try {
             String creatorId = conv.getCreatedBy();
-            boolean isSelfRemoval = actorUserIdStr.equals(userId);
-            boolean isCreator = actorUserIdStr.equals(creatorId);
+            boolean isSelfRemoval = actorAccountIdStr.equals(accountId);
+            boolean isCreator = actorAccountIdStr.equals(creatorId);
             if (!isSelfRemoval && !isCreator) {
                 // Not allowed
                 return null;
@@ -82,13 +82,13 @@ public class GroupMemberService implements IGroupMemberService {
         } catch (Exception ignored) { }
         List<String> members = conv.getMembers();
         if (members != null) {
-            members.remove(userId);
+            members.remove(accountId);
         }
         Conversation updated = conversationRepository.save(conv);
 
-        String content = String.format("%s đã rời nhóm", userService.resolveUserName(userId));
+        String content = String.format("%s đã rời nhóm", userService.resolveUserName(accountId));
         createAndBroadcastSystemLog(updated.getId(), content);
-        broadcastMemberEvent(updated, "member_removed", userId, actorUserIdStr);
+        broadcastMemberEvent(updated, "member_removed", accountId, actorAccountIdStr);
         return updated;
     }
 
@@ -104,13 +104,13 @@ public class GroupMemberService implements IGroupMemberService {
     }
 
     @Override
-    public void broadcastMemberEvent(Conversation conversation, String event, String targetUserId, String actorUserId) {
+    public void broadcastMemberEvent(Conversation conversation, String event, String targetAccountId, String actorAccountId) {
         try {
             Map<String, Object> payload = new HashMap<>();
             payload.put("event", event);
             payload.put("conversationId", conversation.getId());
-            payload.put("targetUserId", targetUserId);
-            payload.put("actorUserId", actorUserId);
+            payload.put("targetAccountId", targetAccountId);
+            payload.put("actorAccountId", actorAccountId);
             payload.put("updatedAt", LocalDateTime.now());
 
             // broadcast to conversation room
