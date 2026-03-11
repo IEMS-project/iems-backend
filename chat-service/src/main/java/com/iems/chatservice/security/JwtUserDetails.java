@@ -7,18 +7,18 @@ import java.util.Collection;
 import java.util.UUID;
 
 public class JwtUserDetails implements UserDetails {
-    private final UUID userId;
+    private final UUID accountId;
     private final String username;
     private final Collection<? extends GrantedAuthority> authorities;
 
-    public JwtUserDetails(UUID userId, String username, Collection<? extends GrantedAuthority> authorities) {
-        this.userId = userId;
+    public JwtUserDetails(UUID accountId, String username, Collection<? extends GrantedAuthority> authorities) {
+        this.accountId = accountId;
         this.username = username;
         this.authorities = authorities;
     }
 
-    public UUID getUserId() {
-        return userId;
+    public UUID getAccountId() {
+        return accountId;
     }
 
     @Override

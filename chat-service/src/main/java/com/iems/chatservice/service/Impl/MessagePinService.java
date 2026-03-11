@@ -29,11 +29,11 @@ public class MessagePinService implements IMessagePinService {
     private final String SYSTEM_SENDER = "SYSTEM";
 
     @Override
-    public Message pinMessage(String conversationId, String messageId, String userId) {
+    public Message pinMessage(String conversationId, String messageId, String accountId) {
         Query messageQuery = new Query(Criteria.where("id").is(messageId));
         Update messageUpdate = new Update()
                 .set("pinned", true)
-                .set("pinnedBy", userId)
+                .set("pinnedBy", accountId)
                 .set("pinnedAt", java.time.LocalDateTime.now());
         mongoTemplate.updateFirst(messageQuery, messageUpdate, Message.class);
 
@@ -43,21 +43,21 @@ public class MessagePinService implements IMessagePinService {
 
         Message pinnedMessage = messageRepository.findById(messageId).orElse(null);
         if (pinnedMessage != null) {
-            messageBroadcastService.broadcastMessageUpdate(pinnedMessage, "message_pinned", java.util.Map.of("pinnedBy", userId));
+            messageBroadcastService.broadcastMessageUpdate(pinnedMessage, "message_pinned", java.util.Map.of("pinnedBy", accountId));
 
             // create system log
             com.iems.chatservice.entity.Message log = new com.iems.chatservice.entity.Message();
             log.setConversationId(conversationId);
             log.setSenderId(SYSTEM_SENDER);
             log.setType("SYSTEM_LOG");
-            log.setContent(String.format("%s đã ghim một tin nhắn", userService.resolveUserName(userId)));
+            log.setContent(String.format("%s đã ghim một tin nhắn", userService.resolveUserName(accountId)));
             messageBroadcastService.saveAndBroadcast(log);
         }
         return pinnedMessage;
     }
 
     @Override
-    public Message unpinMessage(String conversationId, String messageId, String userId) {
+    public Message unpinMessage(String conversationId, String messageId, String accountId) {
         Query messageQuery = new Query(Criteria.where("id").is(messageId));
         Update messageUpdate = new Update()
                 .set("pinned", false)
@@ -71,14 +71,14 @@ public class MessagePinService implements IMessagePinService {
 
         Message unpinnedMessage = messageRepository.findById(messageId).orElse(null);
         if (unpinnedMessage != null) {
-            messageBroadcastService.broadcastMessageUpdate(unpinnedMessage, "message_unpinned", java.util.Map.of("unpinnedBy", userId));
+            messageBroadcastService.broadcastMessageUpdate(unpinnedMessage, "message_unpinned", java.util.Map.of("unpinnedBy", accountId));
 
             // create system log
             com.iems.chatservice.entity.Message log = new com.iems.chatservice.entity.Message();
             log.setConversationId(conversationId);
             log.setSenderId(SYSTEM_SENDER);
             log.setType("SYSTEM_LOG");
-            log.setContent(String.format("%s đã bỏ ghim một tin nhắn", userService.resolveUserName(userId)));
+            log.setContent(String.format("%s đã bỏ ghim một tin nhắn", userService.resolveUserName(accountId)));
             messageBroadcastService.saveAndBroadcast(log);
         }
         return unpinnedMessage;

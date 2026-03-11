@@ -68,7 +68,7 @@ public class MessageService implements IMessageService {
                 Optional<UserDetailDto> userOpt = userService.getUserById(uuid);
                 userOpt.ifPresent(user -> {
                     members.add(MemberResponseDto.builder()
-                            .userId(user.getId())
+                            .accountId(user.getId())
                             .userName(user.getFirstName() + " " + user.getLastName())
                             .userEmail(user.getEmail())
                             .userImage(user.getImage())
@@ -106,39 +106,39 @@ public class MessageService implements IMessageService {
 
     @Override
     public void markAsRead(String conversationId) {
-        UUID userId = userService.getUserIdFromRequest();
-        String userIdStr = userId.toString();
+        UUID accountId = userService.getAccountIdFromRequest();
+        String accountIdStr = accountId.toString();
         if (conversationId == null || conversationId.isBlank()) return;
         
         Criteria markCriteria = new Criteria().andOperator(
             Criteria.where("conversationId").is(conversationId),
-            Criteria.where("senderId").ne(userIdStr),
+            Criteria.where("senderId").ne(accountIdStr),
             new Criteria().orOperator(
                 Criteria.where("readBy").exists(false),
-                Criteria.where("readBy").nin(userIdStr)
+                Criteria.where("readBy").nin(accountIdStr)
             )
         );
         Query q = new Query(markCriteria);
-        Update up = new Update().addToSet("readBy", userIdStr);
+        Update up = new Update().addToSet("readBy", accountIdStr);
         mongoTemplate.updateMulti(q, up, Message.class);
     }
 
     @Override
     public Map<String, Integer> getUnreadCountsByUser() {
-        UUID userId = userService.getUserIdFromRequest();
-        return messageReadService.getUnreadCountsByUser(userId.toString());
+        UUID accountId = userService.getAccountIdFromRequest();
+        return messageReadService.getUnreadCountsByUser(accountId.toString());
     }
 
     @Override
     public int getUnreadCountForConversation(String conversationId) {
-        UUID userId = userService.getUserIdFromRequest();
-        return messageReadService.getUnreadCountForConversation(conversationId, userId.toString());
+        UUID accountId = userService.getAccountIdFromRequest();
+        return messageReadService.getUnreadCountForConversation(conversationId, accountId.toString());
     }
 
     @Override
     public Message replyToMessage(String conversationId, String content, String replyToMessageId) {
-        UUID userId = userService.getUserIdFromRequest();
-        String senderId = userId.toString();
+        UUID accountId = userService.getAccountIdFromRequest();
+        String senderId = accountId.toString();
         
         // Get original message for context
         Message originalMessage = messageRepository.findById(replyToMessageId).orElse(null);
@@ -181,43 +181,43 @@ public class MessageService implements IMessageService {
     // Add reaction to message
     @Override
     public Message addReaction(String messageId, String emoji) {
-        UUID userId = userService.getUserIdFromRequest();
-        return messageReactionService.addReaction(messageId, userId.toString(), emoji);
+        UUID accountId = userService.getAccountIdFromRequest();
+        return messageReactionService.addReaction(messageId, accountId.toString(), emoji);
     }
 
     // Remove reaction from message
     @Override
     public Message removeReaction(String messageId) {
-        UUID userId = userService.getUserIdFromRequest();
-        return messageReactionService.removeReaction(messageId, userId.toString());
+        UUID accountId = userService.getAccountIdFromRequest();
+        return messageReactionService.removeReaction(messageId, accountId.toString());
     }
 
     // Delete message for user (delete for me)
     @Override
     public boolean deleteForMe(String messageId) {
-        UUID userId = userService.getUserIdFromRequest();
-        return messageDeletionService.deleteForMe(messageId, userId.toString());
+        UUID accountId = userService.getAccountIdFromRequest();
+        return messageDeletionService.deleteForMe(messageId, accountId.toString());
     }
 
     // Recall message (delete for everyone)
     @Override
     public Message recallMessage(String messageId) {
-        UUID userId = userService.getUserIdFromRequest();
-        return messageDeletionService.recallMessage(messageId, userId.toString());
+        UUID accountId = userService.getAccountIdFromRequest();
+        return messageDeletionService.recallMessage(messageId, accountId.toString());
     }
 
     // Pin message
     @Override
     public Message pinMessage(String conversationId, String messageId) {
-        UUID userId = userService.getUserIdFromRequest();
-        return messagePinService.pinMessage(conversationId, messageId, userId.toString());
+        UUID accountId = userService.getAccountIdFromRequest();
+        return messagePinService.pinMessage(conversationId, messageId, accountId.toString());
     }
 
     // Unpin message
     @Override
     public Message unpinMessage(String conversationId, String messageId) {
-        UUID userId = userService.getUserIdFromRequest();
-        return messagePinService.unpinMessage(conversationId, messageId, userId.toString());
+        UUID accountId = userService.getAccountIdFromRequest();
+        return messagePinService.unpinMessage(conversationId, messageId, accountId.toString());
     }
 
     // Get pinned messages for conversation
@@ -231,29 +231,29 @@ public class MessageService implements IMessageService {
     // Enhanced mark as read with last read message tracking
     @Override
     public void markAsReadWithLastMessage(String conversationId, String lastMessageId) {
-        UUID userId = userService.getUserIdFromRequest();
-        messageReadService.markAsReadWithLastMessage(conversationId, userId.toString(), lastMessageId);
+        UUID accountId = userService.getAccountIdFromRequest();
+        messageReadService.markAsReadWithLastMessage(conversationId, accountId.toString(), lastMessageId);
     }
 
     // Mark entire conversation as read
     @Override
     public boolean markConversationAsRead(String conversationId) {
-        UUID userId = userService.getUserIdFromRequest();
-        return messageReadService.markConversationAsRead(conversationId, userId.toString());
+        UUID accountId = userService.getAccountIdFromRequest();
+        return messageReadService.markConversationAsRead(conversationId, accountId.toString());
     }
 
 
     // Get messages with user-specific filtering (exclude deleted/recalled)
     @Override
     public List<Message> getMessagesForUser(String conversationId, int page, int size) {
-        UUID userId = userService.getUserIdFromRequest();
-        String userIdStr = userId.toString();
+        UUID accountId = userService.getAccountIdFromRequest();
+        String accountIdStr = accountId.toString();
         
         Criteria userMessagesCriteria = new Criteria().andOperator(
             Criteria.where("conversationId").is(conversationId),
             new Criteria().orOperator(
                 Criteria.where("deletedForUsers").exists(false),
-                Criteria.where("deletedForUsers").nin(userIdStr)
+                Criteria.where("deletedForUsers").nin(accountIdStr)
             )
         );
         
@@ -269,14 +269,14 @@ public class MessageService implements IMessageService {
     // Get paginated messages for conversation with cursor-based pagination
     @Override
     public Map<String, Object> getConversationMessagesPaginated(String conversationId, int limit, String before) {
-        UUID userId = userService.getUserIdFromRequest();
-        String userIdStr = userId.toString();
+        UUID accountId = userService.getAccountIdFromRequest();
+        String accountIdStr = accountId.toString();
         
         Criteria baseCriteria = new Criteria().andOperator(
             Criteria.where("conversationId").is(conversationId),
             new Criteria().orOperator(
                 Criteria.where("deletedForUsers").exists(false),
-                Criteria.where("deletedForUsers").nin(userIdStr)
+                Criteria.where("deletedForUsers").nin(accountIdStr)
             )
         );
         
@@ -331,8 +331,8 @@ public class MessageService implements IMessageService {
     // Get newest messages by type (IMAGE/VIDEO/FILE or MEDIA=both) with before cursor
     @Override
     public Map<String, Object> getLatestByType(String conversationId, String type, int limit, String before) {
-        UUID userId = userService.getUserIdFromRequest();
-        String userIdStr = userId.toString();
+        UUID accountId = userService.getAccountIdFromRequest();
+        String accountIdStr = accountId.toString();
 
         String normalizedType = (type == null ? "MEDIA" : type).toUpperCase();
         boolean mediaBoth = normalizedType.equals("MEDIA") || normalizedType.equals("ALL");
@@ -341,7 +341,7 @@ public class MessageService implements IMessageService {
             Criteria.where("conversationId").is(conversationId),
             new Criteria().orOperator(
                 Criteria.where("deletedForUsers").exists(false),
-                Criteria.where("deletedForUsers").nin(userIdStr)
+                Criteria.where("deletedForUsers").nin(accountIdStr)
             )
         );
 

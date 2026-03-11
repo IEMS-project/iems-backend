@@ -1,6 +1,7 @@
 package com.iems.chatservice.client;
 
 import com.iems.chatservice.config.FeignClientConfig;
+import com.iems.chatservice.dto.AccountIdsDto;
 import com.iems.chatservice.dto.UserIdsDto;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.http.ResponseEntity;
@@ -18,11 +19,16 @@ import java.util.UUID;
 )
 public interface UserServiceFeignClient {
 
-    @GetMapping("/users/{userId}")
-    ResponseEntity<Map<String, Object>> getUserById(@PathVariable("userId") UUID userId);
+    @GetMapping("/users/by-account/{accountId}")
+    ResponseEntity<Map<String, Object>> getUserById(@PathVariable("accountId") UUID accountId);
 
     @PostMapping("/users/by-ids")
     ResponseEntity<Map<String, Object>> getUsersByID(
             @RequestBody UserIdsDto request
+    );
+
+    @PostMapping("/users/by-account-ids")
+    ResponseEntity<Map<String, Object>> getUsersByAccountIds(
+            @RequestBody AccountIdsDto request
     );
 }

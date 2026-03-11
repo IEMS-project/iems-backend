@@ -27,20 +27,20 @@ public class MessageReactionService implements IMessageReactionService {
     private IMessageBroadcastService messageBroadcastService;
 
     @Override
-    public Message addReaction(String messageId, String userId, String emoji) {
+    public Message addReaction(String messageId, String accountId, String emoji) {
         Query query = new Query(Criteria.where("id").is(messageId));
-        Update update = new Update().addToSet("reactions." + emoji, userId);
+        Update update = new Update().addToSet("reactions." + emoji, accountId);
         mongoTemplate.updateFirst(query, update, Message.class);
 
         Message updatedMessage = messageRepository.findById(messageId).orElse(null);
         if (updatedMessage != null) {
-            messageBroadcastService.broadcastMessageUpdate(updatedMessage, "reaction_added", Map.of("userId", userId, "emoji", emoji));
+            messageBroadcastService.broadcastMessageUpdate(updatedMessage, "reaction_added", Map.of("accountId", accountId, "emoji", emoji));
         }
         return updatedMessage;
     }
 
     @Override
-    public Message removeReaction(String messageId, String userId) {
+    public Message removeReaction(String messageId, String accountId) {
         Message message = messageRepository.findById(messageId).orElse(null);
         if (message == null) return null;
 
@@ -48,8 +48,8 @@ public class MessageReactionService implements IMessageReactionService {
         if (reactions != null) {
             String removedEmoji = null;
             for (Map.Entry<String, List<String>> entry : reactions.entrySet()) {
-                if (entry.getValue().contains(userId)) {
-                    entry.getValue().remove(userId);
+                if (entry.getValue().contains(accountId)) {
+                    entry.getValue().remove(accountId);
                     if (entry.getValue().isEmpty()) {
                         reactions.remove(entry.getKey());
                     }
@@ -62,7 +62,7 @@ public class MessageReactionService implements IMessageReactionService {
             Message saved = messageRepository.save(message);
 
             if (removedEmoji != null) {
-                messageBroadcastService.broadcastMessageUpdate(saved, "reaction_removed", Map.of("userId", userId, "emoji", removedEmoji));
+                messageBroadcastService.broadcastMessageUpdate(saved, "reaction_removed", Map.of("accountId", accountId, "emoji", removedEmoji));
             }
             return saved;
         }

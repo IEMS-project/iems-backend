@@ -55,28 +55,28 @@ public class ConversationController {
 
     @PostMapping
     public ResponseEntity<Conversation> create(@RequestBody Conversation conversation,
-                                               @RequestParam(required = false) String actorUserId) {
+                                               @RequestParam(required = false) String actorAccountId) {
         // Resolve actor user id from request param or security context
-        String finalActorUserId;
-        if (actorUserId == null || actorUserId.isBlank()) {
+        String finalactorAccountId;
+        if (actorAccountId == null || actorAccountId.isBlank()) {
             try {
                 Authentication auth = SecurityContextHolder.getContext().getAuthentication();
                 if (auth != null && auth.getPrincipal() instanceof com.iems.chatservice.security.JwtUserDetails jwt) {
-                    finalActorUserId = jwt.getUserId().toString();
+                    finalactorAccountId = jwt.getAccountId().toString();
                 } else {
-                    finalActorUserId = null;
+                    finalactorAccountId = null;
                 }
             } catch (Exception ignore) { 
-                finalActorUserId = null;
+                finalactorAccountId = null;
             }
         } else {
-            finalActorUserId = actorUserId;
+            finalactorAccountId = actorAccountId;
         }
 
         // Ensure createdBy is set to actor
         try {
             if (conversation.getCreatedBy() == null || conversation.getCreatedBy().isBlank()) {
-                conversation.setCreatedBy(finalActorUserId);
+                conversation.setCreatedBy(finalactorAccountId);
             }
         } catch (Exception ignore) { }
 
@@ -88,8 +88,8 @@ public class ConversationController {
                     members = new ArrayList<>();
                     conversation.setMembers(members);
                 }
-                if (finalActorUserId != null && !finalActorUserId.isBlank() && !members.contains(finalActorUserId)) {
-                    members.add(finalActorUserId);
+                if (finalactorAccountId != null && !finalactorAccountId.isBlank() && !members.contains(finalactorAccountId)) {
+                    members.add(finalactorAccountId);
                 }
             }
         } catch (Exception ignore) { }
@@ -111,7 +111,7 @@ public class ConversationController {
                 // Create "members added" system message for each member (except creator)
                 List<String> members = saved.getMembers();
                 if (members != null && members.size() > 1) {
-                    final String creatorId = finalActorUserId; // Create final reference
+                    final String creatorId = finalactorAccountId; // Create final reference
                     List<String> resolvedNames = new ArrayList<>();
                     for (String memberId : members) {
                         if (!memberId.equals(creatorId)) {
@@ -180,15 +180,15 @@ public class ConversationController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    @PostMapping("/{id}/members/{userId}")
-    public ResponseEntity<Conversation> addMember(@PathVariable String id, @PathVariable String userId) {
-        Conversation result = groupMemberService.addMember(id, userId);
+    @PostMapping("/{id}/members/{accountId}")
+    public ResponseEntity<Conversation> addMember(@PathVariable String id, @PathVariable String accountId) {
+        Conversation result = groupMemberService.addMember(id, accountId);
         return result == null ? ResponseEntity.notFound().build() : ResponseEntity.ok(result);
     }
 
-    @DeleteMapping("/{id}/members/{userId}")
-    public ResponseEntity<Conversation> removeMember(@PathVariable String id, @PathVariable String userId) {
-        Conversation result = groupMemberService.removeMember(id, userId);
+    @DeleteMapping("/{id}/members/{accountId}")
+    public ResponseEntity<Conversation> removeMember(@PathVariable String id, @PathVariable String accountId) {
+        Conversation result = groupMemberService.removeMember(id, accountId);
         return result == null ? ResponseEntity.notFound().build() : ResponseEntity.ok(result);
     }
 
@@ -337,29 +337,29 @@ public class ConversationController {
     @DeleteMapping("/{conversationId}")
     public ResponseEntity<Map<String, Object>> deleteGroupConversation(
             @PathVariable String conversationId,
-            @RequestParam(required = false) String actorUserId) {
+            @RequestParam(required = false) String actorAccountId) {
         
         Map<String, Object> response = new HashMap<>();
         
         try {
             // Resolve actor user id from request param or security context
-            String finalActorUserId;
-            if (actorUserId == null || actorUserId.isBlank()) {
+            String finalactorAccountId;
+            if (actorAccountId == null || actorAccountId.isBlank()) {
                 try {
                     Authentication auth = SecurityContextHolder.getContext().getAuthentication();
                     if (auth != null && auth.getPrincipal() instanceof com.iems.chatservice.security.JwtUserDetails jwt) {
-                        finalActorUserId = jwt.getUserId().toString();
+                        finalactorAccountId = jwt.getAccountId().toString();
                     } else {
-                        finalActorUserId = null;
+                        finalactorAccountId = null;
                     }
                 } catch (Exception ignore) { 
-                    finalActorUserId = null;
+                    finalactorAccountId = null;
                 }
             } else {
-                finalActorUserId = actorUserId;
+                finalactorAccountId = actorAccountId;
             }
             
-            if (finalActorUserId == null || finalActorUserId.isBlank()) {
+            if (finalactorAccountId == null || finalactorAccountId.isBlank()) {
                 response.put("success", false);
                 response.put("message", "User not authenticated");
                 return ResponseEntity.badRequest().body(response);
@@ -380,7 +380,7 @@ public class ConversationController {
             }
             
             // Check if user is the creator
-            if (!finalActorUserId.equals(conversation.getCreatedBy())) {
+            if (!finalactorAccountId.equals(conversation.getCreatedBy())) {
                 response.put("success", false);
                 response.put("message", "Only the group creator can delete the conversation");
                 return ResponseEntity.status(403).build();
@@ -400,7 +400,7 @@ public class ConversationController {
                     var payload = java.util.Map.of(
                             "event", "conversation_deleted",
                             "conversationId", conversationId,
-                            "deletedBy", finalActorUserId,
+                            "deletedBy", finalactorAccountId,
                             "type", "GROUP"
                     );
                     for (String memberId : members) {
@@ -421,9 +421,9 @@ public class ConversationController {
     }
     
     // Helper method to resolve user name
-    private String resolveUserName(String userId) {
+    private String resolveUserName(String accountId) {
         try {
-            java.util.UUID uuid = java.util.UUID.fromString(userId);
+            java.util.UUID uuid = java.util.UUID.fromString(accountId);
             var resp = userServiceFeignClient.getUserById(uuid);
             var body = resp.getBody();
             if (body != null && body.containsKey("data")) {
@@ -433,13 +433,13 @@ public class ConversationController {
                 String lastName = data.getOrDefault("lastName", "").toString();
                 String email = data.getOrDefault("email", "").toString();
                 String full = (firstName + " " + lastName).trim();
-                return full.isBlank() ? (email.isBlank() ? userId : email) : full;
+                return full.isBlank() ? (email.isBlank() ? accountId : email) : full;
             }
         } catch (Exception e) {
             // Log the error for debugging
-            System.err.println("Error resolving user name for " + userId + ": " + e.getMessage());
+            System.err.println("Error resolving user name for " + accountId + ": " + e.getMessage());
         }
-        // Return a more user-friendly fallback instead of raw userId
+        // Return a more user-friendly fallback instead of raw accountId
         return "Người dùng";
     }
 }

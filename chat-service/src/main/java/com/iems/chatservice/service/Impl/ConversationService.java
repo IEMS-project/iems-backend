@@ -34,11 +34,11 @@ public class ConversationService implements IConversationService {
 
 
     public List<Map<String, Object>> getConversationsByUser() {
-        UUID userId = userService.getUserIdFromRequest();
-        String userIdStr = userId.toString();
+        UUID accountId = userService.getAccountIdFromRequest();
+        String accountIdStr = accountId.toString();
         
         Query query = new Query();
-        query.addCriteria(Criteria.where("members").in(userIdStr));
+        query.addCriteria(Criteria.where("members").in(accountIdStr));
         query.with(Sort.by(Sort.Direction.DESC, "updatedAt"));
         List<Conversation> conversations = mongoTemplate.find(query, Conversation.class);
         
@@ -57,24 +57,24 @@ public class ConversationService implements IConversationService {
             convData.put("avatarUrl", conv.getAvatarUrl());
             
             // Check if this conversation is pinned by the user
-            boolean isPinned = conv.getPinnedBy() != null && conv.getPinnedBy().containsKey(userIdStr);
+            boolean isPinned = conv.getPinnedBy() != null && conv.getPinnedBy().containsKey(accountIdStr);
             convData.put("isPinned", isPinned);
             if (isPinned) {
-                convData.put("pinnedAt", conv.getPinnedBy().get(userIdStr));
+                convData.put("pinnedAt", conv.getPinnedBy().get(accountIdStr));
             }
             
             // Check notification settings for this user
             boolean notificationsEnabled = conv.getNotificationSettings() == null || 
-                conv.getNotificationSettings().getOrDefault(userIdStr, true);
+                conv.getNotificationSettings().getOrDefault(accountIdStr, true);
             convData.put("notificationsEnabled", notificationsEnabled);
             
             // Check if manually marked as unread by this user
             boolean manuallyMarkedAsUnread = conv.getManuallyMarkedAsUnread() != null && 
-                conv.getManuallyMarkedAsUnread().contains(userIdStr);
+                conv.getManuallyMarkedAsUnread().contains(accountIdStr);
             convData.put("manuallyMarkedAsUnread", manuallyMarkedAsUnread);
             
             // Get last message
-            Message lastMessage = getLastMessageForConversation(conv.getId(), userIdStr);
+            Message lastMessage = getLastMessageForConversation(conv.getId(), accountIdStr);
             if (lastMessage != null) {
                 Map<String, Object> lastMsgData = new HashMap<>();
                 lastMsgData.put("id", lastMessage.getId());
@@ -146,12 +146,12 @@ public class ConversationService implements IConversationService {
     }
 
     @Override
-    public Message getLastMessageForConversation(String conversationId, String userId) {
+    public Message getLastMessageForConversation(String conversationId, String accountId) {
         Criteria lastMessageCriteria = new Criteria().andOperator(
             Criteria.where("conversationId").is(conversationId),
             new Criteria().orOperator(
                 Criteria.where("deletedForUsers").exists(false),
-                Criteria.where("deletedForUsers").nin(userId)
+                Criteria.where("deletedForUsers").nin(accountId)
             ) // Exclude messages deleted by this user
         );
         
@@ -169,7 +169,7 @@ public class ConversationService implements IConversationService {
                 Criteria.where("recalled").ne(true),
                 new Criteria().orOperator(
                     Criteria.where("deletedForUsers").exists(false),
-                    Criteria.where("deletedForUsers").nin(userId)
+                    Criteria.where("deletedForUsers").nin(accountId)
                 )
             );
             
@@ -207,14 +207,14 @@ public class ConversationService implements IConversationService {
     }
     
     @Override
-    public List<Conversation> findByMembersContaining(String userId) {
-        return conversationRepository.findByMembersContaining(userId);
+    public List<Conversation> findByMembersContaining(String accountId) {
+        return conversationRepository.findByMembersContaining(accountId);
     }
     
     @Override
     public boolean pinConversation(String conversationId) {
-        UUID userId = userService.getUserIdFromRequest();
-        String userIdStr = userId.toString();
+        UUID accountId = userService.getAccountIdFromRequest();
+        String accountIdStr = accountId.toString();
         
         try {
             Conversation conversation = conversationRepository.findById(conversationId).orElse(null);
@@ -223,7 +223,7 @@ public class ConversationService implements IConversationService {
             }
             
             // Check if user is a member of the conversation
-            if (!conversation.getMembers().contains(userIdStr)) {
+            if (!conversation.getMembers().contains(accountIdStr)) {
                 return false;
             }
             
@@ -233,7 +233,7 @@ public class ConversationService implements IConversationService {
             }
             
             // Add user to pinnedBy map with current timestamp
-            conversation.getPinnedBy().put(userIdStr, LocalDateTime.now());
+            conversation.getPinnedBy().put(accountIdStr, LocalDateTime.now());
             conversation.setUpdatedAt(LocalDateTime.now());
             
             conversationRepository.save(conversation);
@@ -245,8 +245,8 @@ public class ConversationService implements IConversationService {
     
     @Override
     public boolean unpinConversation(String conversationId) {
-        UUID userId = userService.getUserIdFromRequest();
-        String userIdStr = userId.toString();
+        UUID accountId = userService.getAccountIdFromRequest();
+        String accountIdStr = accountId.toString();
         
         try {
             Conversation conversation = conversationRepository.findById(conversationId).orElse(null);
@@ -255,13 +255,13 @@ public class ConversationService implements IConversationService {
             }
             
             // Check if user is a member of the conversation
-            if (!conversation.getMembers().contains(userIdStr)) {
+            if (!conversation.getMembers().contains(accountIdStr)) {
                 return false;
             }
             
             // Remove user from pinnedBy map
             if (conversation.getPinnedBy() != null) {
-                conversation.getPinnedBy().remove(userIdStr);
+                conversation.getPinnedBy().remove(accountIdStr);
                 conversation.setUpdatedAt(LocalDateTime.now());
                 conversationRepository.save(conversation);
             }
@@ -274,8 +274,8 @@ public class ConversationService implements IConversationService {
     
     @Override
     public boolean markConversationAsUnread(String conversationId) {
-        UUID userId = userService.getUserIdFromRequest();
-        String userIdStr = userId.toString();
+        UUID accountId = userService.getAccountIdFromRequest();
+        String accountIdStr = accountId.toString();
         
         try {
             Conversation conversation = conversationRepository.findById(conversationId).orElse(null);
@@ -284,7 +284,7 @@ public class ConversationService implements IConversationService {
             }
             
             // Check if user is a member of the conversation
-            if (!conversation.getMembers().contains(userIdStr)) {
+            if (!conversation.getMembers().contains(accountIdStr)) {
                 return false;
             }
             
@@ -294,7 +294,7 @@ public class ConversationService implements IConversationService {
             }
             
             // Add user to manually marked as unread set
-            conversation.getManuallyMarkedAsUnread().add(userIdStr);
+            conversation.getManuallyMarkedAsUnread().add(accountIdStr);
             conversation.setUpdatedAt(LocalDateTime.now());
             
             conversationRepository.save(conversation);
@@ -306,8 +306,8 @@ public class ConversationService implements IConversationService {
     
     @Override
     public boolean toggleNotificationSettings(String conversationId) {
-        UUID userId = userService.getUserIdFromRequest();
-        String userIdStr = userId.toString();
+        UUID accountId = userService.getAccountIdFromRequest();
+        String accountIdStr = accountId.toString();
         
         try {
             Conversation conversation = conversationRepository.findById(conversationId).orElse(null);
@@ -316,7 +316,7 @@ public class ConversationService implements IConversationService {
             }
             
             // Check if user is a member of the conversation
-            if (!conversation.getMembers().contains(userIdStr)) {
+            if (!conversation.getMembers().contains(accountIdStr)) {
                 return false;
             }
             
@@ -326,8 +326,8 @@ public class ConversationService implements IConversationService {
             }
             
             // Toggle notification setting for this user
-            boolean currentSetting = conversation.getNotificationSettings().getOrDefault(userIdStr, true);
-            conversation.getNotificationSettings().put(userIdStr, !currentSetting);
+            boolean currentSetting = conversation.getNotificationSettings().getOrDefault(accountIdStr, true);
+            conversation.getNotificationSettings().put(accountIdStr, !currentSetting);
             conversation.setUpdatedAt(LocalDateTime.now());
             
             conversationRepository.save(conversation);
@@ -338,7 +338,7 @@ public class ConversationService implements IConversationService {
     }
     
     @Override
-    public boolean clearManualUnreadMark(String conversationId, String userId) {
+    public boolean clearManualUnreadMark(String conversationId, String accountId) {
         try {
             Conversation conversation = conversationRepository.findById(conversationId).orElse(null);
             if (conversation == null) {
@@ -346,13 +346,13 @@ public class ConversationService implements IConversationService {
             }
             
             // Check if user is a member of the conversation
-            if (!conversation.getMembers().contains(userId)) {
+            if (!conversation.getMembers().contains(accountId)) {
                 return false;
             }
             
             // Remove user from manually marked as unread set
             if (conversation.getManuallyMarkedAsUnread() != null) {
-                conversation.getManuallyMarkedAsUnread().remove(userId);
+                conversation.getManuallyMarkedAsUnread().remove(accountId);
                 conversation.setUpdatedAt(LocalDateTime.now());
                 conversationRepository.save(conversation);
             }
