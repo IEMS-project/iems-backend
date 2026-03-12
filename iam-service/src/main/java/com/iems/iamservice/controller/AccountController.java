@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.*;
 import java.net.URI;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/accounts")
@@ -122,20 +123,20 @@ public class AccountController {
 
 
     @PostMapping("/{id}/roles")
-    @Operation(summary = "Assign roles to user", description = "Add roles to user (additive, no error for duplicates)")
+    @Operation(summary = "Assign role to user", description = "Assign role to user (replaces existing role - user can only have 1 role)")
     public ResponseEntity<ApiResponseDto<Void>> assignRoles(@PathVariable UUID id, @Valid @RequestBody AssignRoleRequestDto dto) {
-        log.info("Assigning roles {} to user ID: {}", dto.getRoleCodes(), id);
+        log.info("Assigning role {} to user ID: {}", dto.getRoleCodes(), id);
         
         userRolePermissionService.assignRolesToUser(id, dto.getRoleCodes());
         
         return ResponseEntity.ok(ApiResponseDto.<Void>builder()
                 .status("success")
-                .message("Roles assigned to user successfully")
+                .message("Role assigned to user successfully")
                 .build());
     }
 
     @PutMapping("/{id}/roles")
-    @Operation(summary = "Replace user roles", description = "Replace all roles for user (removes existing roles)")
+    @Operation(summary = "Replace user role", description = "Replace user role (user can only have 1 role)")
     public ResponseEntity<ApiResponseDto<Void>> replaceRoles(@PathVariable UUID id, @Valid @RequestBody AssignRoleRequestDto dto) {
         log.info("Replacing roles {} for user ID: {}", dto.getRoleCodes(), id);
         

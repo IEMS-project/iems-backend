@@ -38,13 +38,13 @@ public class CustomUserDetailsService implements UserDetailsService {
 
         // Create authorities from roles
         Set<SimpleGrantedAuthority> authorities = userRolePermissionService.getUserRoles(user.getId()).stream()
-                .map(role -> new SimpleGrantedAuthority("ROLE_" + role.getCode()))
+                .map(roleCode -> new SimpleGrantedAuthority("ROLE_" + roleCode))
                 .collect(Collectors.toSet());
 
-        // Add direct permissions
-        userRolePermissionService.getAllUserPermissions(user.getId()).stream()
-                .map(permission -> new SimpleGrantedAuthority(permission.getCode()))
-                .forEach(authorities::add);
+        // Add direct permissions (commented out - permission system not implemented)
+        // userRolePermissionService.getAllUserPermissions(user.getId()).stream()
+        //         .map(permission -> new SimpleGrantedAuthority(permission.getCode()))
+        //         .forEach(authorities::add);
 
         log.debug("User {} loaded with {} authorities", username, authorities.size());
         

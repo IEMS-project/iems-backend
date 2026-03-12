@@ -1,6 +1,7 @@
 package com.iems.iamservice.entity;
 
 import com.iems.iamservice.entity.enums.SubscriptionType;
+import com.iems.iamservice.entity.enums.UserRole;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -56,6 +57,11 @@ public class Account {
 
     @Column
     private Instant premiumUntil;
+
+    @Enumerated(EnumType.STRING)
+    @Column(length = 20)
+    @Builder.Default
+    private UserRole role = UserRole.USER;
 
     @PreUpdate
     public void preUpdate() {

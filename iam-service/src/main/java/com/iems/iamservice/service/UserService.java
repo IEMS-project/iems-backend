@@ -6,11 +6,12 @@ import com.iems.iamservice.dto.request.UserIdsDto;
 import com.iems.iamservice.dto.response.UserBasicInfoDto;
 import com.iems.iamservice.dto.response.UserResponseDto;
 import com.iems.iamservice.entity.User;
-import com.iems.iamservice.entity.UserRole;
 import com.iems.iamservice.exception.AppException;
 import com.iems.iamservice.exception.ErrorCode;
 import com.iems.iamservice.repository.UserRepository;
-import com.iems.iamservice.repository.UserRoleRepository;
+import com.iems.iamservice.repository.AccountRepository;
+import com.iems.iamservice.entity.Account;
+import com.iems.iamservice.entity.enums.UserRole;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -26,7 +27,7 @@ public class UserService {
     private UserRepository repository;
     
     @Autowired
-    private UserRoleRepository userRoleRepository;
+    private AccountRepository accountRepository;
     
     @Autowired
     private AccountService accountService;
@@ -130,14 +131,11 @@ public class UserService {
 
     public List<UserBasicInfoDto> getProjectManagerCandidates() {
         try {
-            List<String> allowedRoles = List.of("ADMIN", "PROJECT_MANAGER");
-            
-            // Get account IDs from UserRole table based on role codes
-            // Note: UserRole.userId is actually accountId in new schema
-            Set<UUID> accountIds = userRoleRepository.findAll()
+            // Only ADMIN role can be project managers
+            Set<UUID> accountIds = accountRepository.findAll()
                     .stream()
-                    .filter(ur -> allowedRoles.contains(ur.getRole().getCode()))
-                    .map(UserRole::getUserId)
+                    .filter(account -> account.getRole() == UserRole.ADMIN)
+                    .map(Account::getId)
                     .collect(Collectors.toSet());
             
             if (accountIds.isEmpty()) {

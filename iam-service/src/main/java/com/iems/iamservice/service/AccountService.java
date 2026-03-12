@@ -6,8 +6,7 @@ import com.iems.iamservice.dto.response.AccountResponseDto;
 import com.iems.iamservice.entity.Account;
 
 
-import com.iems.iamservice.entity.Permission;
-import com.iems.iamservice.entity.Role;
+// import com.iems.iamservice.entity.Permission;
 import com.iems.iamservice.exception.AppException;
 import com.iems.iamservice.exception.ErrorCode;
 import com.iems.iamservice.repository.AccountRepository;
@@ -21,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -64,6 +64,14 @@ public class AccountService {
         // Assign roles after saving account to get the ID
         if (dto.getRoleCodes() != null && !dto.getRoleCodes().isEmpty()) {
             userRolePermissionService.assignRolesToUser(savedUser.getId(), dto.getRoleCodes());
+        } else {
+            // Assign default "USER" role if no roles specified
+            log.info("No roles specified, assigning default USER role to user {}", savedUser.getId());
+            try {
+                userRolePermissionService.assignRolesToUser(savedUser.getId(), Set.of("USER"));
+            } catch (Exception e) {
+                log.warn("Failed to assign default USER role: {}", e.getMessage());
+            }
         }
         
         log.info("User created successfully: {} with ID: {}", savedUser.getUsername(), savedUser.getId());
@@ -215,12 +223,10 @@ public class AccountService {
         dto.setEmail(user.getEmail());
         dto.setEnabled(user.getEnabled());
         dto.setCreatedAt(user.getCreatedAt());
-        dto.setRoles(userRolePermissionService.getUserRoles(user.getId()).stream()
-                .map(Role::getCode)
-                .collect(Collectors.toSet()));
-        dto.setPermissions(userRolePermissionService.getAllUserPermissions(user.getId()).stream()
-        .map(Permission::getCode)
-                .collect(Collectors.toSet()));
+        dto.setRoles(userRolePermissionService.getUserRoles(user.getId()));
+        // dto.setPermissions(userRolePermissionService.getAllUserPermissions(user.getId()).stream()
+        // .map(Permission::getCode)
+        //         .collect(Collectors.toSet()));
         return dto;
     }
 
