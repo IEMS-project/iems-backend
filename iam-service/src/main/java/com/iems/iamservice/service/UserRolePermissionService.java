@@ -1,15 +1,10 @@
 package com.iems.iamservice.service;
 
-import com.iems.iamservice.dto.response.UserPermissionDetails;
-import com.iems.iamservice.entity.Permission;
 import com.iems.iamservice.entity.Role;
-import com.iems.iamservice.entity.UserPermission;
 import com.iems.iamservice.entity.UserRole;
 import com.iems.iamservice.exception.AppException;
 import com.iems.iamservice.exception.ErrorCode;
-import com.iems.iamservice.repository.PermissionRepository;
 import com.iems.iamservice.repository.RoleRepository;
-import com.iems.iamservice.repository.UserPermissionRepository;
 import com.iems.iamservice.repository.UserRoleRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,11 +13,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -30,9 +23,7 @@ import java.util.stream.Collectors;
 public class UserRolePermissionService {
 
     private final UserRoleRepository userRoleRepository;
-    private final UserPermissionRepository userPermissionRepository;
     private final RoleRepository roleRepository;
-    private final PermissionRepository permissionRepository;
 
 
     /**
@@ -115,12 +106,60 @@ public class UserRolePermissionService {
         log.info("Roles replaced successfully for userId={}", userId);
     }
 
+    /**
+     * Get all roles assigned to user
+     */
+    public Set<Role> getUserRoles(UUID userId) {
+        return new HashSet<>(userRoleRepository.findRolesByUserId(userId));
+    }
 
     /**
-     * Assign permissions directly to user (additive - allows multiple permissions, no error for duplicates)
+     * Get all user IDs that have any of the specified roles
+     */
+    public List<UUID> getUserIdsByRoleCodes(List<String> roleCodes) {
+        if (roleCodes == null || roleCodes.isEmpty()) {
+            return List.of();
+        }
+        return userRoleRepository.findUserIdsByRoleCodes(roleCodes);
+    }
+
+    /**
+     * Check if user has specific role
+     */
+    public boolean userHasRole(UUID userId, String roleCode) {
+        Optional<Role> roleOpt = roleRepository.findByCode(roleCode);
+        if (roleOpt.isEmpty() || !roleOpt.get().getActive()) {
+            return false;
+        }
+        return userRoleRepository.existsByUserIdAndRoleIdAndActiveTrue(
+                userId,
+                roleOpt.get().getId()
+        );
+    }
+
+    /**
+     * Remove role from user
      */
     @Transactional
-    public void assignPermissionsToUser(UUID userId, Set<String> permissionCodes) {
+    public void removeRoleFromUser(UUID userId, String roleCode) {
+        log.info("Removing role {} from user ID: {}", roleCode, userId);
+
+        Role role = roleRepository.findByCode(roleCode)
+                .orElseThrow(() -> new AppException(ErrorCode.ROLE_NOT_FOUND_BY_CODE));
+
+        userRoleRepository.deactivateUserRole(userId, role.getId());
+        log.info("Role removed successfully from user ID: {}", userId);
+    }
+
+    /**
+     * Get all users assigned to a role
+     */
+    public List<UUID> getUsersByRole(String roleCode) {
+        Role role = roleRepository.findByCode(roleCode)
+                .orElseThrow(() -> new AppException(ErrorCode.ROLE_NOT_FOUND_BY_CODE));
+        return userRoleRepository.findUserIdsByRoleId(role.getId());
+    }
+}
         if (permissionCodes == null || permissionCodes.isEmpty()) {
             log.info("No permission codes provided for userId={}, skipping direct permission assignment", userId);
             return;

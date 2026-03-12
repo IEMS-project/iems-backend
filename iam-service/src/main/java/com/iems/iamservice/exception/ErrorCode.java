@@ -57,14 +57,6 @@ public enum ErrorCode {
     USER_LOCK_FAILED("User lock/unlock failed", HttpStatus.INTERNAL_SERVER_ERROR),
     USER_DELETE_FAILED("User deletion failed", HttpStatus.INTERNAL_SERVER_ERROR),
 
-    // Permission Service Errors
-    PERMISSION_CODE_ALREADY_EXISTS("Permission code already exists", HttpStatus.CONFLICT),
-    PERMISSION_NOT_FOUND_BY_ID("Permission not found", HttpStatus.NOT_FOUND),
-    PERMISSION_NOT_FOUND_BY_CODE("Permission not found", HttpStatus.NOT_FOUND),
-    PERMISSION_UPDATE_FAILED("Permission update failed", HttpStatus.INTERNAL_SERVER_ERROR),
-    PERMISSION_DELETE_FAILED("Permission deletion failed", HttpStatus.INTERNAL_SERVER_ERROR),
-    PERMISSION_IN_USE("Permission is in use", HttpStatus.CONFLICT),
-
     // Role Service Errors
     ROLE_CODE_ALREADY_EXISTS("Role code already exists", HttpStatus.CONFLICT),
     ROLE_NOT_FOUND_BY_ID("Role not found", HttpStatus.NOT_FOUND),
@@ -72,15 +64,11 @@ public enum ErrorCode {
     ROLE_UPDATE_FAILED("Role update failed", HttpStatus.INTERNAL_SERVER_ERROR),
     ROLE_DELETE_FAILED("Role deletion failed", HttpStatus.INTERNAL_SERVER_ERROR),
     ROLE_IN_USE("Role is in use", HttpStatus.CONFLICT),
-    ROLE_PERMISSION_ASSIGNMENT_FAILED("Assigning permissions to role failed", HttpStatus.INTERNAL_SERVER_ERROR),
 
-    // User Role Permission Service Errors
+    // User Role Service Errors
     USER_ROLE_ASSIGNMENT_FAILED("Assigning role to user failed", HttpStatus.INTERNAL_SERVER_ERROR),
-    USER_PERMISSION_ASSIGNMENT_FAILED("Assigning permission to user failed", HttpStatus.INTERNAL_SERVER_ERROR),
     USER_ROLE_REMOVAL_FAILED("Removing role from user failed", HttpStatus.INTERNAL_SERVER_ERROR),
-    USER_PERMISSION_REMOVAL_FAILED("Removing permission from user failed", HttpStatus.INTERNAL_SERVER_ERROR),
     ROLE_REPLACEMENT_FAILED("Replacing user's roles failed", HttpStatus.INTERNAL_SERVER_ERROR),
-    PERMISSION_REPLACEMENT_FAILED("Replacing user's permissions failed", HttpStatus.INTERNAL_SERVER_ERROR),
 
     // System Errors
     INTERNAL_SERVER_ERROR("Internal server error", HttpStatus.INTERNAL_SERVER_ERROR),

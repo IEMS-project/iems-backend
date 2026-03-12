@@ -9,8 +9,6 @@ import lombok.Setter;
 import org.hibernate.annotations.UuidGenerator;
 
 import java.time.Instant;
-import java.util.HashSet;
-import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -50,24 +48,9 @@ public class Role {
     @Column
     private Instant updatedAt;
 
-    @ManyToMany(fetch = FetchType.LAZY, cascade = {CascadeType.PERSIST, CascadeType.MERGE})
-    @JoinTable(
-            name = "iam_role_permissions",
-            joinColumns = @JoinColumn(name = "role_id"),
-            inverseJoinColumns = @JoinColumn(name = "permission_id")
-    )
-    @Builder.Default
-    private Set<Permission> permissions = new HashSet<>();
-
-
     @PreUpdate
     public void preUpdate() {
         this.updatedAt = Instant.now();
-    }
-
-    public void addPermission(Permission permission) {
-        this.permissions.add(permission);
-        permission.getRoles().add(this);
     }
 
 }
