@@ -9,8 +9,6 @@ import com.iems.iamservice.entity.Account;
 import com.iems.iamservice.entity.User;
 import com.iems.iamservice.exception.AppException;
 import com.iems.iamservice.exception.ErrorCode;
-
-import com.iems.iamservice.entity.Role;
 import com.iems.iamservice.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -74,9 +72,7 @@ public class AuthService {
             accountService.save(user);
 
             // Get roles information
-            Set<String> roles = userRolePermissionService.getUserRoles(user.getId()).stream()
-                    .map(Role::getCode)
-                    .collect(Collectors.toSet());
+            Set<String> roles = userRolePermissionService.getUserRoles(user.getId());
 
             // Create tokens with roles
             String accessToken = jwtService.generateTokenWithUserInfo(
@@ -138,9 +134,7 @@ public class AuthService {
             }
 
             // Get roles information
-            Set<String> roles = userRolePermissionService.getUserRoles(user.getId()).stream()
-                    .map(Role::getCode)
-                    .collect(Collectors.toSet());
+            Set<String> roles = userRolePermissionService.getUserRoles(user.getId());
 
             // Create new access token with roles
             String newAccessToken = jwtService.generateTokenWithUserInfo(
@@ -224,7 +218,7 @@ public class AuthService {
             UUID userId = jwtService.extractUserId(token);
             String email = jwtService.extractEmail(token);
             Set<String> roles = jwtService.extractRoles(token);
-            Set<String> permissions = jwtService.extractPermissions(token);
+            // Set<String> permissions = jwtService.extractPermissions(token);
 
             Account user = accountService.findByUsernameOrEmail(username)
                     .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND_IN_TOKEN));
@@ -234,7 +228,7 @@ public class AuthService {
                     .username(username)
                     .email(email)
                     .roles(roles)
-                    .permissions(permissions)
+                    // .permissions(permissions)
                     .enabled(user.getEnabled())
                     .lastLoginAt(user.getLastLoginAt())
                     .build();

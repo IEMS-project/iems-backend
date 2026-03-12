@@ -69,6 +69,7 @@ public enum ErrorCode {
     USER_ROLE_ASSIGNMENT_FAILED("Assigning role to user failed", HttpStatus.INTERNAL_SERVER_ERROR),
     USER_ROLE_REMOVAL_FAILED("Removing role from user failed", HttpStatus.INTERNAL_SERVER_ERROR),
     ROLE_REPLACEMENT_FAILED("Replacing user's roles failed", HttpStatus.INTERNAL_SERVER_ERROR),
+    MULTIPLE_ROLES_NOT_ALLOWED("User can only have one role", HttpStatus.BAD_REQUEST),
 
     // System Errors
     INTERNAL_SERVER_ERROR("Internal server error", HttpStatus.INTERNAL_SERVER_ERROR),
