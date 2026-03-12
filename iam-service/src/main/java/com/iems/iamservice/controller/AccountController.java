@@ -5,8 +5,6 @@ package com.iems.iamservice.controller;
 import com.iems.iamservice.dto.ApiResponseDto;
 import com.iems.iamservice.dto.request.*;
 import com.iems.iamservice.dto.response.AccountResponseDto;
-import com.iems.iamservice.dto.response.UserPermissionDetails;
-import com.iems.iamservice.dto.response.UserPermissionsResponseDto;
 import com.iems.iamservice.service.AccountService;
 import com.iems.iamservice.service.UserRolePermissionService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -20,7 +18,6 @@ import org.springframework.web.bind.annotation.*;
 import java.net.URI;
 import java.util.List;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/accounts")
@@ -147,85 +144,6 @@ public class AccountController {
         return ResponseEntity.ok(ApiResponseDto.<Void>builder()
                 .status("success")
                 .message("User roles replaced successfully")
-                .build());
-    }
-
-    @PostMapping("/{id}/permissions")
-    @Operation(summary = "Assign permissions to user", description = "Add permissions to user (additive, no error for duplicates)")
-    public ResponseEntity<ApiResponseDto<Void>> assignPermissions(@PathVariable UUID id, @Valid @RequestBody AssignPermissionRequestDto dto) {
-        log.info("Assigning permissions {} to user ID: {}", dto.getPermissionCodes(), id);
-        
-        userRolePermissionService.assignPermissionsToUser(id, dto.getPermissionCodes());
-        
-        return ResponseEntity.ok(ApiResponseDto.<Void>builder()
-                .status("success")
-                .message("Permissions assigned to user successfully")
-                .build());
-    }
-
-    @PutMapping("/{id}/permissions")
-    @Operation(summary = "Replace user permissions", description = "Replace all direct permissions for user (removes existing permissions)")
-    public ResponseEntity<ApiResponseDto<Void>> replacePermissions(@PathVariable UUID id, @Valid @RequestBody AssignPermissionRequestDto dto) {
-        log.info("Replacing permissions {} for user ID: {}", dto.getPermissionCodes(), id);
-        
-        userRolePermissionService.replaceUserPermissions(id, dto.getPermissionCodes());
-        
-        return ResponseEntity.ok(ApiResponseDto.<Void>builder()
-                .status("success")
-                .message("User permissions replaced successfully")
-                .build());
-    }
-
-    @GetMapping("/{id}/permissions")
-    @Operation(summary = "User permissions", description = "Get all permissions for user")
-    public ResponseEntity<ApiResponseDto<UserPermissionsResponseDto>> getUserPermissions(@PathVariable UUID id) {
-        log.info("Getting permissions for user ID: {}", id);
-        
-        var user = accountService.findById(id);
-        var allPermissions = userRolePermissionService.getAllUserPermissions(id);
-        var userRoles = userRolePermissionService.getUserRoles(id);
-        var directPermissions = userRolePermissionService.getUserDirectPermissions(id);
-        
-        var response = UserPermissionsResponseDto.builder()
-                .userId(user.getId())
-                .username(user.getUsername())
-                .directPermissions(directPermissions.stream()
-                        .map(permission -> permission.getCode())
-                        .collect(Collectors.toSet()))
-                .rolePermissions(userRoles.stream()
-                        .map(role -> UserPermissionsResponseDto.RolePermissionsDto.builder()
-                                .roleCode(role.getCode())
-                                .roleName(role.getName())
-                                .permissions(role.getPermissions().stream()
-                                        .map(permission -> permission.getCode())
-                                        .collect(Collectors.toSet()))
-                                .build())
-                        .collect(Collectors.toSet()))
-                .allPermissions(allPermissions.stream()
-                        .map(permission -> permission.getCode())
-                        .collect(Collectors.toSet()))
-                .build();
-        
-        return ResponseEntity.ok(ApiResponseDto.<UserPermissionsResponseDto>builder()
-                .status("success")
-                .message("User permissions retrieved successfully")
-                .data(response)
-                .build());
-    }
-
-    @GetMapping("/{id}/permissions/details")
-    @Operation(summary = "User permissions details", description = "Get detailed permissions for user with source information")
-    public ResponseEntity<ApiResponseDto<UserPermissionDetails>> getUserPermissionDetails(@PathVariable UUID id) {
-        log.info("Getting detailed permissions for user ID: {}", id);
-        
-        // Verify user exists
-        accountService.findById(id);
-        var permissionDetails = userRolePermissionService.getUserPermissionDetails(id);
-        
-        return ResponseEntity.ok(ApiResponseDto.<UserPermissionDetails>builder()
-                .status("success")
-                .message("User permission details retrieved successfully")
-                .data(permissionDetails)
                 .build());
     }
 

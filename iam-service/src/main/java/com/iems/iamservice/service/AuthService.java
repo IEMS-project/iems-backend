@@ -10,7 +10,6 @@ import com.iems.iamservice.entity.User;
 import com.iems.iamservice.exception.AppException;
 import com.iems.iamservice.exception.ErrorCode;
 
-import com.iems.iamservice.entity.Permission;
 import com.iems.iamservice.entity.Role;
 import com.iems.iamservice.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -74,18 +73,14 @@ public class AuthService {
             user.setLastLoginAt(Instant.now());
             accountService.save(user);
 
-            // Get roles and permissions information
+            // Get roles information
             Set<String> roles = userRolePermissionService.getUserRoles(user.getId()).stream()
                     .map(Role::getCode)
                     .collect(Collectors.toSet());
 
-            Set<String> permissions = userRolePermissionService.getAllUserPermissions(user.getId()).stream()
-                    .map(Permission::getCode)
-                    .collect(Collectors.toSet());
-
-            // Create tokens with roles and permissions
+            // Create tokens with roles
             String accessToken = jwtService.generateTokenWithUserInfo(
-                    user.getId(), user.getUsername(), user.getEmail(), roles, permissions);
+                    user.getId(), user.getUsername(), user.getEmail(), roles);
             String refreshToken = jwtService.generateRefreshTokenWithUserId(
                     user.getId(), user.getUsername());
 
@@ -103,7 +98,6 @@ public class AuthService {
                             .username(user.getUsername())
                             .email(user.getEmail())
                             .roles(roles)
-                            .permissions(permissions)
                             .enabled(user.getEnabled())
                             .lastLoginAt(user.getLastLoginAt())
                             .build())
@@ -143,18 +137,14 @@ public class AuthService {
                 throw new AppException(ErrorCode.ACCOUNT_LOCKED);
             }
 
-            // Get roles and permissions information
+            // Get roles information
             Set<String> roles = userRolePermissionService.getUserRoles(user.getId()).stream()
                     .map(Role::getCode)
                     .collect(Collectors.toSet());
 
-            Set<String> permissions = userRolePermissionService.getAllUserPermissions(user.getId()).stream()
-                    .map(Permission::getCode)
-                    .collect(Collectors.toSet());
-
-            // Create new access token with roles and permissions
+            // Create new access token with roles
             String newAccessToken = jwtService.generateTokenWithUserInfo(
-                    user.getId(), user.getUsername(), user.getEmail(), roles, permissions);
+                    user.getId(), user.getUsername(), user.getEmail(), roles);
 
             // Create new refresh token
             String newRefreshToken = jwtService.generateRefreshTokenWithUserId(
@@ -173,7 +163,6 @@ public class AuthService {
                             .username(user.getUsername())
                             .email(user.getEmail())
                             .roles(roles)
-                            .permissions(permissions)
                             .enabled(user.getEnabled())
                             .lastLoginAt(user.getLastLoginAt())
                             .build())

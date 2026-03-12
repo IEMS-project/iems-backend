@@ -96,14 +96,13 @@ public class JwtService {
     }
 
     /**
-     * Create access token with userId, roles and permissions
+     * Create access token with userId, roles
      */
-    public String generateTokenWithUserInfo(UUID userId, String username, String email, Set<String> roles, Set<String> permissions) {
+    public String generateTokenWithUserInfo(UUID userId, String username, String email, Set<String> roles) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("userId", userId.toString());
         claims.put("email", email);
         claims.put("roles", roles);
-        claims.put("permissions", permissions);
         claims.put("type", "access");
 
         Instant now = Instant.now();
@@ -178,16 +177,6 @@ public class JwtService {
         Claims claims = extractAllClaims(token);
         List<String> rolesList = claims.get("roles", List.class);
         return rolesList != null ? Set.copyOf(rolesList) : Set.of();
-    }
-
-    /**
-     * Get permissions from token
-     */
-    @SuppressWarnings("unchecked")
-    public Set<String> extractPermissions(String token) {
-        Claims claims = extractAllClaims(token);
-        List<String> permissionsList = claims.get("permissions", List.class);
-        return permissionsList != null ? Set.copyOf(permissionsList) : Set.of();
     }
 
     /**

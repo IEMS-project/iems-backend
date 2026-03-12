@@ -3,9 +3,7 @@ package com.iems.iamservice.controller;
 import com.iems.iamservice.dto.ApiResponseDto;
 import com.iems.iamservice.dto.request.CreateRoleDto;
 import com.iems.iamservice.dto.request.UpdateRoleDto;
-import com.iems.iamservice.dto.request.AssignPermissionRequestDto;
 import com.iems.iamservice.dto.response.RoleResponseDto;
-import com.iems.iamservice.dto.response.RolePermissionsResponseDto;
 import com.iems.iamservice.service.RoleService;
 import com.iems.iamservice.service.UserRolePermissionService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -101,53 +99,6 @@ public class RoleController {
         return ResponseEntity.ok(ApiResponseDto.<RoleResponseDto>builder()
                 .status("success")
                 .message("Role updated successfully")
-                .data(response)
-                .build());
-    }
-
-    /**
-     * Assign permissions to role
-     */
-    @PostMapping("/{id}/permissions")
-    @Operation(summary = "Assign permissions to role", description = "Assign list of permissions to role")
-    public ResponseEntity<ApiResponseDto<RoleResponseDto>> assignPermissions(@PathVariable UUID id, @Valid @RequestBody AssignPermissionRequestDto dto) {
-        log.info("Assigning permissions {} to role ID: {}", dto.getPermissionCodes(), id);
-        
-        var updated = roleService.assignPermissions(id, dto.getPermissionCodes());
-        var response = roleService.toRoleResponse(updated);
-        
-        return ResponseEntity.ok(ApiResponseDto.<RoleResponseDto>builder()
-                .status("success")
-                .message("Permissions assigned to role successfully")
-                .data(response)
-                .build());
-    }
-
-    /**
-     * Get list of role permissions
-     */
-    @GetMapping("/{id}/permissions")
-    @Operation(summary = "Role permissions", description = "Get list of role permissions")
-    public ResponseEntity<ApiResponseDto<RolePermissionsResponseDto>> getRolePermissions(@PathVariable UUID id) {
-        log.info("Getting permissions for role ID: {}", id);
-        
-        var role = roleService.findById(id);
-        
-        var response = RolePermissionsResponseDto.builder()
-                .roleId(role.getId())
-                .roleCode(role.getCode())
-                .roleName(role.getName())
-                .description(role.getDescription())
-                .active(role.getActive())
-                .createdAt(role.getCreatedAt())
-                .permissions(role.getPermissions().stream()
-                        .map(permission -> permission.getCode())
-                        .collect(Collectors.toSet()))
-                .build();
-        
-        return ResponseEntity.ok(ApiResponseDto.<RolePermissionsResponseDto>builder()
-                .status("success")
-                .message("Role permissions retrieved successfully")
                 .data(response)
                 .build());
     }

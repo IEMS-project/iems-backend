@@ -3,11 +3,9 @@ package com.iems.iamservice.service;
 import com.iems.iamservice.dto.request.CreateRoleDto;
 import com.iems.iamservice.dto.request.UpdateRoleDto;
 import com.iems.iamservice.dto.response.RoleResponseDto;
-import com.iems.iamservice.entity.Permission;
 import com.iems.iamservice.entity.Role;
 import com.iems.iamservice.exception.AppException;
 import com.iems.iamservice.exception.ErrorCode;
-import com.iems.iamservice.repository.PermissionRepository;
 import com.iems.iamservice.repository.RoleRepository;
 import com.iems.iamservice.repository.UserRoleRepository;
 import lombok.RequiredArgsConstructor;
@@ -17,9 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -27,7 +23,6 @@ import java.util.stream.Collectors;
 public class RoleService {
 
     private final RoleRepository roleRepository;
-    private final PermissionRepository permissionRepository;
     private final UserRoleRepository userRoleRepository;
 
     /**
@@ -46,13 +41,6 @@ public class RoleService {
                 .name(dto.getName())
                 .description(dto.getDescription())
                 .build();
-
-        // Set permissions after building to ensure proper bidirectional relationship
-        Set<Permission> permissions = fetchPermissions(dto.getPermissionCodes());
-        permissions.forEach(permission -> {
-            role.getPermissions().add(permission);
-            permission.getRoles().add(role);
-        });
 
         Role savedRole = roleRepository.save(role);
         log.info("Role created successfully: {} with ID: {}", savedRole.getCode(), savedRole.getId());
@@ -99,19 +87,6 @@ public class RoleService {
                 role.setDescription(dto.getDescription());
             }
 
-            if (dto.getPermissionCodes() != null) {
-                // Clear existing permissions from both sides of the relationship
-                role.getPermissions().forEach(permission -> permission.getRoles().remove(role));
-                role.getPermissions().clear();
-
-                // Add new permissions
-                Set<Permission> newPermissions = fetchPermissions(dto.getPermissionCodes());
-                newPermissions.forEach(permission -> {
-                    role.getPermissions().add(permission);
-                    permission.getRoles().add(role);
-                });
-            }
-
             Role updatedRole = roleRepository.save(role);
             log.info("Role updated successfully: {}", updatedRole.getCode());
             return updatedRole;
@@ -124,38 +99,6 @@ public class RoleService {
     }
 
     /**
-     * Assign permissions to role
-     */
-    @Transactional
-    public Role assignPermissions(UUID roleId, Set<String> permissionCodes) {
-        log.info("Assigning permissions {} to role ID: {}", permissionCodes, roleId);
-
-        try {
-            Role role = findById(roleId);
-            Set<Permission> permissions = fetchPermissions(permissionCodes);
-
-            // Clear existing permissions from both sides of the relationship
-            role.getPermissions().forEach(permission -> permission.getRoles().remove(role));
-            role.getPermissions().clear();
-
-            // Add new permissions
-            permissions.forEach(permission -> {
-                role.getPermissions().add(permission);
-                permission.getRoles().add(role);
-            });
-
-            Role updatedRole = roleRepository.save(role);
-            log.info("Permissions assigned successfully to role: {}", updatedRole.getCode());
-            return updatedRole;
-        } catch (AppException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("Failed to assign permissions to role with ID: {}", roleId, e);
-            throw new AppException(ErrorCode.ROLE_PERMISSION_ASSIGNMENT_FAILED);
-        }
-    }
-
-    /**
      * Delete role
      */
     @Transactional
@@ -164,14 +107,7 @@ public class RoleService {
 
         try {
             Role role = findById(id);
-
-            // Xóa toàn bộ quan hệ user-role để tránh lỗi ràng buộc DB
             userRoleRepository.deleteByRoleId(role.getId());
-
-            // Clear all permission relationships before deletion
-            role.getPermissions().forEach(permission -> permission.getRoles().remove(role));
-            role.getPermissions().clear();
-
             roleRepository.delete(role);
             log.info("Role deleted successfully: {}", role.getCode());
         } catch (AppException e) {
@@ -183,19 +119,6 @@ public class RoleService {
     }
 
     /**
-     * Get permissions from codes
-     */
-    private Set<Permission> fetchPermissions(Set<String> codes) {
-        if (codes == null || codes.isEmpty()) {
-            return Set.of();
-        }
-        return codes.stream()
-                .map(code -> permissionRepository.findByCode(code)
-                        .orElseThrow(() -> new AppException(ErrorCode.PERMISSION_NOT_FOUND_BY_CODE)))
-                .collect(Collectors.toSet());
-    }
-
-    /**
      * Convert Role entity to RoleResponseDto
      */
     public RoleResponseDto toRoleResponse(Role role) {
@@ -203,8 +126,6 @@ public class RoleService {
         dto.setId(role.getId());
         dto.setCode(role.getCode());
         dto.setName(role.getName());
-        Set<String> permissions = role.getPermissions().stream().map(Permission::getCode).collect(Collectors.toSet());
-        dto.setPermissions(permissions);
         return dto;
     }
 }

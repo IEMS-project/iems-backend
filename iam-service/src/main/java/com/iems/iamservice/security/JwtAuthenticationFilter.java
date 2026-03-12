@@ -71,11 +71,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         authorities.add(new SimpleGrantedAuthority("ROLE_" + role))
                 );
 
-                // Add permissions (no prefix, hoặc bạn có thể dùng PERM_)
-                jwtService.extractPermissions(jwt).forEach(perm ->
-                        authorities.add(new SimpleGrantedAuthority(perm))
-                );
-
                 UserDetails userDetails = new JwtUserDetails(userId, username, authorities);
 
 

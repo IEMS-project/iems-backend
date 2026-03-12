@@ -1,5 +1,6 @@
 package com.iems.iamservice.entity;
 
+import com.iems.iamservice.entity.enums.SubscriptionType;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -48,6 +49,13 @@ public class Account {
     @Column
     private Instant lastLoginAt;
 
+    @Enumerated(EnumType.STRING)
+    @Column(length = 20, nullable = false)
+    @Builder.Default
+    private SubscriptionType subscriptionType = SubscriptionType.FREE;
+
+    @Column
+    private Instant premiumUntil;
 
     @PreUpdate
     public void preUpdate() {
