@@ -1,340 +1,149 @@
 package com.iems.projectservice.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.iems.projectservice.client.UserServiceFeignClient;
-import com.iems.projectservice.dto.request.UserIdsDto;
+import com.iems.projectservice.dto.request.AccountIdsDto;
 import com.iems.projectservice.dto.response.ProjectMemberResponseDto;
 import com.iems.projectservice.dto.response.UserDetailDto;
-import com.iems.projectservice.entity.Project;
-import com.iems.projectservice.entity.ProjectAllowedRole;
 import com.iems.projectservice.entity.ProjectMember;
-import com.iems.projectservice.entity.enums.MemberStatus;
+import com.iems.projectservice.entity.Role;
 import com.iems.projectservice.exception.AppException;
 import com.iems.projectservice.exception.ProjectErrorCode;
 import com.iems.projectservice.repository.ProjectMemberRepository;
-import com.iems.projectservice.repository.ProjectRepository;
-import com.iems.projectservice.security.JwtUserDetails;
+import com.iems.projectservice.repository.RoleRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class ProjectMemberService {
-    
+
     private final ProjectMemberRepository projectMemberRepository;
-    private final ProjectRepository projectRepository;
-    private final ProjectAllowedRoleService projectAllowedRoleService;
+    private final RoleRepository roleRepository;
+    private final UserServiceFeignClient userServiceFeignClient;
+    private final ObjectMapper objectMapper;
 
-    @Autowired
-    private UserServiceFeignClient userServiceFeignClient;
-
-    public UUID getUserIdFromRequest() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        JwtUserDetails userDetails = (JwtUserDetails) authentication.getPrincipal();
-        UUID userId = userDetails.getUserId();
-        return userId;
-    }
-
-    private Optional<UserDetailDto> getUserById(UUID accountId) {
-        try {
-            ResponseEntity<Map<String, Object>> response = userServiceFeignClient.getUserByAccountId(accountId);
-
-            if (response.getBody() != null && response.getBody().containsKey("data")) {
-                @SuppressWarnings("unchecked")
-                Map<String, Object> userData = (Map<String, Object>) response.getBody().get("data");
-                return Optional.of(convertToUserDetailDto(userData));
-            }
-
-            return Optional.empty();
-        } catch (Exception e) {
-            // Log error and return empty
-            System.err.println("Error fetching user by accountId " + accountId + " from User Service: " + e.getMessage());
-            return Optional.empty();
+    @Transactional
+    public ProjectMember addMemberToProject(UUID projectId, UUID accountId, UUID roleId) {
+        if (projectMemberRepository.existsByProjectIdAndAccountId(projectId, accountId)) {
+            throw new AppException(ProjectErrorCode.PROJECT_MEMBER_ALREADY_EXISTS);
         }
-    }
-    private UserDetailDto convertToUserDetailDto(Map<String, Object> userData) {
-        UserDetailDto dto = new UserDetailDto();
-        dto.setId(UUID.fromString(userData.get("id").toString()));
-        dto.setFirstName((String) userData.get("firstName"));
-        dto.setLastName((String) userData.get("lastName"));
-        dto.setEmail((String) userData.get("email"));
-        dto.setAddress((String) userData.get("address"));
-        dto.setPhone((String) userData.get("phone"));
-
-        // Handle Date objects - convert to string
-        Object dob = userData.get("dob");
-        dto.setDob(dob != null ? dob.toString() : null);
-
-        // Handle enum objects - convert to string
-        Object gender = userData.get("gender");
-        dto.setGender(gender != null ? gender.toString() : null);
-
-        dto.setPersonalID((String) userData.get("personalID"));
-        dto.setImage((String) userData.get("image"));
-        dto.setBankAccountNumber((String) userData.get("bankAccountNumber"));
-        dto.setBankName((String) userData.get("bankName"));
-
-        // Handle enum objects - convert to string
-        Object contractType = userData.get("contractType");
-        dto.setContractType(contractType != null ? contractType.toString() : null);
-
-        // Handle Date objects - convert to string
-        Object startDate = userData.get("startDate");
-        dto.setStartDate(startDate != null ? startDate.toString() : null);
-
-        dto.setRole((String) userData.get("role"));
-        return dto;
+        ProjectMember member = new ProjectMember();
+        member.setProjectId(projectId);
+        member.setAccountId(accountId);
+        member.setRoleId(roleId);
+        member.setJoinedAt(LocalDateTime.now());
+        member.setAssignedByAccountId(accountId); // will be overridden by caller if needed
+        return projectMemberRepository.save(member);
     }
 
+    @Transactional
+    public ProjectMember addMemberToProject(UUID projectId, UUID accountId, UUID roleId, UUID assignedBy) {
+        if (projectMemberRepository.existsByProjectIdAndAccountId(projectId, accountId)) {
+            throw new AppException(ProjectErrorCode.PROJECT_MEMBER_ALREADY_EXISTS);
+        }
+        ProjectMember member = new ProjectMember();
+        member.setProjectId(projectId);
+        member.setAccountId(accountId);
+        member.setRoleId(roleId);
+        member.setJoinedAt(LocalDateTime.now());
+        member.setAssignedByAccountId(assignedBy);
+        return projectMemberRepository.save(member);
+    }
 
-    public ProjectMemberResponseDto addMemberToProject(UUID projectId, UUID accountId, UUID roleId) {
-        log.info("Adding member to project: projectId={}, accountId={}, roleId={}", projectId, accountId, roleId);
-        
-        // Execute transaction logic separately
-        UUID savedMemberId = saveOrUpdateMember(projectId, accountId, roleId);
-        
-        // Fetch and map after transaction is committed
-        ProjectMember savedMember = projectMemberRepository.findById(savedMemberId)
+    @Transactional
+    public void removeMember(UUID projectId, UUID accountId) {
+        ProjectMember member = projectMemberRepository.findByProjectIdAndAccountId(projectId, accountId)
                 .orElseThrow(() -> new AppException(ProjectErrorCode.MEMBER_NOT_FOUND));
-        
-        return mapToProjectMemberResponseDto(savedMember, new HashMap<>());
+        projectMemberRepository.delete(member);
     }
-    
+
     @Transactional
-    public UUID saveOrUpdateMember(UUID projectId, UUID accountId, UUID roleId) {
-        UUID assignedByAccountId = getUserIdFromRequest();
-        
-        // Validate project exists
-        Project project = projectRepository.findById(projectId)
-                .orElseThrow(() -> new AppException(ProjectErrorCode.PROJECT_NOT_FOUND));
-        
-        // Check if user is already a member
-        Optional<ProjectMember> existingMember = projectMemberRepository.findMemberByProjectAndAccount(projectId, accountId);
-        
-        if (existingMember.isPresent()) {
-            // Update existing member
-            log.info("Member already exists, updating role: projectId={}, accountId={}", projectId, accountId);
-            ProjectMember member = existingMember.get();
-            member.setRoleId(roleId);
-            member.setAssignedByAccountId(assignedByAccountId);
-            projectMemberRepository.save(member);
-            return member.getId();
-        } else {
-            // Create new member
-            ProjectMember projectMember = new ProjectMember();
-            projectMember.setProject(project);
-            projectMember.setAccountId(accountId);
-            projectMember.setRoleId(roleId);
-            projectMember.setStatus(MemberStatus.ACTIVE); // Set default status
-            projectMember.setJoinedAt(LocalDateTime.now());
-            projectMember.setAssignedByAccountId(assignedByAccountId);
-            
-            projectMemberRepository.save(projectMember);
-            return projectMember.getId();
-        }
-    }
-    
-    public List<ProjectMemberResponseDto> getProjectMembers(UUID projectId) {
-        log.info("Getting project members: projectId={}", projectId);
-        
-        List<ProjectMember> members = projectMemberRepository.findByProjectId(projectId);
-        Map<UUID, UserDetailDto> userMap = getUserMapFromMembers(members);
-        return members.stream()
-                .map(member -> mapToProjectMemberResponseDto(member, userMap))
-                .collect(Collectors.toList());
-    }
-    
-    @Transactional
-    public ProjectMemberResponseDto updateMemberRole(UUID projectId, UUID accountId, UUID newRoleId) {
-        log.info("Updating member role: projectId={}, accountId={}, newRoleId={}", projectId, accountId, newRoleId);
-        
-        ProjectMember projectMember = projectMemberRepository.findMemberByProjectAndAccount(projectId, accountId)
+    public ProjectMember updateMemberRole(UUID projectId, UUID accountId, UUID newRoleId) {
+        ProjectMember member = projectMemberRepository.findByProjectIdAndAccountId(projectId, accountId)
                 .orElseThrow(() -> new AppException(ProjectErrorCode.MEMBER_NOT_FOUND));
-        
-        projectMember.setRoleId(newRoleId);
-        ProjectMember updatedMember = projectMemberRepository.save(projectMember);
-        
-        return mapToProjectMemberResponseDto(updatedMember, new HashMap<>());
+        member.setRoleId(newRoleId);
+        return projectMemberRepository.save(member);
     }
-    
-    @Transactional
-    public ProjectMemberResponseDto updateMemberStatus(UUID projectId, UUID accountId, MemberStatus newStatus) {
-        log.info("Updating member status: projectId={}, accountId={}, newStatus={}", projectId, accountId, newStatus);
-        
-        ProjectMember projectMember = projectMemberRepository.findMemberByProjectAndAccount(projectId, accountId)
-                .orElseThrow(() -> new AppException(ProjectErrorCode.MEMBER_NOT_FOUND));
-        
-        projectMember.setStatus(newStatus);
-        ProjectMember updatedMember = projectMemberRepository.save(projectMember);
-        
-        return mapToProjectMemberResponseDto(updatedMember, new HashMap<>());
+
+    public List<ProjectMember> getProjectMembers(UUID projectId) {
+        return projectMemberRepository.findByProjectId(projectId);
     }
-    
-    @Transactional
-    public void removeMemberFromProject(UUID projectId, UUID accountId) {
-        log.info("Removing member from project: projectId={}, accountId={}", projectId, accountId);
-        
-        // Check if member exists
-        if (!projectMemberRepository.existsByProjectIdAndAccountId(projectId, accountId)) {
-            throw new AppException(ProjectErrorCode.MEMBER_NOT_FOUND);
-        }
-        
-        // Check if user is project manager (cannot remove project manager)
-        Project project = projectRepository.findById(projectId)
-                .orElseThrow(() -> new AppException(ProjectErrorCode.PROJECT_NOT_FOUND));
-        
-        if (project.getManagerAccountId().equals(accountId)) {
-            throw new AppException(ProjectErrorCode.PROJECT_MANAGER_CANNOT_BE_REMOVED);
-        }
-        
-        // Check if member has active tasks (this would integrate with task service)
-        // For now, just log a warning
-        log.warn("Removing member with potential active tasks: projectId={}, accountId={}", projectId, accountId);
-        
-        projectMemberRepository.deleteByProjectIdAndAccountId(projectId, accountId);
-    }
-    
+
     public boolean isProjectMember(UUID projectId, UUID accountId) {
         return projectMemberRepository.existsByProjectIdAndAccountId(projectId, accountId);
     }
-    
-    public boolean isProjectManager(UUID projectId, UUID accountId) {
-        Project project = projectRepository.findById(projectId)
-                .orElseThrow(() -> new AppException(ProjectErrorCode.PROJECT_NOT_FOUND));
-        return project.getManagerAccountId().equals(accountId);
-    }
-    
-    public List<ProjectMemberResponseDto> getMembersByRole(UUID projectId, UUID roleId) {
-        log.info("Getting project members by role: projectId={}, roleId={}", projectId, roleId);
-        
-        List<ProjectMember> members = projectMemberRepository.findByProjectIdAndRoleId(projectId, roleId);
-        Map<UUID, UserDetailDto> userMap = getUserMapFromMembers(members);
-        return members.stream()
-                .map(member -> mapToProjectMemberResponseDto(member, userMap))
-                .collect(Collectors.toList());
-    }
-    
-    public List<UUID> getUserProjectIds(UUID accountId) {
-        log.info("Getting project IDs for account: {}", accountId);
-        
-        List<ProjectMember> members = projectMemberRepository.findByAccountId(accountId);
-        return members.stream()
-                .map(member -> member.getProject().getId())
-                .collect(Collectors.toList());
+
+    public ProjectMember getMember(UUID projectId, UUID accountId) {
+        return projectMemberRepository.findByProjectIdAndAccountId(projectId, accountId)
+                .orElseThrow(() -> new AppException(ProjectErrorCode.MEMBER_NOT_FOUND));
     }
 
-    // Helper method to get user map from members
-    private Map<UUID, UserDetailDto> getUserMapFromMembers(List<ProjectMember> members) {
-        Set<UUID> accountIds = members.stream()
-                .flatMap(member -> Stream.of(
-                        member.getAccountId(),
-                        member.getAssignedByAccountId()
-                ))
-                .filter(Objects::nonNull)
-                .collect(Collectors.toSet());
+    public List<ProjectMemberResponseDto> getProjectMembersEnriched(UUID projectId) {
+        List<ProjectMember> members = projectMemberRepository.findByProjectId(projectId);
+        if (members.isEmpty())
+            return List.of();
 
-        if (accountIds.isEmpty()) {
-            return new HashMap<>();
+        // Collect all accountIds to batch-fetch (members + assignedBy)
+        Set<UUID> accountIds = new HashSet<>();
+        for (ProjectMember m : members) {
+            accountIds.add(m.getAccountId());
+            if (m.getAssignedByAccountId() != null) {
+                accountIds.add(m.getAssignedByAccountId());
+            }
         }
 
+        // Batch-fetch users from IAM service: UserResponseDto.id == accountId
+        Map<UUID, UserDetailDto> userMap = new HashMap<>();
         try {
-            com.iems.projectservice.dto.request.AccountIdsDto accountIdsDto = 
-                new com.iems.projectservice.dto.request.AccountIdsDto();
-            accountIdsDto.setAccountIds(accountIds);
-            ResponseEntity<Map<String, Object>> response = userServiceFeignClient.getUsersByAccountIds(accountIdsDto);
-            if (response.getBody() != null && response.getBody().containsKey("data")) {
-                @SuppressWarnings("unchecked")
-                List<Map<String, Object>> usersData = (List<Map<String, Object>>) response.getBody().get("data");
-                return usersData.stream()
-                        .map(this::convertToUserDetailDto)
-                        .collect(Collectors.toMap(UserDetailDto::getId, user -> user));
+            ResponseEntity<Map<String, Object>> response = userServiceFeignClient
+                    .getUsersByAccountIds(new AccountIdsDto(accountIds));
+            if (response.getBody() != null && response.getBody().get("data") != null) {
+                List<UserDetailDto> users = objectMapper.convertValue(
+                        response.getBody().get("data"),
+                        objectMapper.getTypeFactory().constructCollectionType(List.class, UserDetailDto.class));
+                userMap = users.stream()
+                        .filter(u -> u.getId() != null)
+                        .collect(Collectors.toMap(UserDetailDto::getId, u -> u));
             }
-            return new HashMap<>();
         } catch (Exception e) {
-            log.error("Error fetching users from User Service: {}", e.getMessage());
-            return new HashMap<>();
+            log.warn("Failed to fetch user details from IAM service: {}", e.getMessage());
         }
+
+        // Fetch roles from local DB
+        Set<UUID> roleIds = members.stream().map(ProjectMember::getRoleId).collect(Collectors.toSet());
+        Map<UUID, String> roleNameMap = roleRepository.findAllById(roleIds)
+                .stream().collect(Collectors.toMap(Role::getId, Role::getName));
+
+        final Map<UUID, UserDetailDto> finalUserMap = userMap;
+        return members.stream().map(m -> {
+            UserDetailDto user = finalUserMap.get(m.getAccountId());
+            UserDetailDto assignedBy = finalUserMap.get(m.getAssignedByAccountId());
+
+            return new ProjectMemberResponseDto(
+                    m.getId(),
+                    m.getAccountId(),
+                    user != null ? trim(user.getFirstName()) + " " + trim(user.getLastName()) : null,
+                    user != null ? user.getEmail() : null,
+                    user != null ? user.getImage() : null,
+                    m.getRoleId(),
+                    roleNameMap.get(m.getRoleId()),
+                    m.getStatus(),
+                    m.getJoinedAt(),
+                    m.getAssignedByAccountId(),
+                    assignedBy != null ? trim(assignedBy.getFirstName()) + " " + trim(assignedBy.getLastName()) : null);
+        }).collect(Collectors.toList());
     }
 
-    private ProjectMemberResponseDto mapToProjectMemberResponseDto(ProjectMember projectMember) {
-        return mapToProjectMemberResponseDto(projectMember, new HashMap<>());
+    private String trim(String s) {
+        return s != null ? s.trim() : "";
     }
-
-    private ProjectMemberResponseDto mapToProjectMemberResponseDto(ProjectMember projectMember, Map<UUID, UserDetailDto> userMap) {
-        ProjectMemberResponseDto dto = new ProjectMemberResponseDto();
-        dto.setId(projectMember.getId());
-        dto.setUserId(projectMember.getAccountId());
-        dto.setRoleId(projectMember.getRoleId());
-        dto.setStatus(projectMember.getStatus());
-        dto.setJoinedAt(projectMember.getJoinedAt());
-        dto.setAssignedBy(projectMember.getAssignedByAccountId());
-        
-        // Get project ID directly to avoid lazy loading issues
-        UUID projectId = projectMember.getProject() != null ? projectMember.getProject().getId() : null;
-        
-        // Get role name from ProjectAllowedRole
-        if (projectId != null) {
-            try {
-                List<ProjectAllowedRole> allowedRoles = projectAllowedRoleService.list(projectId);
-                allowedRoles.stream()
-                    .filter(role -> role.getId().equals(projectMember.getRoleId()))
-                    .findFirst()
-                    .ifPresent(role -> dto.setRoleName(role.getRoleName()));
-            } catch (Exception e) {
-                log.warn("Could not get role name for roleId {}: {}", projectMember.getRoleId(), e.getMessage());
-                dto.setRoleName("Unknown Role");
-            }
-        } else {
-            dto.setRoleName("Unknown Role");
-        }
-
-        // Lấy thông tin user từ userMap hoặc UserService
-        UserDetailDto user = userMap.get(projectMember.getAccountId());
-        if (user == null) {
-            Optional<UserDetailDto> userOpt = getUserById(projectMember.getAccountId());
-            if (userOpt.isPresent()) {
-                user = userOpt.get();
-            }
-        }
-        if (user != null) {
-            dto.setUserName(user.getFirstName() + " " + user.getLastName());
-            dto.setUserEmail(user.getEmail());
-            dto.setUserImage(user.getImage());
-        } else {
-            dto.setUserName("Unknown User");
-            dto.setUserEmail("unknown@example.com");
-            dto.setUserImage(null);
-        }
-
-        // Lấy thông tin assignedBy
-        if (projectMember.getAssignedByAccountId() != null) {
-            UserDetailDto assignedByUser = userMap.get(projectMember.getAssignedByAccountId());
-            if (assignedByUser == null) {
-                Optional<UserDetailDto> assignedByOpt = getUserById(projectMember.getAssignedByAccountId());
-                if (assignedByOpt.isPresent()) {
-                    assignedByUser = assignedByOpt.get();
-                }
-            }
-            if (assignedByUser != null) {
-                dto.setAssignedByName(assignedByUser.getFirstName() + " " + assignedByUser.getLastName());
-            } else {
-                dto.setAssignedByName("Unknown User");
-            }
-        } else {
-            dto.setAssignedByName(null);
-        }
-        return dto;
-    }
-
 }

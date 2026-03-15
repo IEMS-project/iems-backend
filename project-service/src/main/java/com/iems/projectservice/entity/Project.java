@@ -1,16 +1,16 @@
 package com.iems.projectservice.entity;
 
+import com.iems.projectservice.entity.enums.ProjectFramework;
+import com.iems.projectservice.entity.enums.ProjectMethodology;
 import com.iems.projectservice.entity.enums.ProjectStatus;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import lombok.ToString;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.UUID;
 
 @Entity
@@ -27,8 +27,19 @@ public class Project {
     @Column(nullable = false, unique = true)
     private String name;
 
+    @Column(name = "project_key", nullable = false, unique = true, length = 10)
+    private String projectKey;
+
     @Column(columnDefinition = "TEXT")
     private String description;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "methodology")
+    private ProjectMethodology methodology = ProjectMethodology.AGILE;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "framework")
+    private ProjectFramework framework = ProjectFramework.SCRUM;
 
     @Column(name = "start_date", nullable = false)
     private LocalDateTime startDate;
@@ -53,12 +64,4 @@ public class Project {
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
-
-
-
-    @OneToMany(mappedBy = "project", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    @ToString.Exclude
-    private List<ProjectMember> members;
-
-
 }

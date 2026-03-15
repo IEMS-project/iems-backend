@@ -12,24 +12,38 @@ public enum ProjectErrorCode {
 
     PROJECT_NOT_FOUND("Project not found", HttpStatus.NOT_FOUND),
     PROJECT_NAME_EXISTS("Project name already exists", HttpStatus.CONFLICT),
-    MEMBER_NOT_FOUND("Project member not found", HttpStatus.NOT_FOUND),
+    PROJECT_KEY_EXISTS("Project key already exists", HttpStatus.CONFLICT),
     PERMISSION_DENIED("Permission denied", HttpStatus.FORBIDDEN),
 
-
+    MEMBER_NOT_FOUND("Project member not found", HttpStatus.NOT_FOUND),
     PROJECT_MEMBER_ALREADY_EXISTS("User is already a member of this project", HttpStatus.CONFLICT),
     PROJECT_MANAGER_CANNOT_BE_REMOVED("Cannot remove project manager from project", HttpStatus.BAD_REQUEST),
+
+    ROLE_NOT_FOUND("Role not found", HttpStatus.NOT_FOUND),
+    ROLE_ALREADY_EXISTS("Role already exists in this project", HttpStatus.CONFLICT),
     ROLE_ALREADY_ASSIGNED("Cannot delete role that is already assigned to members", HttpStatus.CONFLICT),
-    
-    PHASE_NOT_FOUND("Phase not found", HttpStatus.NOT_FOUND),
-    PHASE_NOT_BELONG_TO_PROJECT("Phase does not belong to this project", HttpStatus.BAD_REQUEST),
 
+    PERMISSION_NOT_FOUND("Permission not found", HttpStatus.NOT_FOUND),
+    PERMISSION_ALREADY_ASSIGNED("Permission is already assigned to this role", HttpStatus.CONFLICT),
 
-    TASK_NOT_FOUND("Task not found", HttpStatus.NOT_FOUND),
-    USER_NOT_FOUND("User not found", HttpStatus.NOT_FOUND),
-    INVALID_STATUS_TRANSITION("Invalid status transition", HttpStatus.BAD_REQUEST);
+    WORKFLOW_NOT_FOUND("Workflow not found", HttpStatus.NOT_FOUND),
+    WORKFLOW_STATUS_NOT_FOUND("Workflow status not found", HttpStatus.NOT_FOUND),
+    WORKFLOW_TRANSITION_NOT_FOUND("Workflow transition not found", HttpStatus.NOT_FOUND),
+    INVALID_WORKFLOW_TRANSITION("Invalid workflow transition", HttpStatus.BAD_REQUEST),
+
+    ISSUE_NOT_FOUND("Issue not found", HttpStatus.NOT_FOUND),
+    ISSUE_TYPE_NOT_FOUND("Issue type not found", HttpStatus.NOT_FOUND),
+    ISSUE_PRIORITY_NOT_FOUND("Issue priority not found", HttpStatus.NOT_FOUND),
+
+    SPRINT_NOT_FOUND("Sprint not found", HttpStatus.NOT_FOUND),
+    SPRINT_ALREADY_ACTIVE("A sprint is already active in this project", HttpStatus.CONFLICT),
+    SPRINT_NOT_ACTIVE("Sprint is not active", HttpStatus.BAD_REQUEST),
+
+    COMMENT_NOT_FOUND("Comment not found", HttpStatus.NOT_FOUND),
+    ATTACHMENT_NOT_FOUND("Attachment not found", HttpStatus.NOT_FOUND),
+
+    USER_NOT_FOUND("User not found", HttpStatus.NOT_FOUND);
 
     private final String message;
     private final HttpStatus httpStatus;
 }
-
-
