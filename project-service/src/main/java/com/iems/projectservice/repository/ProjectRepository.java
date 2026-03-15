@@ -2,8 +2,6 @@ package com.iems.projectservice.repository;
 
 import com.iems.projectservice.entity.Project;
 import com.iems.projectservice.entity.enums.ProjectStatus;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -19,6 +17,8 @@ public interface ProjectRepository extends JpaRepository<Project, UUID> {
     
     Optional<Project> findByName(String name);
     
+    Optional<Project> findByProjectKey(String projectKey);
+    
     List<Project> findByManagerAccountId(UUID managerAccountId);
     
     List<Project> findByStatus(ProjectStatus status);
@@ -27,10 +27,10 @@ public interface ProjectRepository extends JpaRepository<Project, UUID> {
     List<Project> findByDateRange(@Param("startDate") LocalDateTime startDate, 
                                   @Param("endDate") LocalDateTime endDate);
     
-    @Query("SELECT p FROM Project p JOIN p.members pm WHERE pm.accountId = :accountId")
+    @Query("SELECT DISTINCT p FROM Project p JOIN ProjectMember pm ON pm.projectId = p.id WHERE pm.accountId = :accountId")
     List<Project> findByMemberAccountId(@Param("accountId") UUID accountId);
     
     boolean existsByName(String name);
-
-    Optional<Project> findById(UUID projectId);
+    
+    boolean existsByProjectKey(String projectKey);
 }

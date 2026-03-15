@@ -12,7 +12,8 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "project_members")
+@Table(name = "project_members",
+        uniqueConstraints = @UniqueConstraint(columnNames = {"project_id", "account_id"}))
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -22,9 +23,8 @@ public class ProjectMember {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
     
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "project_id", nullable = false)
-    private Project project;
+    @Column(name = "project_id", nullable = false)
+    private UUID projectId;
     
     @Column(name = "account_id", nullable = false)
     private UUID accountId;
@@ -54,6 +54,9 @@ public class ProjectMember {
     protected void onCreate() {
         if (status == null) {
             status = MemberStatus.ACTIVE;
+        }
+        if (joinedAt == null) {
+            joinedAt = LocalDateTime.now();
         }
     }
 }

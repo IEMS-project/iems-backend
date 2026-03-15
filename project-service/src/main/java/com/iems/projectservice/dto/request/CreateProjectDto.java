@@ -1,28 +1,29 @@
 package com.iems.projectservice.dto.request;
 
+import com.iems.projectservice.entity.enums.ProjectFramework;
+import com.iems.projectservice.entity.enums.ProjectMethodology;
 import com.iems.projectservice.entity.enums.ProjectStatus;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import lombok.AllArgsConstructor;
 import lombok.Data;
-import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
 @Data
-@NoArgsConstructor
-@AllArgsConstructor
 public class CreateProjectDto {
-    
-    @NotBlank(message = "Project name is required")
+    @NotBlank
     private String name;
+    
+    @NotBlank
+    private String projectKey;
     
     private String description;
     
-    @NotNull(message = "Start date is required")
+    private ProjectMethodology methodology;
+    private ProjectFramework framework;
+    
+    @NotNull
     private LocalDateTime startDate;
-    
     private LocalDateTime endDate;
-    
     private ProjectStatus status;
 }

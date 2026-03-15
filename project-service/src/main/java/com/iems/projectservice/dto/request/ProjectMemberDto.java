@@ -12,8 +12,8 @@ import java.util.UUID;
 @AllArgsConstructor
 public class ProjectMemberDto {
     
-    @NotNull(message = "User ID is required")
-    private UUID userId;
+    @NotNull(message = "Account ID is required")
+    private UUID accountId;
     
     @NotNull(message = "Role ID is required")
     private UUID roleId;
