@@ -1,7 +1,5 @@
 package com.iems.projectservice.entity;
 
-import com.iems.projectservice.entity.enums.ProjectFramework;
-import com.iems.projectservice.entity.enums.ProjectMethodology;
 import com.iems.projectservice.entity.enums.ProjectStatus;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -32,14 +30,6 @@ public class Project {
 
     @Column(columnDefinition = "TEXT")
     private String description;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "methodology")
-    private ProjectMethodology methodology = ProjectMethodology.AGILE;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "framework")
-    private ProjectFramework framework = ProjectFramework.SCRUM;
 
     @Column(name = "start_date", nullable = false)
     private LocalDateTime startDate;
