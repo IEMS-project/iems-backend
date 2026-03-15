@@ -39,10 +39,11 @@ public class IssueService {
     // ── User enrichment helpers ──────────────────────────────────────────────
 
     private Map<UUID, UserDetailDto> fetchUsers(Set<UUID> accountIds) {
-        if (accountIds.isEmpty()) return Collections.emptyMap();
+        if (accountIds.isEmpty())
+            return Collections.emptyMap();
         try {
-            ResponseEntity<Map<String, Object>> response =
-                    userServiceFeignClient.getUsersByAccountIds(new AccountIdsDto(accountIds));
+            ResponseEntity<Map<String, Object>> response = userServiceFeignClient
+                    .getUsersByAccountIds(new AccountIdsDto(accountIds));
             if (response.getBody() != null && response.getBody().get("data") != null) {
                 List<UserDetailDto> users = objectMapper.convertValue(
                         response.getBody().get("data"),
@@ -58,7 +59,8 @@ public class IssueService {
     }
 
     private UserInfoDto toUserInfo(UserDetailDto u) {
-        if (u == null) return null;
+        if (u == null)
+            return null;
         String name = (u.getFirstName() != null ? u.getFirstName().trim() : "")
                 + " "
                 + (u.getLastName() != null ? u.getLastName().trim() : "");
@@ -91,16 +93,20 @@ public class IssueService {
 
     private IssueResponseDto enrich(Issue issue) {
         Set<UUID> ids = new HashSet<>();
-        if (issue.getAssigneeId() != null) ids.add(issue.getAssigneeId());
-        if (issue.getReporterId() != null) ids.add(issue.getReporterId());
+        if (issue.getAssigneeId() != null)
+            ids.add(issue.getAssigneeId());
+        if (issue.getReporterId() != null)
+            ids.add(issue.getReporterId());
         return toDto(issue, fetchUsers(ids));
     }
 
     private List<IssueResponseDto> enrichList(List<Issue> issues) {
         Set<UUID> ids = new HashSet<>();
         for (Issue i : issues) {
-            if (i.getAssigneeId() != null) ids.add(i.getAssigneeId());
-            if (i.getReporterId() != null) ids.add(i.getReporterId());
+            if (i.getAssigneeId() != null)
+                ids.add(i.getAssigneeId());
+            if (i.getReporterId() != null)
+                ids.add(i.getReporterId());
         }
         Map<UUID, UserDetailDto> userMap = fetchUsers(ids);
         return issues.stream().map(i -> toDto(i, userMap)).collect(Collectors.toList());

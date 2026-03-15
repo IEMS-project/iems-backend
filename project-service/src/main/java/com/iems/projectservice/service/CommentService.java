@@ -57,14 +57,15 @@ public class CommentService {
 
     public List<CommentResponseDto> getCommentsByIssue(UUID issueId) {
         List<Comment> comments = commentRepository.findByIssueIdOrderByCreatedAtAsc(issueId);
-        if (comments.isEmpty()) return List.of();
+        if (comments.isEmpty())
+            return List.of();
 
         // Batch-fetch author info from IAM
         Set<UUID> authorIds = comments.stream().map(Comment::getAuthorId).collect(Collectors.toSet());
         Map<UUID, UserDetailDto> userMap = new HashMap<>();
         try {
-            ResponseEntity<Map<String, Object>> response =
-                    userServiceFeignClient.getUsersByAccountIds(new AccountIdsDto(authorIds));
+            ResponseEntity<Map<String, Object>> response = userServiceFeignClient
+                    .getUsersByAccountIds(new AccountIdsDto(authorIds));
             if (response.getBody() != null && response.getBody().get("data") != null) {
                 List<UserDetailDto> users = objectMapper.convertValue(
                         response.getBody().get("data"),

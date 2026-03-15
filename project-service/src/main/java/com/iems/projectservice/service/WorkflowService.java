@@ -40,9 +40,12 @@ public class WorkflowService {
     public Workflow updateWorkflow(UUID workflowId, CreateWorkflowDto dto) {
         Workflow wf = workflowRepository.findById(workflowId)
                 .orElseThrow(() -> new AppException(ProjectErrorCode.WORKFLOW_NOT_FOUND));
-        if (dto.getName() != null) wf.setName(dto.getName());
-        if (dto.getDescription() != null) wf.setDescription(dto.getDescription());
-        if (dto.getIsDefault() != null) wf.setIsDefault(dto.getIsDefault());
+        if (dto.getName() != null)
+            wf.setName(dto.getName());
+        if (dto.getDescription() != null)
+            wf.setDescription(dto.getDescription());
+        if (dto.getIsDefault() != null)
+            wf.setIsDefault(dto.getIsDefault());
         return workflowRepository.save(wf);
     }
 
@@ -68,10 +71,10 @@ public class WorkflowService {
     public WorkflowStatus addStatus(UUID workflowId, CreateWorkflowStatusDto dto) {
         workflowRepository.findById(workflowId)
                 .orElseThrow(() -> new AppException(ProjectErrorCode.WORKFLOW_NOT_FOUND));
-        
+
         List<WorkflowStatus> existing = workflowStatusRepository.findByWorkflowIdOrderBySortOrderAsc(workflowId);
         int nextOrder = dto.getSortOrder() != null ? dto.getSortOrder() : existing.size();
-        
+
         WorkflowStatus status = new WorkflowStatus();
         status.setWorkflowId(workflowId);
         status.setName(dto.getName());
@@ -84,10 +87,14 @@ public class WorkflowService {
     public WorkflowStatus updateStatus(UUID statusId, CreateWorkflowStatusDto dto) {
         WorkflowStatus status = workflowStatusRepository.findById(statusId)
                 .orElseThrow(() -> new AppException(ProjectErrorCode.WORKFLOW_STATUS_NOT_FOUND));
-        if (dto.getName() != null) status.setName(dto.getName());
-        if (dto.getCategory() != null) status.setCategory(dto.getCategory());
-        if (dto.getSortOrder() != null) status.setSortOrder(dto.getSortOrder());
-        if (dto.getColor() != null) status.setColor(dto.getColor());
+        if (dto.getName() != null)
+            status.setName(dto.getName());
+        if (dto.getCategory() != null)
+            status.setCategory(dto.getCategory());
+        if (dto.getSortOrder() != null)
+            status.setSortOrder(dto.getSortOrder());
+        if (dto.getColor() != null)
+            status.setColor(dto.getColor());
         return workflowStatusRepository.save(status);
     }
 
@@ -105,7 +112,7 @@ public class WorkflowService {
     public WorkflowTransition addTransition(UUID workflowId, CreateWorkflowTransitionDto dto) {
         workflowRepository.findById(workflowId)
                 .orElseThrow(() -> new AppException(ProjectErrorCode.WORKFLOW_NOT_FOUND));
-        
+
         WorkflowTransition t = new WorkflowTransition();
         t.setWorkflowId(workflowId);
         t.setFromStatusId(dto.getFromStatusId());
@@ -157,7 +164,8 @@ public class WorkflowService {
         return wf;
     }
 
-    private WorkflowStatus createStatus(UUID workflowId, String name, StatusCategory category, int sortOrder, String color) {
+    private WorkflowStatus createStatus(UUID workflowId, String name, StatusCategory category, int sortOrder,
+            String color) {
         WorkflowStatus status = new WorkflowStatus();
         status.setWorkflowId(workflowId);
         status.setName(name);
