@@ -1,7 +1,5 @@
 package com.iems.projectservice.dto.request;
 
-import com.iems.projectservice.entity.enums.ProjectFramework;
-import com.iems.projectservice.entity.enums.ProjectMethodology;
 import com.iems.projectservice.entity.enums.ProjectStatus;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -18,9 +16,6 @@ public class CreateProjectDto {
     private String projectKey;
     
     private String description;
-    
-    private ProjectMethodology methodology;
-    private ProjectFramework framework;
     
     @NotNull
     private LocalDateTime startDate;

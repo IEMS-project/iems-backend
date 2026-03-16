@@ -9,8 +9,6 @@ import com.iems.projectservice.dto.response.*;
 import com.iems.projectservice.entity.Project;
 import com.iems.projectservice.entity.ProjectMember;
 import com.iems.projectservice.entity.Role;
-import com.iems.projectservice.entity.enums.ProjectMethodology;
-import com.iems.projectservice.entity.enums.ProjectFramework;
 import com.iems.projectservice.entity.enums.ProjectStatus;
 import com.iems.projectservice.exception.AppException;
 import com.iems.projectservice.exception.ProjectErrorCode;
@@ -66,8 +64,6 @@ public class ProjectService {
         project.setName(dto.getName());
         project.setProjectKey(dto.getProjectKey().toUpperCase());
         project.setDescription(dto.getDescription());
-        project.setMethodology(dto.getMethodology() != null ? dto.getMethodology() : ProjectMethodology.AGILE);
-        project.setFramework(dto.getFramework() != null ? dto.getFramework() : ProjectFramework.SCRUM);
         project.setStartDate(dto.getStartDate());
         project.setEndDate(dto.getEndDate());
         project.setManagerAccountId(currentUserId);
@@ -127,10 +123,6 @@ public class ProjectService {
         }
         if (dto.getDescription() != null)
             project.setDescription(dto.getDescription());
-        if (dto.getMethodology() != null)
-            project.setMethodology(dto.getMethodology());
-        if (dto.getFramework() != null)
-            project.setFramework(dto.getFramework());
         if (dto.getStartDate() != null)
             project.setStartDate(dto.getStartDate());
         if (dto.getEndDate() != null)

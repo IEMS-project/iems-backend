@@ -11,6 +11,7 @@ import com.iems.projectservice.exception.AppException;
 import com.iems.projectservice.exception.ProjectErrorCode;
 import com.iems.projectservice.repository.ProjectMemberRepository;
 import com.iems.projectservice.repository.RoleRepository;
+import com.iems.projectservice.repository.MemberPermissionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -28,6 +29,7 @@ public class ProjectMemberService {
 
     private final ProjectMemberRepository projectMemberRepository;
     private final RoleRepository roleRepository;
+    private final MemberPermissionRepository memberPermissionRepository;
     private final UserServiceFeignClient userServiceFeignClient;
     private final ObjectMapper objectMapper;
 
@@ -63,6 +65,7 @@ public class ProjectMemberService {
     public void removeMember(UUID projectId, UUID accountId) {
         ProjectMember member = projectMemberRepository.findByProjectIdAndAccountId(projectId, accountId)
                 .orElseThrow(() -> new AppException(ProjectErrorCode.MEMBER_NOT_FOUND));
+        memberPermissionRepository.deleteByProjectIdAndAccountId(projectId, accountId);
         projectMemberRepository.delete(member);
     }
 

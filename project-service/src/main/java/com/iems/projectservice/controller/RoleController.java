@@ -2,9 +2,8 @@ package com.iems.projectservice.controller;
 
 import com.iems.projectservice.dto.request.CreateRoleDto;
 import com.iems.projectservice.dto.response.ApiResponseDto;
-import com.iems.projectservice.entity.Permission;
 import com.iems.projectservice.entity.Role;
-import com.iems.projectservice.entity.RolePermission;
+import com.iems.projectservice.entity.enums.ProjectPermission;
 import com.iems.projectservice.service.RoleService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -16,7 +15,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -80,28 +78,28 @@ public class RoleController {
         }
     }
 
-    @PostMapping("/{roleId}/permissions/{permissionId}")
+    @PostMapping("/{roleId}/permissions/{permission}")
     @Operation(summary = "Assign permission to role")
-    public ResponseEntity<ApiResponseDto<RolePermission>> assignPermission(
+    public ResponseEntity<ApiResponseDto<Void>> assignPermission(
             @PathVariable UUID projectId,
             @PathVariable UUID roleId,
-            @PathVariable UUID permissionId) {
+            @PathVariable ProjectPermission permission) {
         try {
-            RolePermission rp = roleService.assignPermission(roleId, permissionId);
-            return ResponseEntity.ok(new ApiResponseDto<>("success", "Permission assigned successfully", rp));
+            roleService.assignPermission(roleId, permission);
+            return ResponseEntity.ok(new ApiResponseDto<>("success", "Permission assigned successfully", null));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(new ApiResponseDto<>("error", e.getMessage(), null));
         }
     }
 
-    @DeleteMapping("/{roleId}/permissions/{permissionId}")
+    @DeleteMapping("/{roleId}/permissions/{permission}")
     @Operation(summary = "Remove permission from role")
     public ResponseEntity<ApiResponseDto<Void>> removePermission(
             @PathVariable UUID projectId,
             @PathVariable UUID roleId,
-            @PathVariable UUID permissionId) {
+            @PathVariable ProjectPermission permission) {
         try {
-            roleService.removePermission(roleId, permissionId);
+            roleService.removePermission(roleId, permission);
             return ResponseEntity.ok(new ApiResponseDto<>("success", "Permission removed successfully", null));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(new ApiResponseDto<>("error", e.getMessage(), null));
@@ -110,38 +108,24 @@ public class RoleController {
 
     @GetMapping("/{roleId}/permissions")
     @Operation(summary = "Get role permissions")
-    public ResponseEntity<ApiResponseDto<List<RolePermission>>> getRolePermissions(
+    public ResponseEntity<ApiResponseDto<List<ProjectPermission>>> getRolePermissions(
             @PathVariable UUID projectId,
             @PathVariable UUID roleId) {
         try {
-            List<RolePermission> perms = roleService.getRolePermissions(roleId);
+            List<ProjectPermission> perms = roleService.getRolePermissions(roleId);
             return ResponseEntity.ok(new ApiResponseDto<>("success", "Permissions retrieved successfully", perms));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(new ApiResponseDto<>("error", e.getMessage(), null));
         }
     }
 
-    // --- System Permissions ---
     @GetMapping("/permissions/all")
-    @Operation(summary = "Get all system permissions")
-    public ResponseEntity<ApiResponseDto<List<Permission>>> getAllPermissions(@PathVariable UUID projectId) {
+    @Operation(summary = "Get all available permissions")
+    public ResponseEntity<ApiResponseDto<List<ProjectPermission>>> getAllPermissions(
+            @PathVariable UUID projectId) {
         try {
-            List<Permission> perms = roleService.getAllPermissions();
+            List<ProjectPermission> perms = roleService.getAllPermissions();
             return ResponseEntity.ok(new ApiResponseDto<>("success", "Permissions retrieved successfully", perms));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(new ApiResponseDto<>("error", e.getMessage(), null));
-        }
-    }
-
-    @PostMapping("/permissions")
-    @Operation(summary = "Create permission")
-    public ResponseEntity<ApiResponseDto<Permission>> createPermission(
-            @PathVariable UUID projectId,
-            @RequestBody Map<String, String> body) {
-        try {
-            Permission perm = roleService.createPermission(body.get("code"), body.get("description"));
-            return ResponseEntity.status(HttpStatus.CREATED)
-                    .body(new ApiResponseDto<>("success", "Permission created successfully", perm));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(new ApiResponseDto<>("error", e.getMessage(), null));
         }
