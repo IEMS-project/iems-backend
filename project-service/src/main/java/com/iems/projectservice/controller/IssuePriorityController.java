@@ -1,7 +1,9 @@
 package com.iems.projectservice.controller;
 
+import com.iems.projectservice.annotation.RequireProjectPermission;
 import com.iems.projectservice.dto.response.ApiResponseDto;
 import com.iems.projectservice.entity.IssuePriority;
+import com.iems.projectservice.entity.enums.ProjectPermission;
 import com.iems.projectservice.service.IssueService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -24,6 +26,7 @@ public class IssuePriorityController {
 
     @GetMapping
     @Operation(summary = "Get issue priorities")
+    @RequireProjectPermission(ProjectPermission.ISSUE_READ)
     public ResponseEntity<ApiResponseDto<List<IssuePriority>>> getIssuePriorities(@PathVariable UUID projectId) {
         List<IssuePriority> priorities = issueService.getIssuePriorities(projectId);
         return ResponseEntity.ok(new ApiResponseDto<>("success", "Issue priorities retrieved", priorities));
@@ -31,6 +34,7 @@ public class IssuePriorityController {
 
     @PostMapping
     @Operation(summary = "Create issue priority")
+    @RequireProjectPermission(ProjectPermission.PROJECT_UPDATE)
     public ResponseEntity<ApiResponseDto<IssuePriority>> createIssuePriority(
             @PathVariable UUID projectId,
             @RequestBody Map<String, String> body) {
@@ -42,6 +46,7 @@ public class IssuePriorityController {
 
     @PatchMapping("/{id}")
     @Operation(summary = "Update issue priority")
+    @RequireProjectPermission(ProjectPermission.PROJECT_UPDATE)
     public ResponseEntity<ApiResponseDto<IssuePriority>> updateIssuePriority(
             @PathVariable UUID projectId,
             @PathVariable UUID id,
@@ -53,6 +58,7 @@ public class IssuePriorityController {
 
     @DeleteMapping("/{id}")
     @Operation(summary = "Delete issue priority")
+    @RequireProjectPermission(ProjectPermission.PROJECT_UPDATE)
     public ResponseEntity<ApiResponseDto<Void>> deleteIssuePriority(
             @PathVariable UUID projectId,
             @PathVariable UUID id) {

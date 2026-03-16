@@ -1,7 +1,9 @@
 package com.iems.projectservice.controller;
 
+import com.iems.projectservice.annotation.RequireProjectPermission;
 import com.iems.projectservice.dto.response.ApiResponseDto;
 import com.iems.projectservice.entity.IssueType;
+import com.iems.projectservice.entity.enums.ProjectPermission;
 import com.iems.projectservice.service.IssueService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -24,6 +26,7 @@ public class IssueTypeController {
 
     @GetMapping
     @Operation(summary = "Get issue types")
+    @RequireProjectPermission(ProjectPermission.ISSUE_READ)
     public ResponseEntity<ApiResponseDto<List<IssueType>>> getIssueTypes(@PathVariable UUID projectId) {
         List<IssueType> types = issueService.getIssueTypes(projectId);
         return ResponseEntity.ok(new ApiResponseDto<>("success", "Issue types retrieved", types));
@@ -31,6 +34,7 @@ public class IssueTypeController {
 
     @PostMapping
     @Operation(summary = "Create issue type")
+    @RequireProjectPermission(ProjectPermission.PROJECT_UPDATE)
     public ResponseEntity<ApiResponseDto<IssueType>> createIssueType(
             @PathVariable UUID projectId,
             @RequestBody Map<String, String> body) {
@@ -42,6 +46,7 @@ public class IssueTypeController {
 
     @PatchMapping("/{id}")
     @Operation(summary = "Update issue type")
+    @RequireProjectPermission(ProjectPermission.PROJECT_UPDATE)
     public ResponseEntity<ApiResponseDto<IssueType>> updateIssueType(
             @PathVariable UUID projectId,
             @PathVariable UUID id,
@@ -53,6 +58,7 @@ public class IssueTypeController {
 
     @DeleteMapping("/{id}")
     @Operation(summary = "Delete issue type")
+    @RequireProjectPermission(ProjectPermission.PROJECT_UPDATE)
     public ResponseEntity<ApiResponseDto<Void>> deleteIssueType(
             @PathVariable UUID projectId,
             @PathVariable UUID id) {

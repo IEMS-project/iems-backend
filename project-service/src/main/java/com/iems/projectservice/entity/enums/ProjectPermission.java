@@ -7,28 +7,40 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public enum ProjectPermission {
 
+    // ── Project ───────────────────────────────────────────────────
+    PROJECT_READ("Read project details"),
+    PROJECT_CREATE("Create projects"),
+    PROJECT_UPDATE("Update project details"),
+    PROJECT_DELETE("Delete project"),
+
     // ── Issues ────────────────────────────────────────────────────
+    ISSUE_READ("Read issues"),
     ISSUE_CREATE("Create issues"),
-    ISSUE_EDIT("Edit issues"),
+    ISSUE_UPDATE("Update issues"),
     ISSUE_DELETE("Delete issues"),
-    ISSUE_ASSIGN("Assign issues"),
-    ISSUE_TRANSITION("Change issue status"),
+
+    // ── Workflow ──────────────────────────────────────────────────
+    WORKFLOW_READ("Read workflows"),
+    WORKFLOW_CREATE("Create workflows"),
+    WORKFLOW_UPDATE("Update workflows"),
+    WORKFLOW_DELETE("Delete workflows"),
+
+    // ── Roles ─────────────────────────────────────────────────────
+    ROLE_READ("Read roles & permissions"),
+    ROLE_CREATE("Create roles & permission assignments"),
+    ROLE_UPDATE("Update roles & permission assignments"),
+    ROLE_DELETE("Delete roles & permission assignments"),
 
     // ── Sprints ───────────────────────────────────────────────────
+    SPRINT_READ("Read sprints"),
     SPRINT_CREATE("Create sprints"),
-    SPRINT_EDIT("Edit sprints"),
+    SPRINT_UPDATE("Update sprints"),
     SPRINT_DELETE("Delete sprints"),
-    SPRINT_MANAGE("Start / complete sprints"),
 
     // ── Members ───────────────────────────────────────────────────
     MEMBER_INVITE("Invite members"),
     MEMBER_REMOVE("Remove members"),
-    MEMBER_ROLE_ASSIGN("Assign member roles"),
-
-    // ── Settings ──────────────────────────────────────────────────
-    PROJECT_EDIT("Edit project details"),
-    WORKFLOW_MANAGE("Manage workflow & statuses"),
-    ROLE_MANAGE("Manage roles & permissions");
+    MEMBER_ROLE_ASSIGN("Assign member roles");
 
     private final String displayName;
 }

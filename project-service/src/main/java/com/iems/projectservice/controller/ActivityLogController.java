@@ -1,7 +1,9 @@
 package com.iems.projectservice.controller;
 
+import com.iems.projectservice.annotation.RequireProjectPermission;
 import com.iems.projectservice.dto.response.ActivityLogResponseDto;
 import com.iems.projectservice.dto.response.ApiResponseDto;
+import com.iems.projectservice.entity.enums.ProjectPermission;
 import com.iems.projectservice.service.ActivityLogService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -22,6 +24,7 @@ public class ActivityLogController {
 
     @GetMapping
     @Operation(summary = "Get project activity log")
+    @RequireProjectPermission(ProjectPermission.PROJECT_READ)
     public ResponseEntity<ApiResponseDto<List<ActivityLogResponseDto>>> getProjectActivities(
             @PathVariable UUID projectId) {
         List<ActivityLogResponseDto> activities = activityLogService.getProjectActivities(projectId);
@@ -30,6 +33,7 @@ public class ActivityLogController {
 
     @GetMapping("/issues/{issueId}")
     @Operation(summary = "Get issue activity log")
+    @RequireProjectPermission(ProjectPermission.ISSUE_READ)
     public ResponseEntity<ApiResponseDto<List<ActivityLogResponseDto>>> getIssueActivities(
             @PathVariable UUID projectId,
             @PathVariable UUID issueId) {
