@@ -32,6 +32,7 @@ public class IssueService {
     private final IssuePriorityRepository issuePriorityRepository;
     private final WorkflowRepository workflowRepository;
     private final WorkflowStatusRepository workflowStatusRepository;
+    private final IssueStatusHistoryRepository issueStatusHistoryRepository;
     private final ActivityLogService activityLogService;
     private final UserServiceFeignClient userServiceFeignClient;
     private final ObjectMapper objectMapper;
@@ -195,6 +196,8 @@ public class IssueService {
     }
 
     private void changeStatus(Issue issue, UUID newStatusId, UUID userId) {
+        UUID fromStatusId = issue.getStatusId();
+
         String fromName = issue.getStatusId() != null
                 ? workflowStatusRepository.findById(issue.getStatusId())
                         .map(WorkflowStatus::getName).orElse("Unknown")
@@ -203,6 +206,17 @@ public class IssueService {
                 .map(WorkflowStatus::getName).orElse("Unknown");
 
         issue.setStatusId(newStatusId);
+
+    IssueStatusHistory history = new IssueStatusHistory();
+    history.setProjectId(issue.getProjectId());
+    history.setIssueId(issue.getId());
+    history.setSprintId(issue.getSprintId());
+    history.setFromStatusId(fromStatusId);
+    history.setToStatusId(newStatusId);
+    history.setStoryPoints(issue.getStoryPoints());
+    history.setChangedBy(userId);
+    issueStatusHistoryRepository.save(history);
+
         activityLogService.log(
                 issue.getProjectId(),
                 issue.getId(),

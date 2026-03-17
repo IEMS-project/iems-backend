@@ -5,10 +5,12 @@ import com.iems.projectservice.dto.request.CreateSprintDto;
 import com.iems.projectservice.dto.request.UpdateSprintDto;
 import com.iems.projectservice.dto.response.ApiResponseDto;
 import com.iems.projectservice.dto.response.IssueResponseDto;
+import com.iems.projectservice.dto.response.SprintBurndownDto;
 import com.iems.projectservice.entity.Sprint;
 import com.iems.projectservice.entity.enums.ProjectPermission;
 import com.iems.projectservice.service.IssueService;
 import com.iems.projectservice.service.ProjectService;
+import com.iems.projectservice.service.SprintBurndownService;
 import com.iems.projectservice.service.SprintService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -30,6 +32,7 @@ import java.util.UUID;
 public class SprintController {
 
     private final SprintService sprintService;
+    private final SprintBurndownService sprintBurndownService;
     private final IssueService issueService;
     private final ProjectService projectService;
 
@@ -159,6 +162,20 @@ public class SprintController {
         try {
             List<IssueResponseDto> issues = issueService.getIssuesBySprint(sprintId);
             return ResponseEntity.ok(new ApiResponseDto<>("success", "Sprint issues retrieved successfully", issues));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(new ApiResponseDto<>("error", e.getMessage(), null));
+        }
+    }
+
+    @GetMapping("/{sprintId}/burndown")
+    @Operation(summary = "Get sprint burndown data")
+    @RequireProjectPermission(ProjectPermission.SPRINT_READ)
+    public ResponseEntity<ApiResponseDto<SprintBurndownDto>> getSprintBurndown(
+            @PathVariable UUID projectId,
+            @PathVariable UUID sprintId) {
+        try {
+            SprintBurndownDto burndown = sprintBurndownService.getSprintBurndown(sprintId);
+            return ResponseEntity.ok(new ApiResponseDto<>("success", "Sprint burndown retrieved successfully", burndown));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(new ApiResponseDto<>("error", e.getMessage(), null));
         }

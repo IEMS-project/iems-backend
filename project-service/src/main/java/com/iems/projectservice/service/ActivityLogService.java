@@ -9,6 +9,9 @@ import com.iems.projectservice.entity.ActivityLog;
 import com.iems.projectservice.repository.ActivityLogRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import com.iems.projectservice.dto.response.PagedResponseDto;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
@@ -34,12 +37,25 @@ public class ActivityLogService {
         return activityLogRepository.save(entry);
     }
 
-    public List<ActivityLogResponseDto> getProjectActivities(UUID projectId) {
-        return enrich(activityLogRepository.findByProjectIdOrderByCreatedAtDesc(projectId));
+    public PagedResponseDto<ActivityLogResponseDto> getProjectActivities(UUID projectId, Pageable pageable) {
+        Page<ActivityLog> page = activityLogRepository.findByProjectIdOrderByCreatedAtDesc(projectId, pageable);
+        return toPagedResponse(page);
     }
 
-    public List<ActivityLogResponseDto> getIssueActivities(UUID issueId) {
-        return enrich(activityLogRepository.findByIssueIdOrderByCreatedAtDesc(issueId));
+    public PagedResponseDto<ActivityLogResponseDto> getIssueActivities(UUID issueId, Pageable pageable) {
+        Page<ActivityLog> page = activityLogRepository.findByIssueIdOrderByCreatedAtDesc(issueId, pageable);
+        return toPagedResponse(page);
+    }
+
+    private PagedResponseDto<ActivityLogResponseDto> toPagedResponse(Page<ActivityLog> page) {
+        return new PagedResponseDto<>(
+                enrich(page.getContent()),
+                page.getNumber(),
+                page.getSize(),
+                page.getTotalElements(),
+                page.getTotalPages(),
+                page.isLast()
+        );
     }
 
     private List<ActivityLogResponseDto> enrich(List<ActivityLog> logs) {
