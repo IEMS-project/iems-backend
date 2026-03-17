@@ -207,15 +207,15 @@ public class IssueService {
 
         issue.setStatusId(newStatusId);
 
-    IssueStatusHistory history = new IssueStatusHistory();
-    history.setProjectId(issue.getProjectId());
-    history.setIssueId(issue.getId());
-    history.setSprintId(issue.getSprintId());
-    history.setFromStatusId(fromStatusId);
-    history.setToStatusId(newStatusId);
-    history.setStoryPoints(issue.getStoryPoints());
-    history.setChangedBy(userId);
-    issueStatusHistoryRepository.save(history);
+        IssueStatusHistory history = new IssueStatusHistory();
+        history.setProjectId(issue.getProjectId());
+        history.setIssueId(issue.getId());
+        history.setSprintId(issue.getSprintId());
+        history.setFromStatusId(fromStatusId);
+        history.setToStatusId(newStatusId);
+        history.setStoryPoints(issue.getStoryPoints());
+        history.setChangedBy(userId);
+        issueStatusHistoryRepository.save(history);
 
         activityLogService.log(
                 issue.getProjectId(),

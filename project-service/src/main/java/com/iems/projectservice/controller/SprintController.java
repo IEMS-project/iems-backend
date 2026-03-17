@@ -175,7 +175,8 @@ public class SprintController {
             @PathVariable UUID sprintId) {
         try {
             SprintBurndownDto burndown = sprintBurndownService.getSprintBurndown(sprintId);
-            return ResponseEntity.ok(new ApiResponseDto<>("success", "Sprint burndown retrieved successfully", burndown));
+            return ResponseEntity
+                    .ok(new ApiResponseDto<>("success", "Sprint burndown retrieved successfully", burndown));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(new ApiResponseDto<>("error", e.getMessage(), null));
         }

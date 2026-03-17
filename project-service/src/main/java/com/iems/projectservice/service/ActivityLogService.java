@@ -54,8 +54,7 @@ public class ActivityLogService {
                 page.getSize(),
                 page.getTotalElements(),
                 page.getTotalPages(),
-                page.isLast()
-        );
+                page.isLast());
     }
 
     private List<ActivityLogResponseDto> enrich(List<ActivityLog> logs) {

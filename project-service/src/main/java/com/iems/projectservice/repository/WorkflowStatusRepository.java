@@ -11,6 +11,8 @@ import java.util.UUID;
 @Repository
 public interface WorkflowStatusRepository extends JpaRepository<WorkflowStatus, UUID> {
     List<WorkflowStatus> findByWorkflowIdOrderBySortOrderAsc(UUID workflowId);
+
     List<WorkflowStatus> findByWorkflowIdInAndCategory(List<UUID> workflowIds, StatusCategory category);
+
     void deleteByWorkflowId(UUID workflowId);
 }
