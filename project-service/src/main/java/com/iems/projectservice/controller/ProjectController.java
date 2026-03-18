@@ -1,5 +1,6 @@
 package com.iems.projectservice.controller;
 
+import com.iems.projectservice.annotation.RequireProjectPermission;
 import com.iems.projectservice.dto.request.CreateProjectDto;
 import com.iems.projectservice.dto.request.ProjectIdsDto;
 import com.iems.projectservice.dto.request.UpdateProjectDto;
@@ -7,6 +8,7 @@ import com.iems.projectservice.dto.response.ApiResponseDto;
 import com.iems.projectservice.dto.response.ProjectInfoResponse;
 import com.iems.projectservice.dto.response.ProjectTableDto;
 import com.iems.projectservice.entity.Project;
+import com.iems.projectservice.entity.enums.ProjectPermission;
 import com.iems.projectservice.service.ProjectService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -45,6 +47,7 @@ public class ProjectController {
 
     @PatchMapping("/{projectId}")
     @Operation(summary = "Update project")
+    @RequireProjectPermission(ProjectPermission.PROJECT_UPDATE)
     public ResponseEntity<ApiResponseDto<Project>> updateProject(
             @PathVariable UUID projectId,
             @Valid @RequestBody UpdateProjectDto dto) {
@@ -60,6 +63,7 @@ public class ProjectController {
 
     @DeleteMapping("/{projectId}")
     @Operation(summary = "Delete project")
+    @RequireProjectPermission(ProjectPermission.PROJECT_DELETE)
     public ResponseEntity<ApiResponseDto<Void>> deleteProject(@PathVariable UUID projectId) {
         try {
             projectService.deleteProject(projectId);
@@ -73,6 +77,7 @@ public class ProjectController {
 
     @GetMapping("/{projectId}")
     @Operation(summary = "Get project by ID")
+    @RequireProjectPermission(ProjectPermission.PROJECT_READ)
     public ResponseEntity<ApiResponseDto<Project>> getProject(@PathVariable UUID projectId) {
         try {
             Project project = projectService.getProjectById(projectId);

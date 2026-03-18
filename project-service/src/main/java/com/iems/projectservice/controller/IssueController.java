@@ -1,9 +1,11 @@
 package com.iems.projectservice.controller;
 
+import com.iems.projectservice.annotation.RequireProjectPermission;
 import com.iems.projectservice.dto.request.CreateIssueDto;
 import com.iems.projectservice.dto.request.UpdateIssueDto;
 import com.iems.projectservice.dto.response.ApiResponseDto;
 import com.iems.projectservice.dto.response.IssueResponseDto;
+import com.iems.projectservice.entity.enums.ProjectPermission;
 import com.iems.projectservice.service.IssueService;
 import com.iems.projectservice.service.ProjectService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -30,6 +32,7 @@ public class IssueController {
 
     @PostMapping
     @Operation(summary = "Create issue")
+    @RequireProjectPermission(ProjectPermission.ISSUE_CREATE)
     public ResponseEntity<ApiResponseDto<IssueResponseDto>> createIssue(
             @PathVariable UUID projectId,
             @Valid @RequestBody CreateIssueDto dto) {
@@ -46,6 +49,7 @@ public class IssueController {
 
     @PatchMapping("/{issueId}")
     @Operation(summary = "Update issue")
+    @RequireProjectPermission(ProjectPermission.ISSUE_UPDATE)
     public ResponseEntity<ApiResponseDto<IssueResponseDto>> updateIssue(
             @PathVariable UUID projectId,
             @PathVariable UUID issueId,
@@ -62,6 +66,7 @@ public class IssueController {
 
     @DeleteMapping("/{issueId}")
     @Operation(summary = "Delete issue")
+    @RequireProjectPermission(ProjectPermission.ISSUE_DELETE)
     public ResponseEntity<ApiResponseDto<Void>> deleteIssue(
             @PathVariable UUID projectId,
             @PathVariable UUID issueId) {
@@ -76,6 +81,7 @@ public class IssueController {
 
     @GetMapping("/{issueId}")
     @Operation(summary = "Get issue by ID")
+    @RequireProjectPermission(ProjectPermission.ISSUE_READ)
     public ResponseEntity<ApiResponseDto<IssueResponseDto>> getIssue(
             @PathVariable UUID projectId,
             @PathVariable UUID issueId) {
@@ -89,6 +95,7 @@ public class IssueController {
 
     @GetMapping
     @Operation(summary = "Get all issues in project")
+    @RequireProjectPermission(ProjectPermission.ISSUE_READ)
     public ResponseEntity<ApiResponseDto<List<IssueResponseDto>>> getIssues(@PathVariable UUID projectId) {
         try {
             List<IssueResponseDto> issues = issueService.getIssuesByProject(projectId);
@@ -100,6 +107,7 @@ public class IssueController {
 
     @GetMapping("/backlog")
     @Operation(summary = "Get product backlog (issues not in any sprint)")
+    @RequireProjectPermission(ProjectPermission.ISSUE_READ)
     public ResponseEntity<ApiResponseDto<List<IssueResponseDto>>> getBacklog(@PathVariable UUID projectId) {
         try {
             List<IssueResponseDto> issues = issueService.getBacklog(projectId);
@@ -111,6 +119,7 @@ public class IssueController {
 
     @GetMapping("/{issueId}/children")
     @Operation(summary = "Get child issues (hierarchy)")
+    @RequireProjectPermission(ProjectPermission.ISSUE_READ)
     public ResponseEntity<ApiResponseDto<List<IssueResponseDto>>> getChildIssues(
             @PathVariable UUID projectId,
             @PathVariable UUID issueId) {
@@ -124,6 +133,7 @@ public class IssueController {
 
     @PatchMapping("/{issueId}/assign")
     @Operation(summary = "Assign issue to user")
+    @RequireProjectPermission(ProjectPermission.ISSUE_UPDATE)
     public ResponseEntity<ApiResponseDto<IssueResponseDto>> assignIssue(
             @PathVariable UUID projectId,
             @PathVariable UUID issueId,
@@ -141,6 +151,7 @@ public class IssueController {
 
     @PatchMapping("/{issueId}/status")
     @Operation(summary = "Change issue status")
+    @RequireProjectPermission(ProjectPermission.ISSUE_UPDATE)
     public ResponseEntity<ApiResponseDto<IssueResponseDto>> changeStatus(
             @PathVariable UUID projectId,
             @PathVariable UUID issueId,
@@ -158,6 +169,7 @@ public class IssueController {
 
     @PatchMapping("/{issueId}/sprint")
     @Operation(summary = "Move issue to sprint")
+    @RequireProjectPermission(ProjectPermission.ISSUE_UPDATE)
     public ResponseEntity<ApiResponseDto<IssueResponseDto>> moveToSprint(
             @PathVariable UUID projectId,
             @PathVariable UUID issueId,
@@ -173,6 +185,7 @@ public class IssueController {
 
     @DeleteMapping("/{issueId}/sprint")
     @Operation(summary = "Remove issue from sprint")
+    @RequireProjectPermission(ProjectPermission.ISSUE_UPDATE)
     public ResponseEntity<ApiResponseDto<IssueResponseDto>> removeFromSprint(
             @PathVariable UUID projectId,
             @PathVariable UUID issueId) {
@@ -187,6 +200,7 @@ public class IssueController {
 
     @GetMapping("/my-issues")
     @Operation(summary = "Get my assigned issues")
+    @RequireProjectPermission(ProjectPermission.ISSUE_READ)
     public ResponseEntity<ApiResponseDto<List<IssueResponseDto>>> getMyIssues(@PathVariable UUID projectId) {
         try {
             UUID userId = projectService.getUserIdFromRequest();

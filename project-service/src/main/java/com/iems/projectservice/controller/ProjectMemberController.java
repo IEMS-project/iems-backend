@@ -1,9 +1,11 @@
 package com.iems.projectservice.controller;
 
+import com.iems.projectservice.annotation.RequireProjectPermission;
 import com.iems.projectservice.dto.request.ProjectMemberDto;
 import com.iems.projectservice.dto.response.ApiResponseDto;
 import com.iems.projectservice.dto.response.ProjectMemberResponseDto;
 import com.iems.projectservice.entity.ProjectMember;
+import com.iems.projectservice.entity.enums.ProjectPermission;
 import com.iems.projectservice.service.ProjectMemberService;
 import com.iems.projectservice.service.ProjectService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -29,6 +31,7 @@ public class ProjectMemberController {
 
     @PostMapping
     @Operation(summary = "Add member to project")
+    @RequireProjectPermission(ProjectPermission.MEMBER_INVITE)
     public ResponseEntity<ApiResponseDto<ProjectMember>> addMember(
             @PathVariable UUID projectId,
             @RequestBody ProjectMemberDto dto) {
@@ -47,6 +50,7 @@ public class ProjectMemberController {
 
     @DeleteMapping("/{accountId}")
     @Operation(summary = "Remove member from project")
+    @RequireProjectPermission(ProjectPermission.MEMBER_REMOVE)
     public ResponseEntity<ApiResponseDto<Void>> removeMember(
             @PathVariable UUID projectId,
             @PathVariable UUID accountId) {
@@ -62,6 +66,7 @@ public class ProjectMemberController {
 
     @PatchMapping("/{accountId}/role")
     @Operation(summary = "Change member role")
+    @RequireProjectPermission(ProjectPermission.MEMBER_ROLE_ASSIGN)
     public ResponseEntity<ApiResponseDto<ProjectMember>> updateMemberRole(
             @PathVariable UUID projectId,
             @PathVariable UUID accountId,
@@ -78,6 +83,7 @@ public class ProjectMemberController {
 
     @GetMapping
     @Operation(summary = "Get project members")
+    @RequireProjectPermission(ProjectPermission.PROJECT_READ)
     public ResponseEntity<ApiResponseDto<List<ProjectMemberResponseDto>>> getMembers(@PathVariable UUID projectId) {
         try {
             List<ProjectMemberResponseDto> members = projectMemberService.getProjectMembersEnriched(projectId);

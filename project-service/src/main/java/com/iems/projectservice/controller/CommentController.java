@@ -1,9 +1,11 @@
 package com.iems.projectservice.controller;
 
+import com.iems.projectservice.annotation.RequireProjectPermission;
 import com.iems.projectservice.dto.request.CreateCommentDto;
 import com.iems.projectservice.dto.response.ApiResponseDto;
 import com.iems.projectservice.dto.response.CommentResponseDto;
 import com.iems.projectservice.entity.Comment;
+import com.iems.projectservice.entity.enums.ProjectPermission;
 import com.iems.projectservice.service.CommentService;
 import com.iems.projectservice.service.ProjectService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -29,6 +31,7 @@ public class CommentController {
 
     @PostMapping
     @Operation(summary = "Add comment to issue")
+    @RequireProjectPermission(ProjectPermission.ISSUE_UPDATE)
     public ResponseEntity<ApiResponseDto<Comment>> addComment(
             @PathVariable UUID projectId,
             @PathVariable UUID issueId,
@@ -42,6 +45,7 @@ public class CommentController {
 
     @PatchMapping("/{commentId}")
     @Operation(summary = "Update comment")
+    @RequireProjectPermission(ProjectPermission.ISSUE_UPDATE)
     public ResponseEntity<ApiResponseDto<Comment>> updateComment(
             @PathVariable UUID projectId,
             @PathVariable UUID issueId,
@@ -54,6 +58,7 @@ public class CommentController {
 
     @DeleteMapping("/{commentId}")
     @Operation(summary = "Delete comment")
+    @RequireProjectPermission(ProjectPermission.ISSUE_UPDATE)
     public ResponseEntity<ApiResponseDto<Void>> deleteComment(
             @PathVariable UUID projectId,
             @PathVariable UUID issueId,
@@ -65,6 +70,7 @@ public class CommentController {
 
     @GetMapping
     @Operation(summary = "Get issue comments")
+    @RequireProjectPermission(ProjectPermission.ISSUE_READ)
     public ResponseEntity<ApiResponseDto<List<CommentResponseDto>>> getComments(
             @PathVariable UUID projectId,
             @PathVariable UUID issueId) {

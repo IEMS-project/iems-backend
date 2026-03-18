@@ -1,5 +1,6 @@
 package com.iems.projectservice.controller;
 
+import com.iems.projectservice.annotation.RequireProjectPermission;
 import com.iems.projectservice.dto.request.CreateWorkflowDto;
 import com.iems.projectservice.dto.request.CreateWorkflowStatusDto;
 import com.iems.projectservice.dto.request.CreateWorkflowTransitionDto;
@@ -7,6 +8,7 @@ import com.iems.projectservice.dto.response.ApiResponseDto;
 import com.iems.projectservice.entity.Workflow;
 import com.iems.projectservice.entity.WorkflowStatus;
 import com.iems.projectservice.entity.WorkflowTransition;
+import com.iems.projectservice.entity.enums.ProjectPermission;
 import com.iems.projectservice.service.WorkflowService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -32,6 +34,7 @@ public class WorkflowController {
     // --- Workflow CRUD ---
     @PostMapping
     @Operation(summary = "Create workflow")
+    @RequireProjectPermission(ProjectPermission.WORKFLOW_CREATE)
     public ResponseEntity<ApiResponseDto<Workflow>> createWorkflow(
             @PathVariable UUID projectId,
             @Valid @RequestBody CreateWorkflowDto dto) {
@@ -46,6 +49,7 @@ public class WorkflowController {
 
     @PatchMapping("/{workflowId}")
     @Operation(summary = "Update workflow")
+    @RequireProjectPermission(ProjectPermission.WORKFLOW_UPDATE)
     public ResponseEntity<ApiResponseDto<Workflow>> updateWorkflow(
             @PathVariable UUID projectId,
             @PathVariable UUID workflowId,
@@ -60,6 +64,7 @@ public class WorkflowController {
 
     @DeleteMapping("/{workflowId}")
     @Operation(summary = "Delete workflow")
+    @RequireProjectPermission(ProjectPermission.WORKFLOW_DELETE)
     public ResponseEntity<ApiResponseDto<Void>> deleteWorkflow(
             @PathVariable UUID projectId,
             @PathVariable UUID workflowId) {
@@ -73,6 +78,7 @@ public class WorkflowController {
 
     @GetMapping
     @Operation(summary = "Get project workflows")
+    @RequireProjectPermission(ProjectPermission.WORKFLOW_READ)
     public ResponseEntity<ApiResponseDto<List<Workflow>>> getWorkflows(@PathVariable UUID projectId) {
         try {
             List<Workflow> workflows = workflowService.getWorkflowsByProject(projectId);
@@ -84,6 +90,7 @@ public class WorkflowController {
 
     @GetMapping("/{workflowId}")
     @Operation(summary = "Get workflow by ID")
+    @RequireProjectPermission(ProjectPermission.WORKFLOW_READ)
     public ResponseEntity<ApiResponseDto<Workflow>> getWorkflow(
             @PathVariable UUID projectId,
             @PathVariable UUID workflowId) {
@@ -98,6 +105,7 @@ public class WorkflowController {
     // --- Status CRUD ---
     @PostMapping("/{workflowId}/statuses")
     @Operation(summary = "Add status to workflow")
+    @RequireProjectPermission(ProjectPermission.WORKFLOW_UPDATE)
     public ResponseEntity<ApiResponseDto<WorkflowStatus>> addStatus(
             @PathVariable UUID projectId,
             @PathVariable UUID workflowId,
@@ -113,6 +121,7 @@ public class WorkflowController {
 
     @PatchMapping("/{workflowId}/statuses/{statusId}")
     @Operation(summary = "Update workflow status")
+    @RequireProjectPermission(ProjectPermission.WORKFLOW_UPDATE)
     public ResponseEntity<ApiResponseDto<WorkflowStatus>> updateStatus(
             @PathVariable UUID projectId,
             @PathVariable UUID workflowId,
@@ -128,6 +137,7 @@ public class WorkflowController {
 
     @DeleteMapping("/{workflowId}/statuses/{statusId}")
     @Operation(summary = "Delete workflow status")
+    @RequireProjectPermission(ProjectPermission.WORKFLOW_UPDATE)
     public ResponseEntity<ApiResponseDto<Void>> deleteStatus(
             @PathVariable UUID projectId,
             @PathVariable UUID workflowId,
@@ -142,6 +152,7 @@ public class WorkflowController {
 
     @GetMapping("/{workflowId}/statuses")
     @Operation(summary = "Get workflow statuses")
+    @RequireProjectPermission(ProjectPermission.WORKFLOW_READ)
     public ResponseEntity<ApiResponseDto<List<WorkflowStatus>>> getStatuses(
             @PathVariable UUID projectId,
             @PathVariable UUID workflowId) {
@@ -156,6 +167,7 @@ public class WorkflowController {
     // --- Transition CRUD ---
     @PostMapping("/{workflowId}/transitions")
     @Operation(summary = "Add transition to workflow")
+    @RequireProjectPermission(ProjectPermission.WORKFLOW_UPDATE)
     public ResponseEntity<ApiResponseDto<WorkflowTransition>> addTransition(
             @PathVariable UUID projectId,
             @PathVariable UUID workflowId,
@@ -171,6 +183,7 @@ public class WorkflowController {
 
     @DeleteMapping("/{workflowId}/transitions/{transitionId}")
     @Operation(summary = "Delete transition")
+    @RequireProjectPermission(ProjectPermission.WORKFLOW_UPDATE)
     public ResponseEntity<ApiResponseDto<Void>> deleteTransition(
             @PathVariable UUID projectId,
             @PathVariable UUID workflowId,
@@ -185,6 +198,7 @@ public class WorkflowController {
 
     @GetMapping("/{workflowId}/transitions")
     @Operation(summary = "Get workflow transitions")
+    @RequireProjectPermission(ProjectPermission.WORKFLOW_READ)
     public ResponseEntity<ApiResponseDto<List<WorkflowTransition>>> getTransitions(
             @PathVariable UUID projectId,
             @PathVariable UUID workflowId) {

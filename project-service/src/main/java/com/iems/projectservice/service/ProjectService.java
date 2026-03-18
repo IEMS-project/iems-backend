@@ -9,6 +9,7 @@ import com.iems.projectservice.dto.response.*;
 import com.iems.projectservice.entity.Project;
 import com.iems.projectservice.entity.ProjectMember;
 import com.iems.projectservice.entity.Role;
+import com.iems.projectservice.entity.enums.ProjectPermission;
 import com.iems.projectservice.entity.enums.ProjectStatus;
 import com.iems.projectservice.exception.AppException;
 import com.iems.projectservice.exception.ProjectErrorCode;
@@ -79,17 +80,16 @@ public class ProjectService {
         adminRoleDto.setIsDefault(true);
         Role adminRole = roleService.createRole(savedProject.getId(), adminRoleDto);
 
-        com.iems.projectservice.dto.request.CreateRoleDto devRoleDto = new com.iems.projectservice.dto.request.CreateRoleDto();
-        devRoleDto.setName("Developer");
-        devRoleDto.setDescription("Developer role");
-        devRoleDto.setIsDefault(false);
-        roleService.createRole(savedProject.getId(), devRoleDto);
-
-        com.iems.projectservice.dto.request.CreateRoleDto viewerRoleDto = new com.iems.projectservice.dto.request.CreateRoleDto();
-        viewerRoleDto.setName("Viewer");
-        viewerRoleDto.setDescription("Read-only access");
-        viewerRoleDto.setIsDefault(false);
-        roleService.createRole(savedProject.getId(), viewerRoleDto);
+        for (ProjectPermission permission : ProjectPermission.values()) {
+            if (permission.name().startsWith("PROJECT_")
+                    || permission.name().startsWith("ISSUE_")
+                    || permission.name().startsWith("WORKFLOW_")
+                    || permission.name().startsWith("ROLE_")
+                    || permission.name().startsWith("SPRINT_")
+                    || permission.name().startsWith("MEMBER_")) {
+                roleService.assignInitialPermission(adminRole.getId(), permission);
+            }
+        }
 
         // Add creator as admin member
         projectMemberService.addMemberToProject(savedProject.getId(), currentUserId, adminRole.getId(), currentUserId);

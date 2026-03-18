@@ -63,8 +63,17 @@ public class RoleService {
     }
 
     public void assignPermission(UUID roleId, ProjectPermission permission) {
-        roleRepository.findById(roleId)
-                .orElseThrow(() -> new AppException(ProjectErrorCode.ROLE_NOT_FOUND));
+        Role role = getRoleById(roleId);
+        assertPermissionsMutable(role);
+        saveRolePermission(roleId, permission);
+    }
+
+    public void assignInitialPermission(UUID roleId, ProjectPermission permission) {
+        getRoleById(roleId);
+        saveRolePermission(roleId, permission);
+    }
+
+    private void saveRolePermission(UUID roleId, ProjectPermission permission) {
         if (rolePermissionRepository.existsByRoleIdAndPermission(roleId, permission)) {
             throw new AppException(ProjectErrorCode.PERMISSION_ALREADY_ASSIGNED);
         }
@@ -76,6 +85,8 @@ public class RoleService {
 
     @Transactional
     public void removePermission(UUID roleId, ProjectPermission permission) {
+        Role role = getRoleById(roleId);
+        assertPermissionsMutable(role);
         rolePermissionRepository.deleteByRoleIdAndPermission(roleId, permission);
     }
 
@@ -86,5 +97,11 @@ public class RoleService {
 
     public List<ProjectPermission> getAllPermissions() {
         return Arrays.asList(ProjectPermission.values());
+    }
+
+    private void assertPermissionsMutable(Role role) {
+        if (Boolean.TRUE.equals(role.getIsDefault())) {
+            throw new AppException(ProjectErrorCode.DEFAULT_ROLE_PERMISSIONS_LOCKED);
+        }
     }
 }

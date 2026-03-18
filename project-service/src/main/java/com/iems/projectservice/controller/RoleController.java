@@ -1,5 +1,6 @@
 package com.iems.projectservice.controller;
 
+import com.iems.projectservice.annotation.RequireProjectPermission;
 import com.iems.projectservice.dto.request.CreateRoleDto;
 import com.iems.projectservice.dto.response.ApiResponseDto;
 import com.iems.projectservice.entity.Role;
@@ -28,6 +29,7 @@ public class RoleController {
 
     @PostMapping
     @Operation(summary = "Create role")
+    @RequireProjectPermission(ProjectPermission.ROLE_CREATE)
     public ResponseEntity<ApiResponseDto<Role>> createRole(
             @PathVariable UUID projectId,
             @Valid @RequestBody CreateRoleDto dto) {
@@ -42,6 +44,7 @@ public class RoleController {
 
     @PatchMapping("/{roleId}")
     @Operation(summary = "Update role")
+    @RequireProjectPermission(ProjectPermission.ROLE_UPDATE)
     public ResponseEntity<ApiResponseDto<Role>> updateRole(
             @PathVariable UUID projectId,
             @PathVariable UUID roleId,
@@ -56,6 +59,7 @@ public class RoleController {
 
     @DeleteMapping("/{roleId}")
     @Operation(summary = "Delete role")
+    @RequireProjectPermission(ProjectPermission.ROLE_DELETE)
     public ResponseEntity<ApiResponseDto<Void>> deleteRole(
             @PathVariable UUID projectId,
             @PathVariable UUID roleId) {
@@ -69,6 +73,7 @@ public class RoleController {
 
     @GetMapping
     @Operation(summary = "Get project roles")
+    @RequireProjectPermission(ProjectPermission.ROLE_READ)
     public ResponseEntity<ApiResponseDto<List<Role>>> getRoles(@PathVariable UUID projectId) {
         try {
             List<Role> roles = roleService.getRolesByProject(projectId);
@@ -80,6 +85,7 @@ public class RoleController {
 
     @PostMapping("/{roleId}/permissions/{permission}")
     @Operation(summary = "Assign permission to role")
+    @RequireProjectPermission(ProjectPermission.ROLE_UPDATE)
     public ResponseEntity<ApiResponseDto<Void>> assignPermission(
             @PathVariable UUID projectId,
             @PathVariable UUID roleId,
@@ -94,6 +100,7 @@ public class RoleController {
 
     @DeleteMapping("/{roleId}/permissions/{permission}")
     @Operation(summary = "Remove permission from role")
+    @RequireProjectPermission(ProjectPermission.ROLE_UPDATE)
     public ResponseEntity<ApiResponseDto<Void>> removePermission(
             @PathVariable UUID projectId,
             @PathVariable UUID roleId,
@@ -108,6 +115,7 @@ public class RoleController {
 
     @GetMapping("/{roleId}/permissions")
     @Operation(summary = "Get role permissions")
+    @RequireProjectPermission(ProjectPermission.ROLE_READ)
     public ResponseEntity<ApiResponseDto<List<ProjectPermission>>> getRolePermissions(
             @PathVariable UUID projectId,
             @PathVariable UUID roleId) {
@@ -121,6 +129,7 @@ public class RoleController {
 
     @GetMapping("/permissions/all")
     @Operation(summary = "Get all available permissions")
+    @RequireProjectPermission(ProjectPermission.ROLE_READ)
     public ResponseEntity<ApiResponseDto<List<ProjectPermission>>> getAllPermissions(
             @PathVariable UUID projectId) {
         try {

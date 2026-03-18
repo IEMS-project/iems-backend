@@ -1,7 +1,9 @@
 package com.iems.projectservice.controller;
 
+import com.iems.projectservice.annotation.RequireProjectPermission;
 import com.iems.projectservice.dto.response.ApiResponseDto;
 import com.iems.projectservice.entity.Attachment;
+import com.iems.projectservice.entity.enums.ProjectPermission;
 import com.iems.projectservice.service.AttachmentService;
 import com.iems.projectservice.service.ProjectService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -26,6 +28,7 @@ public class AttachmentController {
 
     @PostMapping
     @Operation(summary = "Add attachment to issue")
+    @RequireProjectPermission(ProjectPermission.ISSUE_UPDATE)
     public ResponseEntity<ApiResponseDto<Attachment>> addAttachment(
             @PathVariable UUID projectId,
             @PathVariable UUID issueId,
@@ -45,6 +48,7 @@ public class AttachmentController {
 
     @DeleteMapping("/{attachmentId}")
     @Operation(summary = "Delete attachment")
+    @RequireProjectPermission(ProjectPermission.ISSUE_UPDATE)
     public ResponseEntity<ApiResponseDto<Void>> deleteAttachment(
             @PathVariable UUID projectId,
             @PathVariable UUID issueId,
@@ -55,6 +59,7 @@ public class AttachmentController {
 
     @GetMapping
     @Operation(summary = "Get issue attachments")
+    @RequireProjectPermission(ProjectPermission.ISSUE_READ)
     public ResponseEntity<ApiResponseDto<List<Attachment>>> getAttachments(
             @PathVariable UUID projectId,
             @PathVariable UUID issueId) {

@@ -1,5 +1,6 @@
 package com.iems.projectservice.controller;
 
+import com.iems.projectservice.annotation.RequireProjectPermission;
 import com.iems.projectservice.dto.response.ApiResponseDto;
 import com.iems.projectservice.dto.response.MemberPermissionsResponseDto;
 import com.iems.projectservice.entity.enums.ProjectPermission;
@@ -24,6 +25,7 @@ public class MemberPermissionController {
 
     @GetMapping
     @Operation(summary = "Get direct permission overrides for a member")
+    @RequireProjectPermission(ProjectPermission.ROLE_READ)
     public ResponseEntity<ApiResponseDto<MemberPermissionsResponseDto>> getMemberPermissions(
             @PathVariable UUID projectId,
             @PathVariable UUID accountId) {
@@ -39,6 +41,7 @@ public class MemberPermissionController {
 
     @PostMapping("/{permCode}/grant")
     @Operation(summary = "Grant a permission directly to a member")
+    @RequireProjectPermission(ProjectPermission.ROLE_UPDATE)
     public ResponseEntity<ApiResponseDto<Void>> grantPermission(
             @PathVariable UUID projectId,
             @PathVariable UUID accountId,
@@ -59,6 +62,7 @@ public class MemberPermissionController {
 
     @PostMapping("/{permCode}/deny")
     @Operation(summary = "Deny a permission directly for a member")
+    @RequireProjectPermission(ProjectPermission.ROLE_UPDATE)
     public ResponseEntity<ApiResponseDto<Void>> denyPermission(
             @PathVariable UUID projectId,
             @PathVariable UUID accountId,
@@ -79,6 +83,7 @@ public class MemberPermissionController {
 
     @DeleteMapping("/{permCode}")
     @Operation(summary = "Reset a direct permission override for a member")
+    @RequireProjectPermission(ProjectPermission.ROLE_UPDATE)
     public ResponseEntity<ApiResponseDto<Void>> resetPermission(
             @PathVariable UUID projectId,
             @PathVariable UUID accountId,
