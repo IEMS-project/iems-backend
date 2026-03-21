@@ -27,29 +27,26 @@ import java.util.UUID;
 public class UserController {
     private final UserService service;
 
+        private UUID getCurrentAccountId() {
+                Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+                if (authentication == null || !(authentication.getPrincipal() instanceof JwtUserDetails userDetails)) {
+                        throw new IllegalStateException("Unauthorized");
+                }
+                return userDetails.getUserId();
+        }
+
     @Operation(summary = "Update avatar URL", description = "Update only the image field of current user")
     @PutMapping("/me/avatar")
     public ResponseEntity<ApiResponseDto<UserResponseDto>> updateMyAvatar(@RequestBody UpdateAvatarDto payload) {
-        try {
-            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-            JwtUserDetails userDetails = (JwtUserDetails) authentication.getPrincipal();
-            UUID userId = userDetails.getUserId();
+        UUID userId = getCurrentAccountId();
 
-            return service.updateAvatar(userId, payload.getImageUrl())
-                    .map(updated -> ResponseEntity.ok(ApiResponseDto.<UserResponseDto>builder()
-                            .status("success")
-                            .message("Avatar updated")
-                            .data(updated)
-                            .build()))
-                    .orElseGet(() -> ResponseEntity.notFound().build());
-        } catch (Exception e) {
-            log.error("Failed to update avatar", e);
-            return ResponseEntity.internalServerError()
-                    .body(ApiResponseDto.<UserResponseDto>builder()
-                            .status("error")
-                            .message("Failed to update avatar: " + e.getMessage())
-                            .build());
-        }
+        return service.updateAvatar(userId, payload.getImageUrl())
+                .map(updated -> ResponseEntity.ok(ApiResponseDto.<UserResponseDto>builder()
+                        .status("success")
+                        .message("Avatar updated")
+                        .data(updated)
+                        .build()))
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @Operation(summary = "Create user", description = "Create a new user in the system")
@@ -179,9 +176,7 @@ public class UserController {
     public ResponseEntity<ApiResponseDto<UserResponseDto>> updateMyProfile(
             @RequestBody CreateUserDto userRequest
     ) {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        JwtUserDetails userDetails = (JwtUserDetails) authentication.getPrincipal();
-        UUID accountId = userDetails.getUserId(); // getUserId() returns accountId
+        UUID accountId = getCurrentAccountId();
         log.info("Updating profile for account ID: {}", accountId);
 
         return service.updateMyProfile(accountId, userRequest)
@@ -197,9 +192,7 @@ public class UserController {
     @Operation(summary = "Get my profile", description = "Retrieve the profile of the authenticated user")
     @GetMapping("/me")
     public ResponseEntity<ApiResponseDto<UserResponseDto>> getMyProfile() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        JwtUserDetails userDetails = (JwtUserDetails) authentication.getPrincipal();
-        UUID accountId = userDetails.getUserId(); // getUserId() returns accountId
+        UUID accountId = getCurrentAccountId();
         log.info("Getting profile for account ID: {}", accountId);
 
         return service.getUserByAccountId(accountId)
