@@ -36,7 +36,8 @@ public class AuthController {
      */
     @PostMapping("/register")
     @Operation(summary = "Register new user", description = "Register a new user account with profile information")
-    public ResponseEntity<ApiResponseDto<RegisterResponseDto>> register(@Valid @RequestBody RegisterRequestDto registerRequest) {
+    public ResponseEntity<ApiResponseDto<RegisterResponseDto>> register(
+            @Valid @RequestBody RegisterRequestDto registerRequest) {
         log.info("Registration request for username: {}", registerRequest.getUsername());
         
         RegisterResponseDto response = authService.register(registerRequest);
@@ -46,8 +47,7 @@ public class AuthController {
                         .status("success")
                         .message("Registration successful")
                         .data(response)
-                        .build()
-        );
+                        .build());
     }
 
     /**
@@ -59,62 +59,43 @@ public class AuthController {
         log.info("Login request for user: {}", loginRequest.getUsernameOrEmail());
         
         LoginResponseDto response = authService.login(loginRequest);
-
-        // If the service returned a refresh token, store it into an HttpOnly cookie
-        try {
-            String refreshToken = null;
-            try {
-                // assume getter exists
-                refreshToken = (response != null) ? response.getRefreshToken() : null;
-            } catch (Exception ex) {
-                // ignore if DTO does not expose getter
-            }
-
-            if (refreshToken != null) {
-                ResponseCookie cookie = ResponseCookie.from("refreshToken", refreshToken)
-                        .httpOnly(true)
-                        .secure(true)
-                        .path("/")
-                        .maxAge(7 * 24 * 60 * 60) // 7 days
-                        .sameSite("Lax")
-                        .build();
-
-                // Remove refresh token from response body if possible to avoid exposing it to JS
-                try {
-                    // if DTO has setter
-                    response.getClass().getMethod("setRefreshToken", String.class).invoke(response, (String) null);
-                } catch (Exception ignore) {
-                    // ignore - best effort only
-                }
-
-                return ResponseEntity.ok()
-                        .header(HttpHeaders.SET_COOKIE, cookie.toString())
-                        .body(ApiResponseDto.<LoginResponseDto>builder()
-                                .status("success")
-                                .message("Login successful")
-                                .data(response)
-                                .build());
-            }
-        } catch (Exception e) {
-            log.warn("Failed to set refresh cookie: {}", e.getMessage());
-        }
-
-        return ResponseEntity.ok(
-                ApiResponseDto.<LoginResponseDto>builder()
-                        .status("success")
-                        .message("Login successful")
-                        .data(response)
-                        .build()
-        );
-
+        return withRefreshCookie(response, "Login successful");
     }
 
-    /**
-     * Refresh token
-     */
+    @PostMapping("/google")
+    @Operation(summary = "Google Login/Register", description = "Authenticate using Google ID token. Auto-register if account does not exist")
+    public ResponseEntity<ApiResponseDto<LoginResponseDto>> googleAuth(
+            @Valid @RequestBody GoogleAuthRequestDto googleAuthRequest) {
+        log.info("Google auth request");
+
+        LoginResponseDto response = authService.authenticateWithGoogle(googleAuthRequest.getIdToken());
+        return withRefreshCookie(response, "Google authentication successful");
+    }
+
+    @PostMapping("/google/code")
+    @Operation(summary = "Google Login/Register with Authorization Code", description = "Authenticate using Google OAuth authorization code. Auto-register if account does not exist")
+    public ResponseEntity<ApiResponseDto<LoginResponseDto>> googleAuthWithCode(
+            @Valid @RequestBody GoogleCodeAuthRequestDto googleCodeAuthRequest) {
+        log.info("Google auth request with authorization code");
+
+        LoginResponseDto response = authService.authenticateWithGoogleCode(googleCodeAuthRequest.getCode());
+        return withRefreshCookie(response, "Google authentication successful");
+    }
+
+    @PostMapping("/github")
+    @Operation(summary = "GitHub Login/Register", description = "Authenticate using GitHub OAuth authorization code. Auto-register if account does not exist")
+    public ResponseEntity<ApiResponseDto<LoginResponseDto>> githubAuth(
+            @Valid @RequestBody GithubAuthRequestDto githubAuthRequest) {
+        log.info("GitHub auth request");
+
+        LoginResponseDto response = authService.authenticateWithGithub(githubAuthRequest.getCode());
+        return withRefreshCookie(response, "GitHub authentication successful");
+    }
+
     @PostMapping("/refresh")
     @Operation(summary = "Refresh token", description = "Refresh access token using refresh token")
-    public ResponseEntity<ApiResponseDto<LoginResponseDto>> refreshToken(HttpServletRequest request, @RequestBody(required = false) RefreshTokenRequestDto refreshRequest, HttpServletResponse servletResponse) {
+    public ResponseEntity<ApiResponseDto<LoginResponseDto>> refreshToken(HttpServletRequest request,
+            @RequestBody(required = false) RefreshTokenRequestDto refreshRequest, HttpServletResponse servletResponse) {
         log.info("Refresh token request");
 
         // Try to read refresh token from cookie first
@@ -183,7 +164,9 @@ public class AuthController {
      */
     @PostMapping("/logout")
     @Operation(summary = "Logout", description = "Logout and invalidate token")
-    public ResponseEntity<ApiResponseDto<Void>> logout(@RequestHeader(value = "Authorization", required = false) String authHeader, HttpServletRequest request, HttpServletResponse servletResponse) {
+    public ResponseEntity<ApiResponseDto<Void>> logout(
+            @RequestHeader(value = "Authorization", required = false) String authHeader, HttpServletRequest request,
+            HttpServletResponse servletResponse) {
         log.info("Logout request");
 
         // Try to logout by refresh token cookie if present
@@ -250,7 +233,8 @@ public class AuthController {
      */
     @GetMapping("/me")
     @Operation(summary = "Get user info", description = "Get current user information from JWT token")
-    public ResponseEntity<ApiResponseDto<LoginResponseDto.UserInfoDto>> getCurrentUser(@RequestHeader("Authorization") String authHeader) {
+    public ResponseEntity<ApiResponseDto<LoginResponseDto.UserInfoDto>> getCurrentUser(
+            @RequestHeader("Authorization") String authHeader) {
         log.info("Get current user info request");
         
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
@@ -268,6 +252,34 @@ public class AuthController {
                 .status("success")
                 .message("User information retrieved successfully")
                 .data(userInfo)
+                .build());
+    }
+
+    private ResponseEntity<ApiResponseDto<LoginResponseDto>> withRefreshCookie(LoginResponseDto response,
+            String message) {
+        if (response != null && response.getRefreshToken() != null && !response.getRefreshToken().isBlank()) {
+            ResponseCookie cookie = ResponseCookie.from("refreshToken", response.getRefreshToken())
+                    .httpOnly(true)
+                    .secure(true)
+                    .path("/")
+                    .maxAge(7 * 24 * 60 * 60)
+                    .sameSite("Lax")
+                    .build();
+            response.setRefreshToken(null);
+
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.SET_COOKIE, cookie.toString())
+                    .body(ApiResponseDto.<LoginResponseDto>builder()
+                            .status("success")
+                            .message(message)
+                            .data(response)
+                            .build());
+        }
+
+        return ResponseEntity.ok(ApiResponseDto.<LoginResponseDto>builder()
+                .status("success")
+                .message(message)
+                .data(response)
                 .build());
     }
 }
