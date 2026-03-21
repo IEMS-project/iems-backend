@@ -2,6 +2,8 @@ package com.iems.iamservice.controller;
 
 import com.iems.iamservice.dto.ApiResponseDto;
 import com.iems.iamservice.dto.request.LoginRequestDto;
+import com.iems.iamservice.dto.request.OAuthCodeRequestDto;
+import com.iems.iamservice.dto.request.OAuthIdTokenRequestDto;
 import com.iems.iamservice.dto.request.RefreshTokenRequestDto;
 import com.iems.iamservice.dto.request.RegisterRequestDto;
 import com.iems.iamservice.dto.response.LoginResponseDto;
@@ -107,6 +109,48 @@ public class AuthController {
                         .build()
         );
 
+    }
+
+    /**
+     * Login with Google ID token
+     */
+    @PostMapping("/google")
+    @Operation(summary = "Google login by ID token", description = "Login/register with Google ID token")
+    public ResponseEntity<ApiResponseDto<LoginResponseDto>> loginWithGoogle(@Valid @RequestBody OAuthIdTokenRequestDto request) {
+        LoginResponseDto response = authService.loginWithGoogleIdToken(request);
+        return ResponseEntity.ok(ApiResponseDto.<LoginResponseDto>builder()
+                .status("success")
+                .message("Google login successful")
+                .data(response)
+                .build());
+    }
+
+    /**
+     * Login with Google authorization code
+     */
+    @PostMapping("/google/code")
+    @Operation(summary = "Google login by code", description = "Login/register with Google OAuth authorization code")
+    public ResponseEntity<ApiResponseDto<LoginResponseDto>> loginWithGoogleCode(@Valid @RequestBody OAuthCodeRequestDto request) {
+        LoginResponseDto response = authService.loginWithGoogleCode(request);
+        return ResponseEntity.ok(ApiResponseDto.<LoginResponseDto>builder()
+                .status("success")
+                .message("Google login successful")
+                .data(response)
+                .build());
+    }
+
+    /**
+     * Login with GitHub authorization code
+     */
+    @PostMapping("/github")
+    @Operation(summary = "GitHub login by code", description = "Login/register with GitHub OAuth authorization code")
+    public ResponseEntity<ApiResponseDto<LoginResponseDto>> loginWithGithubCode(@Valid @RequestBody OAuthCodeRequestDto request) {
+        LoginResponseDto response = authService.loginWithGithubCode(request);
+        return ResponseEntity.ok(ApiResponseDto.<LoginResponseDto>builder()
+                .status("success")
+                .message("GitHub login successful")
+                .data(response)
+                .build());
     }
 
     /**

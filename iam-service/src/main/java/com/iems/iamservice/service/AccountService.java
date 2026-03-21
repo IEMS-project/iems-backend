@@ -100,6 +100,10 @@ public class AccountService {
         return accountRepository.findByUsernameOrEmail(usernameOrEmail);
     }
 
+    public Optional<Account> findByEmail(String email) {
+        return accountRepository.findByEmail(email);
+    }
+
     /**
      * Find user by userId (deprecated - for backward compatibility)
      */
