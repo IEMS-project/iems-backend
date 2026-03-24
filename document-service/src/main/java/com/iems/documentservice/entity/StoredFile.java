@@ -32,7 +32,7 @@ public class StoredFile {
     @Column(name = "owner_id", nullable = false)
     private UUID ownerId;
 
-    // path/key in MinIO bucket
+    // public_id / path key in Cloudinary
     @Column(nullable = false)
     private String path;
 

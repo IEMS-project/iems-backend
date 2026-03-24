@@ -44,7 +44,6 @@ public class AvatarController {
 
     @PostMapping(value = "/upload/avatar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "Upload employee avatar for current user")
-    @PreAuthorize("hasAuthority('DOC_CREATE')")
     public ResponseEntity<ApiResponseDto<String>> uploadAvatar(@RequestPart("file") MultipartFile file) throws Exception {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         JwtUserDetails principal = (JwtUserDetails) authentication.getPrincipal();
@@ -57,7 +56,7 @@ public class AvatarController {
             ext = original.substring(dot);
         }
         String fileName = userId + "_avt" + ext;
-        String objectKey = "employee_avatar/" + fileName;
+        String objectKey = "avatar/employee/" + fileName;
 
         try (InputStream in = file.getInputStream()) {
             storageService.upload(objectKey, in, file.getSize(), file.getContentType());
@@ -85,7 +84,6 @@ public class AvatarController {
 
     @PostMapping(value = "/upload/group-avatar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "Upload group avatar for a specific group")
-    @PreAuthorize("hasAuthority('DOC_CREATE')")
     public ResponseEntity<ApiResponseDto<String>> uploadGroupAvatar(@RequestPart("file") MultipartFile file,
                                                                     @RequestParam("groupId") String groupId) throws Exception {
         // Auth required; only admin or group owner allowed; Chat-Service will re-check on update call
@@ -99,7 +97,7 @@ public class AvatarController {
             ext = original.substring(dot);
         }
         String fileName = groupId + "_avt" + ext;
-        String objectKey = "group_avatar/" + fileName;
+        String objectKey = "avatar/group/" + fileName;
 
         try (InputStream in = file.getInputStream()) {
             storageService.upload(objectKey, in, file.getSize(), file.getContentType());
@@ -127,11 +125,10 @@ public class AvatarController {
 
     @GetMapping("/group-avatar/{groupId}")
     @Operation(summary = "Get group avatar URL or stream if necessary")
-    @PreAuthorize("hasAuthority('DOC_READ')")
     public ResponseEntity<ApiResponseDto<String>> getGroupAvatarUrl(@PathVariable("groupId") String groupId) throws Exception {
         // Find latest file that matches naming scheme
         Optional<StoredFile> latest = storedFileRepository
-                .findFirstByPathStartingWithOrderByCreatedAtDesc("group_avatar/" + groupId + "_avt");
+                .findFirstByPathStartingWithOrderByCreatedAtDesc("avatar/group/" + groupId + "_avt");
 
         if (latest.isEmpty()) {
             return ResponseEntity.ok(new ApiResponseDto<>(200, "No group avatar", null));
@@ -143,10 +140,9 @@ public class AvatarController {
 
     @GetMapping("/avatar/{userId}")
     @Operation(summary = "Get avatar URL for user or stream if necessary")
-    @PreAuthorize("hasAuthority('DOC_READ')")
     public ResponseEntity<ApiResponseDto<String>> getAvatarUrl(@PathVariable("userId") UUID userId) throws Exception {
         Optional<StoredFile> latest = storedFileRepository
-                .findFirstByOwnerIdAndPathStartingWithOrderByCreatedAtDesc(userId, "employee_avatar/" + userId + "_avt");
+                .findFirstByOwnerIdAndPathStartingWithOrderByCreatedAtDesc(userId, "avatar/employee/" + userId + "_avt");
 
         if (latest.isEmpty()) {
             return ResponseEntity.ok(new ApiResponseDto<>(200, "No avatar", null));

@@ -1,81 +1,89 @@
 package com.iems.documentservice.service;
 
-import io.minio.*;
-import io.minio.http.Method;
-import org.springframework.beans.factory.annotation.Value;
+import com.cloudinary.Cloudinary;
+import com.cloudinary.utils.ObjectUtils;
 import org.springframework.stereotype.Service;
 
 import java.io.InputStream;
-import java.util.concurrent.TimeUnit;
+import java.net.URI;
+import java.util.Map;
 
 @Service
 public class ObjectStorageService {
 
-    private final MinioClient minioClient;
+    private final Cloudinary cloudinary;
 
-    @Value("${minio.bucket}")
-    private String bucketName;
-
-    @Value("${minio.presign.expiryMinutes:60}")
-    private int presignExpiryMinutes;
-
-    // Base URL for publicly accessible MinIO (nginx/gateway or direct console endpoint host). Example: http://localhost:9000
-    @Value("${minio.public-url:${minio.url}}")
-    private String publicBaseUrl;
-
-    public ObjectStorageService(MinioClient minioClient) {
-        this.minioClient = minioClient;
+    public ObjectStorageService(Cloudinary cloudinary) {
+        this.cloudinary = cloudinary;
     }
 
+    /**
+     * Upload một file lên Cloudinary.
+     * Tất cả file đều dùng resource_type = "raw" để hỗ trợ mọi loại file.
+     * public_id = objectKey (giữ nguyên cấu trúc thư mục và tên file).
+     */
     public void upload(String objectKey, InputStream inputStream, long size, String contentType) throws Exception {
-        minioClient.putObject(
-                PutObjectArgs.builder()
-                        .bucket(bucketName)
-                        .object(objectKey)
-                        .stream(inputStream, size, -1)
-                        .contentType(contentType)
-                        .build()
-        );
+        byte[] bytes = inputStream.readAllBytes();
+        cloudinary.uploader().upload(bytes, ObjectUtils.asMap(
+                "public_id", objectKey,
+                "resource_type", "raw",
+                "overwrite", true,
+                "invalidate", true
+        ));
     }
 
+    /**
+     * Tải xuống file từ Cloudinary bằng cách lấy URL công khai rồi mở stream HTTP.
+     */
     public InputStream download(String objectKey) throws Exception {
-        return minioClient.getObject(
-                GetObjectArgs.builder()
-                        .bucket(bucketName)
-                        .object(objectKey)
-                        .build()
-        );
+        String url = buildPublicUrl(objectKey);
+        return URI.create(url).toURL().openStream();
     }
 
+    /**
+     * Xóa file khỏi Cloudinary.
+     * invalidate = true để xóa cache CDN.
+     */
     public void delete(String objectKey) throws Exception {
-        minioClient.removeObject(
-                RemoveObjectArgs.builder()
-                        .bucket(bucketName)
-                        .object(objectKey)
-                        .build()
-        );
+        cloudinary.uploader().destroy(objectKey, ObjectUtils.asMap(
+                "resource_type", "raw",
+                "invalidate", true
+        ));
     }
 
+    /**
+     * Trả về URL download của file.
+     * Vì file được upload với type "upload" (public) nên URL CDN đã có thể truy cập trực tiếp.
+     * Nếu cần kiểm soát truy cập, đổi upload type sang "authenticated" và dùng privateDownload.
+     */
     public String presignGetUrl(String objectKey) throws Exception {
-        return minioClient.getPresignedObjectUrl(
-                GetPresignedObjectUrlArgs.builder()
-                        .method(Method.GET)
-                        .bucket(bucketName)
-                        .object(objectKey)
-                        .expiry(presignExpiryMinutes, TimeUnit.MINUTES)
-                        .build()
-        );
+        return buildPublicUrl(objectKey);
     }
 
+    /**
+     * Trả về URL công khai trên CDN Cloudinary.
+     * Dạng: https://res.cloudinary.com/{cloud_name}/raw/upload/{objectKey}
+     */
     public String buildPublicUrl(String objectKey) {
-        String base = publicBaseUrl;
-        if (base.endsWith("/")) {
-            base = base.substring(0, base.length() - 1);
-        }
-        // MinIO path-style URL: {base}/{bucket}/{object}
-        return base + "/" + bucketName + "/" + objectKey;
+        return cloudinary.url()
+                .resourceType("raw")
+                .type("upload")
+                .generate(objectKey);
+    }
+
+    /**
+     * Upload file và trả về URL công khai ngay sau khi upload.
+     * Tiện lợi khi cần URL ngay lập tức không cần gọi buildPublicUrl riêng.
+     */
+    public String uploadAndGetUrl(String objectKey, InputStream inputStream, long size, String contentType) throws Exception {
+        byte[] bytes = inputStream.readAllBytes();
+        @SuppressWarnings("unchecked")
+        Map<String, Object> result = cloudinary.uploader().upload(bytes, ObjectUtils.asMap(
+                "public_id", objectKey,
+                "resource_type", "raw",
+                "overwrite", true,
+                "invalidate", true
+        ));
+        return (String) result.get("secure_url");
     }
 }
-
-
-

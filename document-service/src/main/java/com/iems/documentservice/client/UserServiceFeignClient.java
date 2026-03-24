@@ -1,6 +1,7 @@
 package com.iems.documentservice.client;
 
 import com.iems.documentservice.config.FeignClientConfig;
+import com.iems.documentservice.dto.request.AccountIdsDto;
 import com.iems.documentservice.dto.request.UpdateAvatarRequest;
 import com.iems.documentservice.dto.request.UserIdsDto;
 import org.springframework.cloud.openfeign.FeignClient;
@@ -27,6 +28,14 @@ public interface UserServiceFeignClient {
     ResponseEntity<Map<String, Object>> getUsersByID(
             @RequestBody UserIdsDto request
     );
+
+    @PostMapping("/users/by-account-ids")
+    ResponseEntity<Map<String, Object>> getUsersByAccountIds(
+            @RequestBody AccountIdsDto request
+    );
+
+    @GetMapping("/users/by-account/{accountId}")
+    ResponseEntity<Map<String, Object>> getUserByAccountId(@PathVariable("accountId") UUID accountId);
 
     @PutMapping("/users/me/avatar")
     ResponseEntity<Map<String, Object>> updateMyAvatar(@RequestBody UpdateAvatarRequest body);
