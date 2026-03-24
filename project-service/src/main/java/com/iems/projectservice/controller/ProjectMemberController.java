@@ -94,4 +94,21 @@ public class ProjectMemberController {
                     .body(new ApiResponseDto<>("error", e.getMessage(), null));
         }
     }
+
+    @GetMapping("/check")
+    @Operation(summary = "Check if current user is a member of the project")
+    public ResponseEntity<Void> checkMembership(@PathVariable UUID projectId) {
+        try {
+            UUID currentUserId = projectService.getUserIdFromRequest();
+            boolean isMember = projectMemberService.isProjectMember(projectId, currentUserId);
+            if (isMember) {
+                return ResponseEntity.ok().build();
+            } else {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+            }
+        } catch (Exception e) {
+            log.error("Error checking membership", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
 }

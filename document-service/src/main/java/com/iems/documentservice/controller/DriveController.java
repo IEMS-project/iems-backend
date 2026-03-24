@@ -39,7 +39,6 @@ public class DriveController {
 
     @PostMapping("/folders")
     @Operation(summary = "Create folder")
-    @PreAuthorize("hasAuthority('DOC_CREATE')")
     public ResponseEntity<ApiResponseDto<FolderResponse>> createFolder(@Valid @RequestBody CreateFolderRequest request) {
         FolderResponse data = driveService.createFolder(request);
         return ResponseEntity.ok(new ApiResponseDto<>(200, "Folder created", data));
@@ -48,28 +47,24 @@ public class DriveController {
 
     @GetMapping("/folders")
     @Operation(summary = "List all folders of owner")
-    @PreAuthorize("hasAuthority('DOC_READ')")
     public ResponseEntity<ApiResponseDto<Object>> listFolders() {
         return ResponseEntity.ok(new ApiResponseDto<>(200, "OK", driveService.listFolders()));
     }
 
     @GetMapping("/files")
     @Operation(summary = "List all files of owner")
-    @PreAuthorize("hasAuthority('DOC_READ')")
     public ResponseEntity<ApiResponseDto<Object>> listFiles() {
         return ResponseEntity.ok(new ApiResponseDto<>(200, "OK", driveService.listFiles()));
     }
 
     @GetMapping("/files/accessible")
     @Operation(summary = "List all files accessible to requester (owned/public/shared)")
-    @PreAuthorize("hasAuthority('DOC_READ')")
     public ResponseEntity<ApiResponseDto<Object>> listAccessibleFiles() {
         return ResponseEntity.ok(new ApiResponseDto<>(200, "OK", driveService.listAccessibleFiles()));
     }
 
     @GetMapping("/folders/{id}/contents")
     @Operation(summary = "List all folders and files inside a folder")
-    @PreAuthorize("hasAuthority('DOC_READ')")
     public ResponseEntity<ApiResponseDto<Object>> listFolderContents(@PathVariable UUID id) {
         return ResponseEntity.ok(new ApiResponseDto<>(200, "OK", driveService.listFolderContents(id)));
     }
@@ -143,7 +138,6 @@ public class DriveController {
 
     @PostMapping("/batch-delete")
     @Operation(summary = "Delete multiple files and folders at once")
-    @PreAuthorize("hasAuthority('DOC_DELETE')")
     public ResponseEntity<ApiResponseDto<BatchDeleteResponse>> batchDelete(@Valid @RequestBody BatchDeleteRequest request) throws Exception {
         BatchDeleteResponse data = driveService.batchDelete(request.getFileIds(), request.getFolderIds());
         return ResponseEntity.ok(new ApiResponseDto<>(200, "Batch delete completed", data));
@@ -151,7 +145,6 @@ public class DriveController {
 
     @PostMapping("/batch-move")
     @Operation(summary = "Move multiple files and folders to a destination folder")
-    @PreAuthorize("hasAuthority('DOC_UPDATE')")
     public ResponseEntity<ApiResponseDto<BatchMoveResponse>> batchMove(@Valid @RequestBody BatchMoveRequest request) {
         BatchMoveResponse data = driveService.batchMove(request.getFileIds(), request.getFolderIds(), request.getDestinationFolderId());
         return ResponseEntity.ok(new ApiResponseDto<>(200, "Batch move completed", data));
@@ -229,6 +222,12 @@ public class DriveController {
     @Operation(summary = "Get shared users for an item")
     public ResponseEntity<ApiResponseDto<Object>> getSharedUsers(@PathVariable UUID id, @RequestParam("type") String type) {
         return ResponseEntity.ok(new ApiResponseDto<>(200, "OK", driveService.getSharedUsers(id, type)));
+    }
+
+    @GetMapping("/items/{id}/activities")
+    @Operation(summary = "Get activity history for an item")
+    public ResponseEntity<ApiResponseDto<Object>> getItemActivities(@PathVariable UUID id, @RequestParam("type") String type) {
+        return ResponseEntity.ok(new ApiResponseDto<>(200, "OK", driveService.listItemActivities(id, type)));
     }
 
     // Update share permission
