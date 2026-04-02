@@ -7,9 +7,11 @@ import com.iems.aiservice.dto.HealthResponse;
 import com.iems.aiservice.entity.ChatMessage;
 import com.iems.aiservice.entity.Conversation;
 import com.iems.aiservice.service.ChatHistoryService;
+import com.iems.aiservice.service.DocumentContextService;
 import com.iems.aiservice.service.JwtService;
 import com.iems.aiservice.service.OllamaChatService;
 import jakarta.validation.Valid;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -28,26 +30,28 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 import static org.springframework.http.HttpStatus.UNAUTHORIZED;
 
 @RestController
 @RequestMapping("/api/ai")
+@Slf4j
 public class AiChatController {
 
     private final OllamaChatService ollamaChatService;
     private final AiProperties aiProperties;
     private final JwtService jwtService;
     private final ChatHistoryService chatHistoryService;
+    private final DocumentContextService documentContextService;
 
     public AiChatController(OllamaChatService ollamaChatService, AiProperties aiProperties, JwtService jwtService,
-            ChatHistoryService chatHistoryService) {
+            ChatHistoryService chatHistoryService, DocumentContextService documentContextService) {
         this.ollamaChatService = ollamaChatService;
         this.aiProperties = aiProperties;
         this.jwtService = jwtService;
         this.chatHistoryService = chatHistoryService;
+        this.documentContextService = documentContextService;
     }
 
     @PostMapping("/chat")
@@ -61,7 +65,15 @@ public class AiChatController {
                 request.conversationId(), userId, request.question(), request.projectId());
         chatHistoryService.saveMessage(conversationId, "user", request.question());
 
-        String answer = ollamaChatService.ask(request.question());
+        String documentContext = documentContextService.buildDocumentContext(
+            request.projectId(), request.selectedDocumentIds(), request.question());
+        log.info("Chat request projectId={} selectedCount={} contextChars={} conversationId={}",
+            request.projectId(),
+            request.selectedDocumentIds() == null ? 0 : request.selectedDocumentIds().size(),
+            documentContext.length(),
+            conversationId);
+
+        String answer = ollamaChatService.ask(request.question(), request.selectedDocumentIds(), documentContext);
         chatHistoryService.saveMessage(conversationId, "assistant", answer);
         chatHistoryService.updateTimestamp(conversationId);
 
@@ -85,12 +97,20 @@ public class AiChatController {
                 request.conversationId(), userId, request.question(), request.projectId());
         chatHistoryService.saveMessage(conversationId, "user", request.question());
 
+        String documentContext = documentContextService.buildDocumentContext(
+            request.projectId(), request.selectedDocumentIds(), request.question());
+        log.info("Stream chat request projectId={} selectedCount={} contextChars={} conversationId={}",
+            request.projectId(),
+            request.selectedDocumentIds() == null ? 0 : request.selectedDocumentIds().size(),
+            documentContext.length(),
+            conversationId);
+
         SseEmitter emitter = new SseEmitter(0L);
         StringBuilder fullAnswer = new StringBuilder();
 
         CompletableFuture.runAsync(() -> {
             try {
-                ollamaChatService.streamAsk(request.question(), chunk -> {
+                ollamaChatService.streamAsk(request.question(), request.selectedDocumentIds(), documentContext, chunk -> {
                     try {
                         fullAnswer.append(chunk);
                         emitter.send(SseEmitter.event().data(Map.of(

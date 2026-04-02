@@ -7,8 +7,12 @@ public class AiProperties {
 
     private String baseUrl;
     private String model;
+    private String embeddingModel = "nomic-embed-text";
     private String systemPrompt;
     private double temperature = 0.2;
+    private int retrievalTopK = 6;
+    private int chunkSize = 900;
+    private int chunkOverlap = 150;
 
     public String getBaseUrl() {
         return baseUrl;
@@ -40,5 +44,37 @@ public class AiProperties {
 
     public void setTemperature(double temperature) {
         this.temperature = temperature;
+    }
+
+    public String getEmbeddingModel() {
+        return embeddingModel;
+    }
+
+    public void setEmbeddingModel(String embeddingModel) {
+        this.embeddingModel = embeddingModel;
+    }
+
+    public int getRetrievalTopK() {
+        return retrievalTopK;
+    }
+
+    public void setRetrievalTopK(int retrievalTopK) {
+        this.retrievalTopK = retrievalTopK;
+    }
+
+    public int getChunkSize() {
+        return chunkSize;
+    }
+
+    public void setChunkSize(int chunkSize) {
+        this.chunkSize = chunkSize;
+    }
+
+    public int getChunkOverlap() {
+        return chunkOverlap;
+    }
+
+    public void setChunkOverlap(int chunkOverlap) {
+        this.chunkOverlap = chunkOverlap;
     }
 }
