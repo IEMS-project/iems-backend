@@ -21,8 +21,7 @@ public class OllamaEmbeddingService {
         try {
             Map<String, Object> payload = Map.of(
                     "model", aiProperties.getEmbeddingModel(),
-                    "input", text
-            );
+                    "input", text);
             Map<String, Object> response = ollamaRestClient.post()
                     .uri("/api/embed")
                     .contentType(MediaType.APPLICATION_JSON)
@@ -42,8 +41,7 @@ public class OllamaEmbeddingService {
 
         Map<String, Object> payload = Map.of(
                 "model", aiProperties.getEmbeddingModel(),
-                "prompt", text
-        );
+                "prompt", text);
         Map<String, Object> response = ollamaRestClient.post()
                 .uri("/api/embeddings")
                 .contentType(MediaType.APPLICATION_JSON)

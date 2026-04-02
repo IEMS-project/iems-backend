@@ -66,12 +66,12 @@ public class AiChatController {
         chatHistoryService.saveMessage(conversationId, "user", request.question());
 
         String documentContext = documentContextService.buildDocumentContext(
-            request.projectId(), request.selectedDocumentIds(), request.question());
+                request.projectId(), request.selectedDocumentIds(), request.question());
         log.info("Chat request projectId={} selectedCount={} contextChars={} conversationId={}",
-            request.projectId(),
-            request.selectedDocumentIds() == null ? 0 : request.selectedDocumentIds().size(),
-            documentContext.length(),
-            conversationId);
+                request.projectId(),
+                request.selectedDocumentIds() == null ? 0 : request.selectedDocumentIds().size(),
+                documentContext.length(),
+                conversationId);
 
         String answer = ollamaChatService.ask(request.question(), request.selectedDocumentIds(), documentContext);
         chatHistoryService.saveMessage(conversationId, "assistant", answer);
@@ -98,28 +98,29 @@ public class AiChatController {
         chatHistoryService.saveMessage(conversationId, "user", request.question());
 
         String documentContext = documentContextService.buildDocumentContext(
-            request.projectId(), request.selectedDocumentIds(), request.question());
+                request.projectId(), request.selectedDocumentIds(), request.question());
         log.info("Stream chat request projectId={} selectedCount={} contextChars={} conversationId={}",
-            request.projectId(),
-            request.selectedDocumentIds() == null ? 0 : request.selectedDocumentIds().size(),
-            documentContext.length(),
-            conversationId);
+                request.projectId(),
+                request.selectedDocumentIds() == null ? 0 : request.selectedDocumentIds().size(),
+                documentContext.length(),
+                conversationId);
 
         SseEmitter emitter = new SseEmitter(0L);
         StringBuilder fullAnswer = new StringBuilder();
 
         CompletableFuture.runAsync(() -> {
             try {
-                ollamaChatService.streamAsk(request.question(), request.selectedDocumentIds(), documentContext, chunk -> {
-                    try {
-                        fullAnswer.append(chunk);
-                        emitter.send(SseEmitter.event().data(Map.of(
-                                "type", "chunk",
-                                "content", chunk)));
-                    } catch (Exception sendException) {
-                        throw new RuntimeException(sendException);
-                    }
-                });
+                ollamaChatService.streamAsk(request.question(), request.selectedDocumentIds(), documentContext,
+                        chunk -> {
+                            try {
+                                fullAnswer.append(chunk);
+                                emitter.send(SseEmitter.event().data(Map.of(
+                                        "type", "chunk",
+                                        "content", chunk)));
+                            } catch (Exception sendException) {
+                                throw new RuntimeException(sendException);
+                            }
+                        });
 
                 // End of stream, save assistant message
                 chatHistoryService.saveMessage(conversationId, "assistant", fullAnswer.toString());

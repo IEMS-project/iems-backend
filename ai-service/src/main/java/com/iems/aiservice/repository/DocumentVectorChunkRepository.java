@@ -9,6 +9,8 @@ import java.util.List;
 @Repository
 public interface DocumentVectorChunkRepository extends MongoRepository<DocumentVectorChunk, String> {
     List<DocumentVectorChunk> findByProjectIdAndDocumentId(String projectId, String documentId);
+
     List<DocumentVectorChunk> findByProjectIdAndDocumentIdIn(String projectId, List<String> documentIds);
+
     void deleteByProjectIdAndDocumentId(String projectId, String documentId);
 }

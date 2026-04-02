@@ -81,7 +81,8 @@ public class ProjectDocumentService {
         requireProjectMember(projectId);
 
         return projectDocumentRepository
-                .findFirstByProjectIdAndIsFolderTrueAndParentIdIsNullAndFileNameIgnoreCase(projectId, DEFAULT_DOCS_FOLDER_NAME)
+                .findFirstByProjectIdAndIsFolderTrueAndParentIdIsNullAndFileNameIgnoreCase(projectId,
+                        DEFAULT_DOCS_FOLDER_NAME)
                 .map(this::toResponse)
                 .orElseGet(() -> {
                     UUID userId = permissionHelper.getCurrentUserId();
@@ -143,9 +144,9 @@ public class ProjectDocumentService {
 
     @Transactional
     public ProjectDocumentResponse uploadDocument(UUID projectId,
-                                                  UUID folderId,
-                                                  MultipartFile file,
-                                                  boolean allowEmbedded) throws Exception {
+            UUID folderId,
+            MultipartFile file,
+            boolean allowEmbedded) throws Exception {
         requireProjectMember(projectId);
         UUID userId = permissionHelper.getCurrentUserId();
 
@@ -169,11 +170,12 @@ public class ProjectDocumentService {
                 .uploadedBy(userId)
                 .cloudinaryPath(objectKey)
                 .createdAt(OffsetDateTime.now())
-            .allowEmbedded(allowEmbedded)
-            .aiIndexed(allowEmbedded && ragSupported)
+                .allowEmbedded(allowEmbedded)
+                .aiIndexed(allowEmbedded && ragSupported)
                 .build());
 
-        log.info("Uploaded document id={} projectId={} fileName={} fileType={} allowEmbedded={} ragSupported={} aiIndexed={}",
+        log.info(
+                "Uploaded document id={} projectId={} fileName={} fileType={} allowEmbedded={} ragSupported={} aiIndexed={}",
                 doc.getId(),
                 projectId,
                 doc.getFileName(),
@@ -218,7 +220,8 @@ public class ProjectDocumentService {
 
     private void deleteRecursive(UUID projectId, ProjectDocument doc) throws Exception {
         if (Boolean.TRUE.equals(doc.getIsFolder())) {
-            List<ProjectDocument> children = projectDocumentRepository.findByProjectIdAndParentId(projectId, doc.getId());
+            List<ProjectDocument> children = projectDocumentRepository.findByProjectIdAndParentId(projectId,
+                    doc.getId());
             for (ProjectDocument child : children) {
                 deleteRecursive(projectId, child);
             }

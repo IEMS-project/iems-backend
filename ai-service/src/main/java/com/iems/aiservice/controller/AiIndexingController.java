@@ -28,7 +28,8 @@ public class AiIndexingController {
     @PostMapping("/events")
     public ResponseEntity<Map<String, Object>> processEvent(@Valid @RequestBody IndexingCommandRequest request) {
         String operation = request.operation().trim().toUpperCase(Locale.ROOT);
-        log.info("Indexing command received operation={} projectId={} documentId={} fileName={} fileType={} hasDownloadUrl={}",
+        log.info(
+                "Indexing command received operation={} projectId={} documentId={} fileName={} fileType={} hasDownloadUrl={}",
                 operation,
                 request.projectId(),
                 request.documentId(),

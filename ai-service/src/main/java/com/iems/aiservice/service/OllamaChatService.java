@@ -32,10 +32,10 @@ public class OllamaChatService {
     public String ask(String question, List<String> selectedDocumentIds, String documentContext) {
         String scopedQuestion = buildScopedQuestion(question, selectedDocumentIds, documentContext);
         log.info("Ollama ask start model={} selectedCount={} contextChars={} promptChars={}",
-            aiProperties.getModel(),
-            selectedDocumentIds == null ? 0 : selectedDocumentIds.size(),
-            documentContext == null ? 0 : documentContext.length(),
-            scopedQuestion.length());
+                aiProperties.getModel(),
+                selectedDocumentIds == null ? 0 : selectedDocumentIds.size(),
+                documentContext == null ? 0 : documentContext.length(),
+                scopedQuestion.length());
         Map<String, Object> payload = Map.of(
                 "model", aiProperties.getModel(),
                 "stream", false,
@@ -68,15 +68,15 @@ public class OllamaChatService {
     }
 
     public void streamAsk(String question,
-                          List<String> selectedDocumentIds,
-                          String documentContext,
-                          Consumer<String> onChunk) {
+            List<String> selectedDocumentIds,
+            String documentContext,
+            Consumer<String> onChunk) {
         String scopedQuestion = buildScopedQuestion(question, selectedDocumentIds, documentContext);
         log.info("Ollama stream start model={} selectedCount={} contextChars={} promptChars={}",
-            aiProperties.getModel(),
-            selectedDocumentIds == null ? 0 : selectedDocumentIds.size(),
-            documentContext == null ? 0 : documentContext.length(),
-            scopedQuestion.length());
+                aiProperties.getModel(),
+                selectedDocumentIds == null ? 0 : selectedDocumentIds.size(),
+                documentContext == null ? 0 : documentContext.length(),
+                scopedQuestion.length());
         Map<String, Object> payload = Map.of(
                 "model", aiProperties.getModel(),
                 "stream", true,

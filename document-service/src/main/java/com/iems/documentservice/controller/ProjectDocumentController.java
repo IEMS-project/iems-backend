@@ -54,7 +54,8 @@ public class ProjectDocumentController {
     public ResponseEntity<ApiResponseDto<ProjectDocumentResponse>> createFolder(
             @PathVariable UUID projectId,
             @RequestBody com.iems.documentservice.dto.request.CreateFolderRequest request) {
-        ProjectDocumentResponse doc = projectDocumentService.createFolder(projectId, request.getName(), request.getParentId());
+        ProjectDocumentResponse doc = projectDocumentService.createFolder(projectId, request.getName(),
+                request.getParentId());
         return ResponseEntity.ok(new ApiResponseDto<>(200, "Folder created", doc));
     }
 

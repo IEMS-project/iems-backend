@@ -30,10 +30,10 @@ public class DocumentContextService {
     private final AiProperties aiProperties;
 
     public void indexDocument(String projectId,
-                              String docId,
-                              String fileName,
-                              String fileType,
-                              String downloadUrl) {
+            String docId,
+            String fileName,
+            String fileType,
+            String downloadUrl) {
         String resolvedFileName = (fileName == null || fileName.isBlank()) ? docId : fileName;
         log.info("Index start projectId={} docId={} fileName={} fileType={} hasDownloadUrl={}",
                 projectId,
@@ -65,21 +65,21 @@ public class DocumentContextService {
     }
 
     public String buildDocumentContext(String projectId,
-                                       List<String> selectedDocumentIds,
-                                       String question) {
+            List<String> selectedDocumentIds,
+            String question) {
         if (projectId == null || projectId.isBlank()
                 || selectedDocumentIds == null || selectedDocumentIds.isEmpty()) {
             log.info("Context skip because projectId or selectedDocumentIds is empty projectId={} selectedCount={}",
-                projectId,
-                selectedDocumentIds == null ? 0 : selectedDocumentIds.size());
+                    projectId,
+                    selectedDocumentIds == null ? 0 : selectedDocumentIds.size());
             return "";
         }
 
         List<String> limitedDocIds = selectedDocumentIds.stream().limit(MAX_SELECTED_DOCS).toList();
         log.info("Context build start projectId={} selectedCount={} limitedDocIds={}",
-            projectId,
-            selectedDocumentIds.size(),
-            limitedDocIds);
+                projectId,
+                selectedDocumentIds.size(),
+                limitedDocIds);
         List<DocumentVectorChunk> chunks = documentVectorChunkRepository
                 .findByProjectIdAndDocumentIdIn(projectId, limitedDocIds);
 
@@ -100,9 +100,9 @@ public class DocumentContextService {
                 .toList();
 
         log.info("Context scoring completed projectId={} candidateChunks={} topChunks={}",
-            projectId,
-            chunks.size(),
-            topChunks.size());
+                projectId,
+                chunks.size(),
+                topChunks.size());
 
         StringBuilder context = new StringBuilder();
         for (ScoredChunk scored : topChunks) {
@@ -125,9 +125,9 @@ public class DocumentContextService {
     }
 
     private void upsertDocumentEmbeddings(String projectId,
-                                          String docId,
-                                          String fileName,
-                                          String content) {
+            String docId,
+            String fileName,
+            String content) {
         if (content == null || content.isBlank()) {
             return;
         }
@@ -149,11 +149,11 @@ public class DocumentContextService {
 
         List<String> textChunks = chunkText(normalized, aiProperties.getChunkSize(), aiProperties.getChunkOverlap());
         log.info("Index chunking result projectId={} docId={} chunkCount={} chunkSize={} chunkOverlap={}",
-            projectId,
-            docId,
-            textChunks.size(),
-            aiProperties.getChunkSize(),
-            aiProperties.getChunkOverlap());
+                projectId,
+                docId,
+                textChunks.size(),
+                aiProperties.getChunkSize(),
+                aiProperties.getChunkOverlap());
         List<DocumentVectorChunk> toSave = new ArrayList<>();
 
         for (int i = 0; i < textChunks.size(); i++) {
