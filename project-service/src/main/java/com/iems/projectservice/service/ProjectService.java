@@ -1,5 +1,6 @@
 package com.iems.projectservice.service;
 
+import com.iems.projectservice.client.DocumentServiceFeignClient;
 import com.iems.projectservice.client.UserServiceFeignClient;
 import com.iems.projectservice.dto.request.AccountIdsDto;
 import com.iems.projectservice.dto.request.CreateProjectDto;
@@ -23,6 +24,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -37,6 +40,7 @@ public class ProjectService {
     private final RoleService roleService;
     private final WorkflowService workflowService;
     private final IssueService issueService;
+    private final DocumentServiceFeignClient documentServiceFeignClient;
     private final UserServiceFeignClient userServiceFeignClient;
     private final ObjectMapper objectMapper;
 
@@ -100,6 +104,18 @@ public class ProjectService {
         // Create default issue types and priorities
         issueService.createDefaultIssueTypes(savedProject.getId());
         issueService.createDefaultPriorities(savedProject.getId());
+
+        // Run docs initialization only after DB commit so downstream membership checks can see the new project.
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                try {
+                    documentServiceFeignClient.initDefaultDocsFolder(savedProject.getId());
+                } catch (Exception e) {
+                    log.warn("Failed to initialize default docs folder for project {}: {}", savedProject.getId(), e.getMessage());
+                }
+            }
+        });
 
         return savedProject;
     }

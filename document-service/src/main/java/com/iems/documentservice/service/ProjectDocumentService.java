@@ -3,6 +3,7 @@ package com.iems.documentservice.service;
 import com.iems.documentservice.client.ProjectServiceFeignClient;
 import com.iems.documentservice.dto.response.ProjectDocumentResponse;
 import com.iems.documentservice.entity.ProjectDocument;
+import com.iems.documentservice.entity.enums.AiIndexOperation;
 import com.iems.documentservice.exception.AppException;
 import com.iems.documentservice.exception.DocumentErrorCode;
 import com.iems.documentservice.repository.ProjectDocumentRepository;
@@ -25,11 +26,13 @@ import java.util.stream.Collectors;
 public class ProjectDocumentService {
 
     private static final long MAX_UPLOAD_SIZE = 50L * 1024 * 1024; // 50 MB
+    private static final String DEFAULT_DOCS_FOLDER_NAME = "docs";
 
     private final ProjectDocumentRepository projectDocumentRepository;
     private final ProjectServiceFeignClient projectServiceFeignClient;
     private final ObjectStorageService objectStorageService;
     private final PermissionHelper permissionHelper;
+    private final AiIndexEventService aiIndexEventService;
 
     // ────────── ACCESS CHECK ──────────
 
@@ -78,6 +81,27 @@ public class ProjectDocumentService {
     }
 
     @Transactional
+    public ProjectDocumentResponse initDefaultDocsFolder(UUID projectId) {
+        requireProjectMember(projectId);
+
+        return projectDocumentRepository
+                .findFirstByProjectIdAndIsFolderTrueAndParentIdIsNullAndFileNameIgnoreCase(projectId, DEFAULT_DOCS_FOLDER_NAME)
+                .map(this::toResponse)
+                .orElseGet(() -> {
+                    UUID userId = permissionHelper.getCurrentUserId();
+                    ProjectDocument docsFolder = projectDocumentRepository.save(ProjectDocument.builder()
+                            .projectId(projectId)
+                            .fileName(DEFAULT_DOCS_FOLDER_NAME)
+                            .isFolder(true)
+                            .parentId(null)
+                            .uploadedBy(userId)
+                            .createdAt(OffsetDateTime.now())
+                            .build());
+                    return toResponse(docsFolder);
+                });
+    }
+
+    @Transactional
     public ProjectDocumentResponse renameDocument(UUID projectId, UUID docId, String newName) {
         requireProjectMember(projectId);
         ProjectDocument doc = projectDocumentRepository.findByProjectIdAndId(projectId, docId)
@@ -93,8 +117,21 @@ public class ProjectDocumentService {
         ProjectDocument doc = projectDocumentRepository.findByProjectIdAndId(projectId, docId)
                 .orElseThrow(() -> new AppException(DocumentErrorCode.FILE_NOT_FOUND));
 
+        boolean wasUnderDocs = isFileUnderDocsTree(projectId, doc.getParentId(), doc.getIsFolder());
+        boolean nowUnderDocs = isFileUnderDocsTree(projectId, targetParentId, doc.getIsFolder());
+
         doc.setParentId(targetParentId);
-        return toResponse(projectDocumentRepository.save(doc));
+        ProjectDocument savedDoc = projectDocumentRepository.save(doc);
+
+        if (!Boolean.TRUE.equals(savedDoc.getIsFolder())) {
+            if (!wasUnderDocs && nowUnderDocs) {
+                aiIndexEventService.createPendingEvent(savedDoc, AiIndexOperation.INDEX);
+            } else if (wasUnderDocs && !nowUnderDocs) {
+                aiIndexEventService.createPendingEvent(savedDoc, AiIndexOperation.DEINDEX);
+            }
+        }
+
+        return toResponse(savedDoc);
     }
 
     // ────────── UPLOAD ──────────
@@ -125,6 +162,10 @@ public class ProjectDocumentService {
                 .cloudinaryPath(objectKey)
                 .createdAt(OffsetDateTime.now())
                 .build());
+
+        if (isInsideDocsTree(projectId, folderId)) {
+            aiIndexEventService.createPendingEvent(doc, AiIndexOperation.INDEX);
+        }
 
         return toResponse(doc);
     }
@@ -197,5 +238,35 @@ public class ProjectDocumentService {
 
     private String buildProjectObjectKey(UUID projectId, String fileName) {
         return "document/projects/" + projectId + "/" + System.currentTimeMillis() + "-" + fileName;
+    }
+
+    private boolean isFileUnderDocsTree(UUID projectId, UUID parentId, Boolean isFolder) {
+        if (Boolean.TRUE.equals(isFolder)) {
+            return false;
+        }
+        return isInsideDocsTree(projectId, parentId);
+    }
+
+    private boolean isInsideDocsTree(UUID projectId, UUID folderId) {
+        if (folderId == null) {
+            return false;
+        }
+
+        ProjectDocument current = projectDocumentRepository.findByProjectIdAndId(projectId, folderId).orElse(null);
+        while (current != null) {
+            if (Boolean.TRUE.equals(current.getIsFolder())
+                    && current.getParentId() == null
+                    && current.getFileName() != null
+                    && DEFAULT_DOCS_FOLDER_NAME.equalsIgnoreCase(current.getFileName())) {
+                return true;
+            }
+
+            UUID parentId = current.getParentId();
+            if (parentId == null) {
+                return false;
+            }
+            current = projectDocumentRepository.findByProjectIdAndId(projectId, parentId).orElse(null);
+        }
+        return false;
     }
 }

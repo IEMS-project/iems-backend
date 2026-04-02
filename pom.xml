@@ -41,6 +41,7 @@
         <module>document-service</module>
 		<module>project-service</module>
 		<module>chat-service</module>
+		<module>ai-service</module>
 	</modules>
 
 	<build>

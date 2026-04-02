@@ -36,5 +36,8 @@ public interface DocumentServiceFeignClient {
     @DeleteMapping("/api/files/{id}")
     ResponseEntity<DocumentApiResponseDto<Object>> deleteFile(@PathVariable("id") String fileId);
 
+        @PostMapping("/api/projects/{projectId}/documents/folders/init-default")
+        ResponseEntity<DocumentApiResponseDto<Object>> initDefaultDocsFolder(@PathVariable("projectId") UUID projectId);
+
 
 }

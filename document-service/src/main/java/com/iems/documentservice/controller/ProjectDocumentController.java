@@ -49,6 +49,14 @@ public class ProjectDocumentController {
         return ResponseEntity.ok(new ApiResponseDto<>(200, "Folder created", doc));
     }
 
+    @PostMapping("/folders/init-default")
+    @Operation(summary = "Initialize default docs folder for project")
+    public ResponseEntity<ApiResponseDto<ProjectDocumentResponse>> initDefaultDocsFolder(
+            @PathVariable UUID projectId) {
+        ProjectDocumentResponse doc = projectDocumentService.initDefaultDocsFolder(projectId);
+        return ResponseEntity.ok(new ApiResponseDto<>(200, "Default docs folder initialized", doc));
+    }
+
     @PutMapping("/{docId}/rename")
     @Operation(summary = "Rename a project document/folder")
     public ResponseEntity<ApiResponseDto<ProjectDocumentResponse>> renameDocument(

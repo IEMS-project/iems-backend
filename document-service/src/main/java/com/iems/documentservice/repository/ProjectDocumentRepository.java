@@ -16,4 +16,6 @@ public interface ProjectDocumentRepository extends JpaRepository<ProjectDocument
     Optional<ProjectDocument> findByProjectIdAndId(UUID projectId, UUID id);
 
     List<ProjectDocument> findByProjectIdAndParentId(UUID projectId, UUID parentId);
+
+    Optional<ProjectDocument> findFirstByProjectIdAndIsFolderTrueAndParentIdIsNullAndFileNameIgnoreCase(UUID projectId, String fileName);
 }
