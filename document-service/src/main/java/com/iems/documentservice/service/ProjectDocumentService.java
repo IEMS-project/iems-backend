@@ -307,7 +307,11 @@ public class ProjectDocumentService {
         String normalizedFileName = fileName != null ? fileName.toLowerCase() : "";
         String normalizedFileType = fileType != null ? fileType.toLowerCase() : "";
         return normalizedFileName.endsWith(".txt")
+                || normalizedFileName.endsWith(".pdf")
+                || normalizedFileName.endsWith(".docx")
                 || normalizedFileType.contains("text")
+                || normalizedFileType.contains("pdf")
+                || normalizedFileType.contains("wordprocessingml")
                 || normalizedFileType.contains("json")
                 || normalizedFileType.contains("xml")
                 || normalizedFileType.contains("markdown");

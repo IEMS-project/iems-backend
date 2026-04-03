@@ -5,9 +5,16 @@ import com.iems.aiservice.entity.DocumentVectorChunk;
 import com.iems.aiservice.repository.DocumentVectorChunkRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.pdfbox.Loader;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.text.PDFTextStripper;
+import org.apache.poi.xwpf.extractor.XWPFWordExtractor;
+import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Instant;
@@ -41,19 +48,31 @@ public class DocumentContextService {
                 resolvedFileName,
                 fileType,
                 downloadUrl != null && !downloadUrl.isBlank());
-        if (!isTextLike(resolvedFileName, fileType)) {
-            log.info("Skipping non-text document docId={} fileName={} fileType={}", docId, resolvedFileName, fileType);
+            if (!isSupportedForEmbedding(resolvedFileName, fileType)) {
+                log.info("Skipping unsupported document docId={} fileName={} fileType={}", docId, resolvedFileName, fileType);
             return;
         }
 
         RestClient restClient = RestClient.builder().build();
-        String content = restClient.get()
+            byte[] contentBytes = restClient.get()
                 .uri(downloadUrl)
                 .retrieve()
-                .body(String.class);
+                .body(byte[].class);
 
-        int contentLength = content != null ? content.length() : 0;
-        log.info("Index download completed projectId={} docId={} contentLength={}", projectId, docId, contentLength);
+            int contentLength = contentBytes != null ? contentBytes.length : 0;
+            log.info("Index download completed projectId={} docId={} rawBytes={}", projectId, docId, contentLength);
+
+            String content = extractTextContent(contentBytes, resolvedFileName, fileType);
+            int extractedLength = content != null ? content.length() : 0;
+            log.info("Index extraction completed projectId={} docId={} extractedChars={}", projectId, docId, extractedLength);
+
+            if (content == null || content.isBlank()) {
+                log.info("Skipping index because extracted text is empty projectId={} docId={} fileName={}",
+                    projectId,
+                    docId,
+                    resolvedFileName);
+                return;
+            }
 
         upsertDocumentEmbeddings(projectId, docId, resolvedFileName, content);
     }
@@ -177,14 +196,48 @@ public class DocumentContextService {
         log.info("Indexed document {} with {} chunks", docId, toSave.size());
     }
 
-    private boolean isTextLike(String fileName, String fileType) {
+    private boolean isSupportedForEmbedding(String fileName, String fileType) {
         String lowerFileName = fileName != null ? fileName.toLowerCase() : "";
         String lowerFileType = fileType != null ? fileType.toLowerCase() : "";
         return lowerFileName.endsWith(".txt")
+                || lowerFileName.endsWith(".pdf")
+                || lowerFileName.endsWith(".docx")
                 || lowerFileType.contains("text")
+                || lowerFileType.contains("pdf")
+                || lowerFileType.contains("wordprocessingml")
                 || lowerFileType.contains("json")
                 || lowerFileType.contains("xml")
                 || lowerFileType.contains("markdown");
+    }
+
+    private String extractTextContent(byte[] contentBytes, String fileName, String fileType) {
+        if (contentBytes == null || contentBytes.length == 0) {
+            return "";
+        }
+
+        String lowerFileName = fileName != null ? fileName.toLowerCase() : "";
+        String lowerFileType = fileType != null ? fileType.toLowerCase() : "";
+
+        try {
+            if (lowerFileName.endsWith(".pdf") || lowerFileType.contains("pdf")) {
+                try (PDDocument document = Loader.loadPDF(contentBytes)) {
+                    return new PDFTextStripper().getText(document);
+                }
+            }
+
+            if (lowerFileName.endsWith(".docx") || lowerFileType.contains("wordprocessingml")) {
+                try (XWPFDocument document = new XWPFDocument(new ByteArrayInputStream(contentBytes));
+                        XWPFWordExtractor extractor = new XWPFWordExtractor(document)) {
+                    return extractor.getText();
+                }
+            }
+
+            return new String(contentBytes, StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new IllegalStateException(
+                    "Failed to extract text from file " + fileName + " (type=" + fileType + ")",
+                    e);
+        }
     }
 
     private List<String> chunkText(String text, int chunkSize, int chunkOverlap) {

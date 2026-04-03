@@ -67,13 +67,19 @@ public class AiChatController {
 
         String documentContext = documentContextService.buildDocumentContext(
                 request.projectId(), request.selectedDocumentIds(), request.question());
+        String conversationContext = chatHistoryService.buildRecentConversationContext(conversationId);
         log.info("Chat request projectId={} selectedCount={} contextChars={} conversationId={}",
                 request.projectId(),
                 request.selectedDocumentIds() == null ? 0 : request.selectedDocumentIds().size(),
                 documentContext.length(),
                 conversationId);
+        log.info("Chat memory conversationId={} memoryChars={}", conversationId, conversationContext.length());
 
-        String answer = ollamaChatService.ask(request.question(), request.selectedDocumentIds(), documentContext);
+        String answer = ollamaChatService.ask(
+            request.question(),
+            request.selectedDocumentIds(),
+            documentContext,
+            conversationContext);
         chatHistoryService.saveMessage(conversationId, "assistant", answer);
         chatHistoryService.updateTimestamp(conversationId);
 
@@ -99,11 +105,13 @@ public class AiChatController {
 
         String documentContext = documentContextService.buildDocumentContext(
                 request.projectId(), request.selectedDocumentIds(), request.question());
+        String conversationContext = chatHistoryService.buildRecentConversationContext(conversationId);
         log.info("Stream chat request projectId={} selectedCount={} contextChars={} conversationId={}",
                 request.projectId(),
                 request.selectedDocumentIds() == null ? 0 : request.selectedDocumentIds().size(),
                 documentContext.length(),
                 conversationId);
+        log.info("Stream chat memory conversationId={} memoryChars={}", conversationId, conversationContext.length());
 
         SseEmitter emitter = new SseEmitter(0L);
         StringBuilder fullAnswer = new StringBuilder();
@@ -111,6 +119,7 @@ public class AiChatController {
         CompletableFuture.runAsync(() -> {
             try {
                 ollamaChatService.streamAsk(request.question(), request.selectedDocumentIds(), documentContext,
+                    conversationContext,
                         chunk -> {
                             try {
                                 fullAnswer.append(chunk);

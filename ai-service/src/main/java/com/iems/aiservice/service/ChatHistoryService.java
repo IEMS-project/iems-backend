@@ -9,9 +9,13 @@ import org.springframework.stereotype.Service;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 public class ChatHistoryService {
+
+    private static final int DEFAULT_HISTORY_LIMIT = 10;
+    private static final int MAX_HISTORY_CHARS = 4000;
 
     private final ConversationRepository conversationRepository;
     private final ChatMessageRepository chatMessageRepository;
@@ -71,6 +75,31 @@ public class ChatHistoryService {
 
     public List<ChatMessage> getConversationMessages(String conversationId) {
         return chatMessageRepository.findByConversationIdOrderByTimestampAsc(conversationId);
+    }
+
+    public String buildRecentConversationContext(String conversationId) {
+        if (conversationId == null || conversationId.isBlank()) {
+            return "";
+        }
+
+        List<ChatMessage> messages = getConversationMessages(conversationId);
+        if (messages.isEmpty()) {
+            return "";
+        }
+
+        int fromIndex = Math.max(0, messages.size() - DEFAULT_HISTORY_LIMIT);
+        String raw = messages.subList(fromIndex, messages.size()).stream()
+                .map(message -> {
+                    String roleLabel = "assistant".equalsIgnoreCase(message.getRole()) ? "Assistant" : "User";
+                    String content = message.getContent() == null ? "" : message.getContent().trim();
+                    return roleLabel + ": " + content;
+                })
+                .collect(Collectors.joining("\n"));
+
+        if (raw.length() <= MAX_HISTORY_CHARS) {
+            return raw;
+        }
+        return raw.substring(raw.length() - MAX_HISTORY_CHARS);
     }
 
     public void deleteConversation(String id) {

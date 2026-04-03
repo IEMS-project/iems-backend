@@ -4,11 +4,14 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.iems.aiservice.config.AiProperties;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.ResourceLoader;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -22,25 +25,34 @@ public class OllamaChatService {
     private final RestClient ollamaRestClient;
     private final AiProperties aiProperties;
     private final ObjectMapper objectMapper;
+    private final String systemPrompt;
 
-    public OllamaChatService(RestClient ollamaRestClient, AiProperties aiProperties, ObjectMapper objectMapper) {
+    public OllamaChatService(RestClient ollamaRestClient,
+            AiProperties aiProperties,
+            ObjectMapper objectMapper,
+            ResourceLoader resourceLoader) {
         this.ollamaRestClient = ollamaRestClient;
         this.aiProperties = aiProperties;
         this.objectMapper = objectMapper;
+        this.systemPrompt = loadSystemPrompt(resourceLoader, aiProperties.getSystemPromptFile());
     }
 
-    public String ask(String question, List<String> selectedDocumentIds, String documentContext) {
-        String scopedQuestion = buildScopedQuestion(question, selectedDocumentIds, documentContext);
-        log.info("Ollama ask start model={} selectedCount={} contextChars={} promptChars={}",
+    public String ask(String question,
+            List<String> selectedDocumentIds,
+            String documentContext,
+            String conversationContext) {
+        String scopedQuestion = buildScopedQuestion(question, selectedDocumentIds, documentContext, conversationContext);
+        log.info("Ollama ask start model={} selectedCount={} contextChars={} memoryChars={} promptChars={}",
                 aiProperties.getModel(),
                 selectedDocumentIds == null ? 0 : selectedDocumentIds.size(),
                 documentContext == null ? 0 : documentContext.length(),
+                conversationContext == null ? 0 : conversationContext.length(),
                 scopedQuestion.length());
         Map<String, Object> payload = Map.of(
                 "model", aiProperties.getModel(),
                 "stream", false,
                 "messages", List.of(
-                        Map.of("role", "system", "content", aiProperties.getSystemPrompt()),
+                    Map.of("role", "system", "content", systemPrompt),
                         Map.of("role", "user", "content", scopedQuestion)),
                 "options", Map.of("temperature", aiProperties.getTemperature()));
 
@@ -70,18 +82,20 @@ public class OllamaChatService {
     public void streamAsk(String question,
             List<String> selectedDocumentIds,
             String documentContext,
+            String conversationContext,
             Consumer<String> onChunk) {
-        String scopedQuestion = buildScopedQuestion(question, selectedDocumentIds, documentContext);
-        log.info("Ollama stream start model={} selectedCount={} contextChars={} promptChars={}",
+        String scopedQuestion = buildScopedQuestion(question, selectedDocumentIds, documentContext, conversationContext);
+        log.info("Ollama stream start model={} selectedCount={} contextChars={} memoryChars={} promptChars={}",
                 aiProperties.getModel(),
                 selectedDocumentIds == null ? 0 : selectedDocumentIds.size(),
                 documentContext == null ? 0 : documentContext.length(),
+            conversationContext == null ? 0 : conversationContext.length(),
                 scopedQuestion.length());
         Map<String, Object> payload = Map.of(
                 "model", aiProperties.getModel(),
                 "stream", true,
                 "messages", List.of(
-                        Map.of("role", "system", "content", aiProperties.getSystemPrompt()),
+                    Map.of("role", "system", "content", systemPrompt),
                         Map.of("role", "user", "content", scopedQuestion)),
                 "options", Map.of("temperature", aiProperties.getTemperature()));
 
@@ -114,9 +128,13 @@ public class OllamaChatService {
                 });
     }
 
-    private String buildScopedQuestion(String question, List<String> selectedDocumentIds, String documentContext) {
+    private String buildScopedQuestion(String question,
+            List<String> selectedDocumentIds,
+            String documentContext,
+            String conversationContext) {
         if ((selectedDocumentIds == null || selectedDocumentIds.isEmpty())
-                && (documentContext == null || documentContext.isBlank())) {
+                && (documentContext == null || documentContext.isBlank())
+                && (conversationContext == null || conversationContext.isBlank())) {
             return question;
         }
 
@@ -133,6 +151,34 @@ public class OllamaChatService {
             prompt.append("\n\nDocument context:\n").append(documentContext);
         }
 
+        if (conversationContext != null && !conversationContext.isBlank()) {
+            prompt.append("\n\nRecent conversation memory:\n")
+                    .append(conversationContext)
+                    .append("\nUse this memory to keep continuity, but prioritize selected document context when relevant.");
+        }
+
         return prompt.toString();
+    }
+
+    private String loadSystemPrompt(ResourceLoader resourceLoader, String promptPath) {
+        String resolvedPath = (promptPath == null || promptPath.isBlank())
+                ? "classpath:prompts/systemt_prompt.txt"
+                : promptPath;
+        try {
+            Resource resource = resourceLoader.getResource(resolvedPath);
+            if (!resource.exists()) {
+                throw new IllegalStateException("System prompt file not found: " + resolvedPath);
+            }
+            try (var inputStream = resource.getInputStream()) {
+                String content = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8).trim();
+                if (content.isBlank()) {
+                    throw new IllegalStateException("System prompt file is empty: " + resolvedPath);
+                }
+                log.info("Loaded system prompt from {} (chars={})", resolvedPath, content.length());
+                return content;
+            }
+        } catch (IOException e) {
+            throw new IllegalStateException("Failed to load system prompt file: " + resolvedPath, e);
+        }
     }
 }

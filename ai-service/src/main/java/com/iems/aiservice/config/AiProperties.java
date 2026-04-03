@@ -8,7 +8,7 @@ public class AiProperties {
     private String baseUrl;
     private String model;
     private String embeddingModel = "nomic-embed-text";
-    private String systemPrompt;
+    private String systemPromptFile = "classpath:prompts/systemt_prompt.txt";
     private double temperature = 0.2;
     private int retrievalTopK = 6;
     private int chunkSize = 900;
@@ -30,12 +30,12 @@ public class AiProperties {
         this.model = model;
     }
 
-    public String getSystemPrompt() {
-        return systemPrompt;
+    public String getSystemPromptFile() {
+        return systemPromptFile;
     }
 
-    public void setSystemPrompt(String systemPrompt) {
-        this.systemPrompt = systemPrompt;
+    public void setSystemPromptFile(String systemPromptFile) {
+        this.systemPromptFile = systemPromptFile;
     }
 
     public double getTemperature() {
