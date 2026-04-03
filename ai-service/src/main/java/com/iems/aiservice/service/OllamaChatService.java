@@ -41,7 +41,8 @@ public class OllamaChatService {
             List<String> selectedDocumentIds,
             String documentContext,
             String conversationContext) {
-        String scopedQuestion = buildScopedQuestion(question, selectedDocumentIds, documentContext, conversationContext);
+        String scopedQuestion = buildScopedQuestion(question, selectedDocumentIds, documentContext,
+                conversationContext);
         log.info("Ollama ask start model={} selectedCount={} contextChars={} memoryChars={} promptChars={}",
                 aiProperties.getModel(),
                 selectedDocumentIds == null ? 0 : selectedDocumentIds.size(),
@@ -52,7 +53,7 @@ public class OllamaChatService {
                 "model", aiProperties.getModel(),
                 "stream", false,
                 "messages", List.of(
-                    Map.of("role", "system", "content", systemPrompt),
+                        Map.of("role", "system", "content", systemPrompt),
                         Map.of("role", "user", "content", scopedQuestion)),
                 "options", Map.of("temperature", aiProperties.getTemperature()));
 
@@ -84,18 +85,19 @@ public class OllamaChatService {
             String documentContext,
             String conversationContext,
             Consumer<String> onChunk) {
-        String scopedQuestion = buildScopedQuestion(question, selectedDocumentIds, documentContext, conversationContext);
+        String scopedQuestion = buildScopedQuestion(question, selectedDocumentIds, documentContext,
+                conversationContext);
         log.info("Ollama stream start model={} selectedCount={} contextChars={} memoryChars={} promptChars={}",
                 aiProperties.getModel(),
                 selectedDocumentIds == null ? 0 : selectedDocumentIds.size(),
                 documentContext == null ? 0 : documentContext.length(),
-            conversationContext == null ? 0 : conversationContext.length(),
+                conversationContext == null ? 0 : conversationContext.length(),
                 scopedQuestion.length());
         Map<String, Object> payload = Map.of(
                 "model", aiProperties.getModel(),
                 "stream", true,
                 "messages", List.of(
-                    Map.of("role", "system", "content", systemPrompt),
+                        Map.of("role", "system", "content", systemPrompt),
                         Map.of("role", "user", "content", scopedQuestion)),
                 "options", Map.of("temperature", aiProperties.getTemperature()));
 

@@ -48,31 +48,33 @@ public class DocumentContextService {
                 resolvedFileName,
                 fileType,
                 downloadUrl != null && !downloadUrl.isBlank());
-            if (!isSupportedForEmbedding(resolvedFileName, fileType)) {
-                log.info("Skipping unsupported document docId={} fileName={} fileType={}", docId, resolvedFileName, fileType);
+        if (!isSupportedForEmbedding(resolvedFileName, fileType)) {
+            log.info("Skipping unsupported document docId={} fileName={} fileType={}", docId, resolvedFileName,
+                    fileType);
             return;
         }
 
         RestClient restClient = RestClient.builder().build();
-            byte[] contentBytes = restClient.get()
+        byte[] contentBytes = restClient.get()
                 .uri(downloadUrl)
                 .retrieve()
                 .body(byte[].class);
 
-            int contentLength = contentBytes != null ? contentBytes.length : 0;
-            log.info("Index download completed projectId={} docId={} rawBytes={}", projectId, docId, contentLength);
+        int contentLength = contentBytes != null ? contentBytes.length : 0;
+        log.info("Index download completed projectId={} docId={} rawBytes={}", projectId, docId, contentLength);
 
-            String content = extractTextContent(contentBytes, resolvedFileName, fileType);
-            int extractedLength = content != null ? content.length() : 0;
-            log.info("Index extraction completed projectId={} docId={} extractedChars={}", projectId, docId, extractedLength);
+        String content = extractTextContent(contentBytes, resolvedFileName, fileType);
+        int extractedLength = content != null ? content.length() : 0;
+        log.info("Index extraction completed projectId={} docId={} extractedChars={}", projectId, docId,
+                extractedLength);
 
-            if (content == null || content.isBlank()) {
-                log.info("Skipping index because extracted text is empty projectId={} docId={} fileName={}",
+        if (content == null || content.isBlank()) {
+            log.info("Skipping index because extracted text is empty projectId={} docId={} fileName={}",
                     projectId,
                     docId,
                     resolvedFileName);
-                return;
-            }
+            return;
+        }
 
         upsertDocumentEmbeddings(projectId, docId, resolvedFileName, content);
     }

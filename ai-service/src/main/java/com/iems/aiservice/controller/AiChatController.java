@@ -76,10 +76,10 @@ public class AiChatController {
         log.info("Chat memory conversationId={} memoryChars={}", conversationId, conversationContext.length());
 
         String answer = ollamaChatService.ask(
-            request.question(),
-            request.selectedDocumentIds(),
-            documentContext,
-            conversationContext);
+                request.question(),
+                request.selectedDocumentIds(),
+                documentContext,
+                conversationContext);
         chatHistoryService.saveMessage(conversationId, "assistant", answer);
         chatHistoryService.updateTimestamp(conversationId);
 
@@ -119,7 +119,7 @@ public class AiChatController {
         CompletableFuture.runAsync(() -> {
             try {
                 ollamaChatService.streamAsk(request.question(), request.selectedDocumentIds(), documentContext,
-                    conversationContext,
+                        conversationContext,
                         chunk -> {
                             try {
                                 fullAnswer.append(chunk);
