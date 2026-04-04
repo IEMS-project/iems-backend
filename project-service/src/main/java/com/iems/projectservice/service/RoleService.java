@@ -41,9 +41,12 @@ public class RoleService {
     public Role updateRole(UUID roleId, CreateRoleDto dto) {
         Role role = roleRepository.findById(roleId)
                 .orElseThrow(() -> new AppException(ProjectErrorCode.ROLE_NOT_FOUND));
-        if (dto.getName() != null) role.setName(dto.getName());
-        if (dto.getDescription() != null) role.setDescription(dto.getDescription());
-        if (dto.getIsDefault() != null) role.setIsDefault(dto.getIsDefault());
+        if (dto.getName() != null)
+            role.setName(dto.getName());
+        if (dto.getDescription() != null)
+            role.setDescription(dto.getDescription());
+        if (dto.getIsDefault() != null)
+            role.setIsDefault(dto.getIsDefault());
         return roleRepository.save(role);
     }
 

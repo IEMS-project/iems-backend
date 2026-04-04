@@ -23,7 +23,8 @@ public enum ProjectErrorCode {
     ROLE_ALREADY_EXISTS("Role already exists in this project", HttpStatus.CONFLICT),
     ROLE_ALREADY_ASSIGNED("Cannot delete role that is already assigned to members", HttpStatus.CONFLICT),
     DEFAULT_ROLE_PERMISSIONS_LOCKED("Cannot modify permissions of the admin/default role", HttpStatus.BAD_REQUEST),
-    DEFAULT_ROLE_MEMBER_PERMISSIONS_LOCKED("Cannot modify user permissions for a member with the admin/default role", HttpStatus.BAD_REQUEST),
+    DEFAULT_ROLE_MEMBER_PERMISSIONS_LOCKED("Cannot modify user permissions for a member with the admin/default role",
+            HttpStatus.BAD_REQUEST),
 
     PERMISSION_NOT_FOUND("Permission not found", HttpStatus.NOT_FOUND),
     PERMISSION_ALREADY_ASSIGNED("Permission is already assigned to this role", HttpStatus.CONFLICT),

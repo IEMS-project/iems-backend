@@ -220,7 +220,8 @@ public class WorkflowController {
             @PathVariable UUID workflowId) {
         try {
             List<WorkflowTransition> transitions = workflowService.getTransitions(workflowId);
-            return ResponseEntity.ok(new ApiResponseDto<>("success", "Transitions retrieved successfully", transitions));
+            return ResponseEntity
+                    .ok(new ApiResponseDto<>("success", "Transitions retrieved successfully", transitions));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(new ApiResponseDto<>("error", e.getMessage(), null));
         }

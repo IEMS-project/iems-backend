@@ -17,31 +17,24 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.List;
 import java.util.UUID;
 
-@FeignClient(
-        name = "DOCUMENT-SERVICE",
-        configuration = FeignClientConfig.class
-)
+@FeignClient(name = "DOCUMENT-SERVICE", configuration = FeignClientConfig.class)
 public interface DocumentServiceFeignClient {
 
-    @PostMapping(value = "/api/files/upload-batch", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    ResponseEntity<DocumentApiResponseDto<List<SimpleFileResponse>>> uploadFiles(
-            @RequestParam(required = false) UUID folderId,
-            @RequestPart("files") MultipartFile[] files
-    );
+        @PostMapping(value = "/api/files/upload-batch", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+        ResponseEntity<DocumentApiResponseDto<List<SimpleFileResponse>>> uploadFiles(
+                        @RequestParam(required = false) UUID folderId,
+                        @RequestPart("files") MultipartFile[] files);
 
-    @PostMapping(value = "/api/files/upload-public", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    ResponseEntity<DocumentApiResponseDto<List<SimpleFileResponse>>> uploadFilesToPublic(
-            @RequestPart("files") MultipartFile[] files
-    );
+        @PostMapping(value = "/api/files/upload-public", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+        ResponseEntity<DocumentApiResponseDto<List<SimpleFileResponse>>> uploadFilesToPublic(
+                        @RequestPart("files") MultipartFile[] files);
 
-    @DeleteMapping("/api/files/{id}")
-    ResponseEntity<DocumentApiResponseDto<Object>> deleteFile(@PathVariable("id") String fileId);
+        @DeleteMapping("/api/files/{id}")
+        ResponseEntity<DocumentApiResponseDto<Object>> deleteFile(@PathVariable("id") String fileId);
 
         @PostMapping("/api/projects/{projectId}/documents/folders/init-default")
         ResponseEntity<DocumentApiResponseDto<Object>> initDefaultDocsFolder(
                         @PathVariable("projectId") UUID projectId,
-                        @RequestHeader(value = "Authorization", required = false) String authorization
-        );
-
+                        @RequestHeader(value = "Authorization", required = false) String authorization);
 
 }

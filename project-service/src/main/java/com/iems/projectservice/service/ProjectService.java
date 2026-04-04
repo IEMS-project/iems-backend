@@ -90,13 +90,13 @@ public class ProjectService {
         Role adminRole = roleService.createRole(savedProject.getId(), adminRoleDto);
 
         List<ProjectPermission> defaultPermissions = Arrays.stream(ProjectPermission.values())
-            .filter(permission -> permission.name().startsWith("PROJECT_")
-                || permission.name().startsWith("ISSUE_")
-                || permission.name().startsWith("WORKFLOW_")
-                || permission.name().startsWith("ROLE_")
-                || permission.name().startsWith("SPRINT_")
-                || permission.name().startsWith("MEMBER_"))
-            .toList();
+                .filter(permission -> permission.name().startsWith("PROJECT_")
+                        || permission.name().startsWith("ISSUE_")
+                        || permission.name().startsWith("WORKFLOW_")
+                        || permission.name().startsWith("ROLE_")
+                        || permission.name().startsWith("SPRINT_")
+                        || permission.name().startsWith("MEMBER_"))
+                .toList();
         roleService.assignInitialPermissionsForNewRole(adminRole.getId(), defaultPermissions);
         log.debug("createProject stage=role_setup durationMs={}", System.currentTimeMillis() - startMs);
 
@@ -113,7 +113,8 @@ public class ProjectService {
         issueService.createDefaultPriorities(savedProject.getId());
         log.debug("createProject stage=issue_defaults durationMs={}", System.currentTimeMillis() - startMs);
 
-        // Run docs initialization only after DB commit so downstream membership checks can see the new project.
+        // Run docs initialization only after DB commit so downstream membership checks
+        // can see the new project.
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
@@ -129,7 +130,7 @@ public class ProjectService {
         });
 
         log.info("createProject completed projectId={} durationMs={}", savedProject.getId(),
-            System.currentTimeMillis() - startMs);
+                System.currentTimeMillis() - startMs);
 
         return savedProject;
     }

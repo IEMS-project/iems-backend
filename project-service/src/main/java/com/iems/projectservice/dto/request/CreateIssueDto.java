@@ -11,12 +11,12 @@ import java.util.UUID;
 public class CreateIssueDto {
     @NotNull
     private UUID issueTypeId;
-    
+
     private UUID parentId;
-    
+
     @NotBlank
     private String title;
-    
+
     private String description;
     private UUID priorityId;
     private UUID assigneeId;

@@ -62,7 +62,8 @@ public class ProjectMemberService {
     }
 
     @Transactional
-    public List<ProjectMember> addMembersToProject(UUID projectId, List<UUID> accountIds, UUID roleId, UUID assignedBy) {
+    public List<ProjectMember> addMembersToProject(UUID projectId, List<UUID> accountIds, UUID roleId,
+            UUID assignedBy) {
         List<ProjectMember> created = new ArrayList<>();
         for (UUID accountId : accountIds) {
             if (accountId == null) {
@@ -83,7 +84,8 @@ public class ProjectMemberService {
     }
 
     @Transactional
-    public List<ProjectMember> addMembersToProject(UUID projectId, List<com.iems.projectservice.dto.request.ProjectMemberDto> members,
+    public List<ProjectMember> addMembersToProject(UUID projectId,
+            List<com.iems.projectservice.dto.request.ProjectMemberDto> members,
             UUID assignedBy) {
         List<ProjectMember> created = new ArrayList<>();
         for (com.iems.projectservice.dto.request.ProjectMemberDto memberDto : members) {

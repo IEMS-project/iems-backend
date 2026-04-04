@@ -80,17 +80,17 @@ public class IssueController {
                 .body(content);
     }
 
-        @GetMapping("/export")
-        @Operation(summary = "Export issues to Excel")
-        @RequireProjectPermission(ProjectPermission.ISSUE_READ)
-        public ResponseEntity<byte[]> exportIssues(@PathVariable UUID projectId) {
+    @GetMapping("/export")
+    @Operation(summary = "Export issues to Excel")
+    @RequireProjectPermission(ProjectPermission.ISSUE_READ)
+    public ResponseEntity<byte[]> exportIssues(@PathVariable UUID projectId) {
         byte[] content = issueService.exportIssuesToExcel(projectId);
         return ResponseEntity.ok()
-            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=issues-export.xlsx")
-            .contentType(MediaType.parseMediaType(
-                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
-            .body(content);
-        }
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=issues-export.xlsx")
+                .contentType(MediaType.parseMediaType(
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(content);
+    }
 
     @PatchMapping("/{issueId}")
     @Operation(summary = "Update issue")

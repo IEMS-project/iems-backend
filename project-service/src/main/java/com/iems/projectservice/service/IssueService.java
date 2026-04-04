@@ -47,13 +47,14 @@ import java.util.stream.Collectors;
 public class IssueService {
 
     private static final String[] IMPORT_HEADERS = {
-            "Issue Key", "Issue Type", "Title", "Description", "Priority", "Assignee Email", "Sprint Name", "Story Points", "Due Date"
+            "Issue Key", "Issue Type", "Title", "Description", "Priority", "Assignee Email", "Sprint Name",
+            "Story Points", "Due Date"
     };
-        private static final int IMPORT_DATA_START_ROW_INDEX = 1;
-        private static final int IMPORT_DATA_END_ROW_INDEX = 500;
+    private static final int IMPORT_DATA_START_ROW_INDEX = 1;
+    private static final int IMPORT_DATA_END_ROW_INDEX = 500;
 
-        private record ParsedIssueImportRow(String issueKey, CreateIssueDto createDto) {
-        }
+    private record ParsedIssueImportRow(String issueKey, CreateIssueDto createDto) {
+    }
 
     private final IssueRepository issueRepository;
     private final ProjectRepository projectRepository;
@@ -161,21 +162,21 @@ public class IssueService {
         Issue saved = createIssueEntity(projectId, dto, reporterId, issueKey, defaultStatusId, nextSortOrder, true);
 
         return enrich(saved);
-        }
+    }
 
-        private UUID resolveDefaultStatusId(UUID projectId) {
+    private UUID resolveDefaultStatusId(UUID projectId) {
         Workflow defaultWorkflow = workflowRepository.findByProjectIdAndIsDefaultTrue(projectId)
-            .orElse(null);
+                .orElse(null);
         if (defaultWorkflow == null) {
             return null;
         }
 
         List<WorkflowStatus> statuses = workflowStatusRepository
-            .findByWorkflowIdOrderBySortOrderAsc(defaultWorkflow.getId());
+                .findByWorkflowIdOrderBySortOrderAsc(defaultWorkflow.getId());
         return statuses.isEmpty() ? null : statuses.get(0).getId();
-        }
+    }
 
-        private Issue createIssueEntity(UUID projectId, CreateIssueDto dto, UUID reporterId, String issueKey,
+    private Issue createIssueEntity(UUID projectId, CreateIssueDto dto, UUID reporterId, String issueKey,
             UUID defaultStatusId, int sortOrder, boolean logActivity) {
         Issue issue = new Issue();
         issue.setProjectId(projectId);
@@ -197,7 +198,7 @@ public class IssueService {
 
         if (logActivity) {
             activityLogService.log(projectId, saved.getId(), reporterId, "ISSUE_CREATED",
-                "Created issue " + issueKey + ": " + dto.getTitle());
+                    "Created issue " + issueKey + ": " + dto.getTitle());
         }
 
         return saved;
@@ -370,7 +371,8 @@ public class IssueService {
         List<ParsedIssueImportRow> rows = parseImportRows(file, issueTypeByName, priorityByName, assigneeByEmail,
                 sprintByName);
         if (rows.isEmpty()) {
-            throw new AppException(ProjectErrorCode.ISSUE_IMPORT_FILE_INVALID, "Excel file does not contain any data rows");
+            throw new AppException(ProjectErrorCode.ISSUE_IMPORT_FILE_INVALID,
+                    "Excel file does not contain any data rows");
         }
 
         int insertedCount = 0;
@@ -399,9 +401,9 @@ public class IssueService {
                 }
             }
 
-                String newIssueKey = project.getProjectKey() + "-" + (issueCount + 1);
-                issueCount++;
-                createIssueEntity(projectId, row.createDto(), reporterId, newIssueKey, defaultStatusId, nextSortOrder++,
+            String newIssueKey = project.getProjectKey() + "-" + (issueCount + 1);
+            issueCount++;
+            createIssueEntity(projectId, row.createDto(), reporterId, newIssueKey, defaultStatusId, nextSortOrder++,
                     true);
             insertedCount++;
         }
@@ -472,7 +474,7 @@ public class IssueService {
                 row.createCell(8).setCellValue(issue.getDueDate() != null ? issue.getDueDate().toString() : "");
             }
 
-                List<String> issueTypeOptions = issueTypes.stream()
+            List<String> issueTypeOptions = issueTypes.stream()
                     .map(IssueType::getName)
                     .filter(Objects::nonNull)
                     .map(String::trim)
@@ -480,7 +482,7 @@ public class IssueService {
                     .distinct()
                     .toList();
 
-                List<String> priorityOptions = priorities.stream()
+            List<String> priorityOptions = priorities.stream()
                     .map(IssuePriority::getName)
                     .filter(Objects::nonNull)
                     .map(String::trim)
@@ -488,7 +490,7 @@ public class IssueService {
                     .distinct()
                     .toList();
 
-                List<String> sprintOptions = sprints.stream()
+            List<String> sprintOptions = sprints.stream()
                     .map(Sprint::getName)
                     .filter(Objects::nonNull)
                     .map(String::trim)
@@ -496,7 +498,7 @@ public class IssueService {
                     .distinct()
                     .toList();
 
-                addTemplateDropdowns(workbook, sheet, issueTypeOptions, priorityOptions, assigneeEmails, sprintOptions);
+            addTemplateDropdowns(workbook, sheet, issueTypeOptions, priorityOptions, assigneeEmails, sprintOptions);
 
             for (int i = 0; i < IMPORT_HEADERS.length; i++) {
                 sheet.autoSizeColumn(i);
@@ -1011,7 +1013,8 @@ public class IssueService {
     public List<IssuePriority> syncIssuePriorities(UUID projectId, List<IssuePrioritySyncItemDto> items) {
         List<IssuePrioritySyncItemDto> safeItems = items != null ? items : List.of();
         List<IssuePriority> existing = issuePriorityRepository.findByProjectIdOrderBySortOrderAsc(projectId);
-        Map<UUID, IssuePriority> existingById = existing.stream().collect(Collectors.toMap(IssuePriority::getId, i -> i));
+        Map<UUID, IssuePriority> existingById = existing.stream()
+                .collect(Collectors.toMap(IssuePriority::getId, i -> i));
 
         int sortOrder = 0;
         for (IssuePrioritySyncItemDto item : safeItems) {
