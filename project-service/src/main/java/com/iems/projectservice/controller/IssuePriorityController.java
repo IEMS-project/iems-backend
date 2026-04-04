@@ -1,6 +1,7 @@
 package com.iems.projectservice.controller;
 
 import com.iems.projectservice.annotation.RequireProjectPermission;
+import com.iems.projectservice.dto.request.BatchIssuePrioritySyncRequest;
 import com.iems.projectservice.dto.response.ApiResponseDto;
 import com.iems.projectservice.entity.IssuePriority;
 import com.iems.projectservice.entity.enums.ProjectPermission;
@@ -42,6 +43,16 @@ public class IssuePriorityController {
                 body.get("name"), body.get("iconUrl"), body.get("color"));
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(new ApiResponseDto<>("success", "Issue priority created", priority));
+    }
+
+    @PostMapping("/sync")
+    @Operation(summary = "Sync issue priorities in one request")
+    @RequireProjectPermission(ProjectPermission.PROJECT_UPDATE)
+    public ResponseEntity<ApiResponseDto<List<IssuePriority>>> syncIssuePriorities(
+            @PathVariable UUID projectId,
+            @RequestBody BatchIssuePrioritySyncRequest request) {
+        List<IssuePriority> priorities = issueService.syncIssuePriorities(projectId, request.getPriorities());
+        return ResponseEntity.ok(new ApiResponseDto<>("success", "Issue priorities synced", priorities));
     }
 
     @PatchMapping("/{id}")

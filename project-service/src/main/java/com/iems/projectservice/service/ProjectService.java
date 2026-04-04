@@ -26,7 +26,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
+import java.util.concurrent.CompletableFuture;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -53,6 +56,8 @@ public class ProjectService {
     @Transactional
     public Project createProject(CreateProjectDto dto) {
         log.info("Creating project: {}", dto.getName());
+        final String authHeader = extractAuthorizationHeader();
+        final long startMs = System.currentTimeMillis();
 
         if (projectRepository.existsByName(dto.getName())) {
             throw new AppException(ProjectErrorCode.PROJECT_NAME_EXISTS);
@@ -84,38 +89,47 @@ public class ProjectService {
         adminRoleDto.setIsDefault(true);
         Role adminRole = roleService.createRole(savedProject.getId(), adminRoleDto);
 
-        for (ProjectPermission permission : ProjectPermission.values()) {
-            if (permission.name().startsWith("PROJECT_")
-                    || permission.name().startsWith("ISSUE_")
-                    || permission.name().startsWith("WORKFLOW_")
-                    || permission.name().startsWith("ROLE_")
-                    || permission.name().startsWith("SPRINT_")
-                    || permission.name().startsWith("MEMBER_")) {
-                roleService.assignInitialPermission(adminRole.getId(), permission);
-            }
-        }
+        List<ProjectPermission> defaultPermissions = Arrays.stream(ProjectPermission.values())
+            .filter(permission -> permission.name().startsWith("PROJECT_")
+                || permission.name().startsWith("ISSUE_")
+                || permission.name().startsWith("WORKFLOW_")
+                || permission.name().startsWith("ROLE_")
+                || permission.name().startsWith("SPRINT_")
+                || permission.name().startsWith("MEMBER_"))
+            .toList();
+        roleService.assignInitialPermissionsForNewRole(adminRole.getId(), defaultPermissions);
+        log.debug("createProject stage=role_setup durationMs={}", System.currentTimeMillis() - startMs);
 
         // Add creator as admin member
         projectMemberService.addMemberToProject(savedProject.getId(), currentUserId, adminRole.getId(), currentUserId);
+        log.debug("createProject stage=member_added durationMs={}", System.currentTimeMillis() - startMs);
 
         // Create default workflow
         workflowService.createDefaultWorkflow(savedProject.getId());
+        log.debug("createProject stage=workflow_default durationMs={}", System.currentTimeMillis() - startMs);
 
         // Create default issue types and priorities
         issueService.createDefaultIssueTypes(savedProject.getId());
         issueService.createDefaultPriorities(savedProject.getId());
+        log.debug("createProject stage=issue_defaults durationMs={}", System.currentTimeMillis() - startMs);
 
         // Run docs initialization only after DB commit so downstream membership checks can see the new project.
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
-                try {
-                    documentServiceFeignClient.initDefaultDocsFolder(savedProject.getId());
-                } catch (Exception e) {
-                    log.warn("Failed to initialize default docs folder for project {}: {}", savedProject.getId(), e.getMessage());
-                }
+                CompletableFuture.runAsync(() -> {
+                    try {
+                        documentServiceFeignClient.initDefaultDocsFolder(savedProject.getId(), authHeader);
+                    } catch (Exception e) {
+                        log.warn("Failed to initialize default docs folder for project {}: {}", savedProject.getId(),
+                                e.getMessage());
+                    }
+                });
             }
         });
+
+        log.info("createProject completed projectId={} durationMs={}", savedProject.getId(),
+            System.currentTimeMillis() - startMs);
 
         return savedProject;
     }
@@ -237,6 +251,18 @@ public class ProjectService {
 
     private boolean hasPermissionToUpdateProject(Project project, UUID accountId) {
         return project.getManagerAccountId().equals(accountId) || isAdmin(accountId);
+    }
+
+    private String extractAuthorizationHeader() {
+        try {
+            var attributes = RequestContextHolder.getRequestAttributes();
+            if (attributes instanceof ServletRequestAttributes servletRequestAttributes) {
+                return servletRequestAttributes.getRequest().getHeader("Authorization");
+            }
+        } catch (Exception ignored) {
+            // Ignore request context extraction errors.
+        }
+        return null;
     }
 
     public boolean isAdmin(UUID accountId) {

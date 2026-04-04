@@ -1,6 +1,7 @@
 package com.iems.projectservice.controller;
 
 import com.iems.projectservice.annotation.RequireProjectPermission;
+import com.iems.projectservice.dto.request.BatchWorkflowStatusSyncRequest;
 import com.iems.projectservice.dto.request.CreateWorkflowDto;
 import com.iems.projectservice.dto.request.CreateWorkflowStatusDto;
 import com.iems.projectservice.dto.request.CreateWorkflowTransitionDto;
@@ -159,6 +160,21 @@ public class WorkflowController {
         try {
             List<WorkflowStatus> statuses = workflowService.getStatuses(workflowId);
             return ResponseEntity.ok(new ApiResponseDto<>("success", "Statuses retrieved successfully", statuses));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(new ApiResponseDto<>("error", e.getMessage(), null));
+        }
+    }
+
+    @PostMapping("/{workflowId}/statuses/sync")
+    @Operation(summary = "Sync workflow statuses in one request")
+    @RequireProjectPermission(ProjectPermission.WORKFLOW_UPDATE)
+    public ResponseEntity<ApiResponseDto<List<WorkflowStatus>>> syncStatuses(
+            @PathVariable UUID projectId,
+            @PathVariable UUID workflowId,
+            @RequestBody BatchWorkflowStatusSyncRequest request) {
+        try {
+            List<WorkflowStatus> statuses = workflowService.syncStatuses(workflowId, request.getStatuses());
+            return ResponseEntity.ok(new ApiResponseDto<>("success", "Statuses synced successfully", statuses));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(new ApiResponseDto<>("error", e.getMessage(), null));
         }

@@ -9,6 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.multipart.MultipartFile;
@@ -37,7 +38,10 @@ public interface DocumentServiceFeignClient {
     ResponseEntity<DocumentApiResponseDto<Object>> deleteFile(@PathVariable("id") String fileId);
 
         @PostMapping("/api/projects/{projectId}/documents/folders/init-default")
-        ResponseEntity<DocumentApiResponseDto<Object>> initDefaultDocsFolder(@PathVariable("projectId") UUID projectId);
+        ResponseEntity<DocumentApiResponseDto<Object>> initDefaultDocsFolder(
+                        @PathVariable("projectId") UUID projectId,
+                        @RequestHeader(value = "Authorization", required = false) String authorization
+        );
 
 
 }

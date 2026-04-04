@@ -36,6 +36,9 @@ public enum ProjectErrorCode {
     ISSUE_NOT_FOUND("Issue not found", HttpStatus.NOT_FOUND),
     ISSUE_TYPE_NOT_FOUND("Issue type not found", HttpStatus.NOT_FOUND),
     ISSUE_PRIORITY_NOT_FOUND("Issue priority not found", HttpStatus.NOT_FOUND),
+    ISSUE_IMPORT_FILE_INVALID("Issue import file is invalid", HttpStatus.BAD_REQUEST),
+    ISSUE_IMPORT_TEMPLATE_INVALID("Issue import template is invalid", HttpStatus.BAD_REQUEST),
+    ISSUE_IMPORT_ROW_INVALID("Issue import row is invalid", HttpStatus.BAD_REQUEST),
 
     SPRINT_NOT_FOUND("Sprint not found", HttpStatus.NOT_FOUND),
     SPRINT_ALREADY_ACTIVE("A sprint is already active in this project", HttpStatus.CONFLICT),

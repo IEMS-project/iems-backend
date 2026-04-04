@@ -3,6 +3,7 @@ package com.iems.projectservice.service;
 import com.iems.projectservice.dto.request.CreateWorkflowDto;
 import com.iems.projectservice.dto.request.CreateWorkflowStatusDto;
 import com.iems.projectservice.dto.request.CreateWorkflowTransitionDto;
+import com.iems.projectservice.dto.request.WorkflowStatusSyncItemDto;
 import com.iems.projectservice.entity.Workflow;
 import com.iems.projectservice.entity.WorkflowStatus;
 import com.iems.projectservice.entity.WorkflowTransition;
@@ -16,7 +17,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -105,6 +108,65 @@ public class WorkflowService {
     }
 
     public List<WorkflowStatus> getStatuses(UUID workflowId) {
+        return workflowStatusRepository.findByWorkflowIdOrderBySortOrderAsc(workflowId);
+    }
+
+    @Transactional
+    public List<WorkflowStatus> syncStatuses(UUID workflowId, List<WorkflowStatusSyncItemDto> items) {
+        workflowRepository.findById(workflowId)
+                .orElseThrow(() -> new AppException(ProjectErrorCode.WORKFLOW_NOT_FOUND));
+
+        List<WorkflowStatusSyncItemDto> safeItems = items != null ? items : List.of();
+        List<WorkflowStatus> existing = workflowStatusRepository.findByWorkflowIdOrderBySortOrderAsc(workflowId);
+        Map<UUID, WorkflowStatus> existingById = new HashMap<>();
+        for (WorkflowStatus status : existing) {
+            existingById.put(status.getId(), status);
+        }
+
+        int sortOrder = 0;
+        for (WorkflowStatusSyncItemDto item : safeItems) {
+            if (item == null) {
+                continue;
+            }
+            boolean removed = Boolean.TRUE.equals(item.getRemoved());
+
+            if (removed && item.getId() != null) {
+                deleteStatus(item.getId());
+                continue;
+            }
+
+            if (item.getId() != null) {
+                WorkflowStatus status = existingById.get(item.getId());
+                if (status == null || !status.getWorkflowId().equals(workflowId)) {
+                    throw new AppException(ProjectErrorCode.WORKFLOW_STATUS_NOT_FOUND);
+                }
+                if (item.getName() != null && !item.getName().trim().isEmpty()) {
+                    status.setName(item.getName().trim());
+                }
+                if (item.getColor() != null) {
+                    status.setColor(item.getColor());
+                }
+                if (item.getCategory() != null) {
+                    status.setCategory(item.getCategory());
+                }
+                status.setSortOrder(sortOrder++);
+                workflowStatusRepository.save(status);
+                continue;
+            }
+
+            if (item.getName() == null || item.getName().trim().isEmpty()) {
+                continue;
+            }
+
+            WorkflowStatus created = new WorkflowStatus();
+            created.setWorkflowId(workflowId);
+            created.setName(item.getName().trim());
+            created.setColor(item.getColor());
+            created.setCategory(item.getCategory() != null ? item.getCategory() : StatusCategory.TODO);
+            created.setSortOrder(sortOrder++);
+            workflowStatusRepository.save(created);
+        }
+
         return workflowStatusRepository.findByWorkflowIdOrderBySortOrderAsc(workflowId);
     }
 

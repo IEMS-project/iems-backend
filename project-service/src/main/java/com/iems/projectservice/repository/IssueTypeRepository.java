@@ -10,4 +10,6 @@ import java.util.UUID;
 @Repository
 public interface IssueTypeRepository extends JpaRepository<IssueType, UUID> {
     List<IssueType> findByProjectIdOrderBySortOrderAsc(UUID projectId);
+
+    long countByProjectId(UUID projectId);
 }

@@ -1,5 +1,7 @@
 package com.iems.projectservice.dto.request;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonSetter;
 import lombok.Data;
 
 import java.time.LocalDate;
@@ -13,9 +15,17 @@ public class UpdateIssueDto {
     private UUID statusId;
     private UUID priorityId;
     private UUID assigneeId;
+    @JsonIgnore
+    private boolean assigneeIdSet;
     private UUID sprintId;
     private UUID parentId;
     private Integer storyPoints;
     private Integer sortOrder;
     private LocalDate dueDate;
+
+    @JsonSetter("assigneeId")
+    public void setAssigneeId(UUID assigneeId) {
+        this.assigneeId = assigneeId;
+        this.assigneeIdSet = true;
+    }
 }
