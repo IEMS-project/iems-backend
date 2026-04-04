@@ -23,7 +23,8 @@ public enum ProjectErrorCode {
     ROLE_ALREADY_EXISTS("Role already exists in this project", HttpStatus.CONFLICT),
     ROLE_ALREADY_ASSIGNED("Cannot delete role that is already assigned to members", HttpStatus.CONFLICT),
     DEFAULT_ROLE_PERMISSIONS_LOCKED("Cannot modify permissions of the admin/default role", HttpStatus.BAD_REQUEST),
-    DEFAULT_ROLE_MEMBER_PERMISSIONS_LOCKED("Cannot modify user permissions for a member with the admin/default role", HttpStatus.BAD_REQUEST),
+    DEFAULT_ROLE_MEMBER_PERMISSIONS_LOCKED("Cannot modify user permissions for a member with the admin/default role",
+            HttpStatus.BAD_REQUEST),
 
     PERMISSION_NOT_FOUND("Permission not found", HttpStatus.NOT_FOUND),
     PERMISSION_ALREADY_ASSIGNED("Permission is already assigned to this role", HttpStatus.CONFLICT),
@@ -36,6 +37,9 @@ public enum ProjectErrorCode {
     ISSUE_NOT_FOUND("Issue not found", HttpStatus.NOT_FOUND),
     ISSUE_TYPE_NOT_FOUND("Issue type not found", HttpStatus.NOT_FOUND),
     ISSUE_PRIORITY_NOT_FOUND("Issue priority not found", HttpStatus.NOT_FOUND),
+    ISSUE_IMPORT_FILE_INVALID("Issue import file is invalid", HttpStatus.BAD_REQUEST),
+    ISSUE_IMPORT_TEMPLATE_INVALID("Issue import template is invalid", HttpStatus.BAD_REQUEST),
+    ISSUE_IMPORT_ROW_INVALID("Issue import row is invalid", HttpStatus.BAD_REQUEST),
 
     SPRINT_NOT_FOUND("Sprint not found", HttpStatus.NOT_FOUND),
     SPRINT_ALREADY_ACTIVE("A sprint is already active in this project", HttpStatus.CONFLICT),

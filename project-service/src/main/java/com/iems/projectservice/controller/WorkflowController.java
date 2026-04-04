@@ -1,6 +1,7 @@
 package com.iems.projectservice.controller;
 
 import com.iems.projectservice.annotation.RequireProjectPermission;
+import com.iems.projectservice.dto.request.BatchWorkflowStatusSyncRequest;
 import com.iems.projectservice.dto.request.CreateWorkflowDto;
 import com.iems.projectservice.dto.request.CreateWorkflowStatusDto;
 import com.iems.projectservice.dto.request.CreateWorkflowTransitionDto;
@@ -164,6 +165,21 @@ public class WorkflowController {
         }
     }
 
+    @PostMapping("/{workflowId}/statuses/sync")
+    @Operation(summary = "Sync workflow statuses in one request")
+    @RequireProjectPermission(ProjectPermission.WORKFLOW_UPDATE)
+    public ResponseEntity<ApiResponseDto<List<WorkflowStatus>>> syncStatuses(
+            @PathVariable UUID projectId,
+            @PathVariable UUID workflowId,
+            @RequestBody BatchWorkflowStatusSyncRequest request) {
+        try {
+            List<WorkflowStatus> statuses = workflowService.syncStatuses(workflowId, request.getStatuses());
+            return ResponseEntity.ok(new ApiResponseDto<>("success", "Statuses synced successfully", statuses));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(new ApiResponseDto<>("error", e.getMessage(), null));
+        }
+    }
+
     // --- Transition CRUD ---
     @PostMapping("/{workflowId}/transitions")
     @Operation(summary = "Add transition to workflow")
@@ -204,7 +220,8 @@ public class WorkflowController {
             @PathVariable UUID workflowId) {
         try {
             List<WorkflowTransition> transitions = workflowService.getTransitions(workflowId);
-            return ResponseEntity.ok(new ApiResponseDto<>("success", "Transitions retrieved successfully", transitions));
+            return ResponseEntity
+                    .ok(new ApiResponseDto<>("success", "Transitions retrieved successfully", transitions));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(new ApiResponseDto<>("error", e.getMessage(), null));
         }

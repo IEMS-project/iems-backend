@@ -1,6 +1,7 @@
 package com.iems.projectservice.controller;
 
 import com.iems.projectservice.annotation.RequireProjectPermission;
+import com.iems.projectservice.dto.request.BatchIssueTypeSyncRequest;
 import com.iems.projectservice.dto.response.ApiResponseDto;
 import com.iems.projectservice.entity.IssueType;
 import com.iems.projectservice.entity.enums.ProjectPermission;
@@ -42,6 +43,16 @@ public class IssueTypeController {
                 body.get("name"), body.get("description"), body.get("iconUrl"));
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(new ApiResponseDto<>("success", "Issue type created", type));
+    }
+
+    @PostMapping("/sync")
+    @Operation(summary = "Sync issue types in one request")
+    @RequireProjectPermission(ProjectPermission.PROJECT_UPDATE)
+    public ResponseEntity<ApiResponseDto<List<IssueType>>> syncIssueTypes(
+            @PathVariable UUID projectId,
+            @RequestBody BatchIssueTypeSyncRequest request) {
+        List<IssueType> types = issueService.syncIssueTypes(projectId, request.getIssueTypes());
+        return ResponseEntity.ok(new ApiResponseDto<>("success", "Issue types synced", types));
     }
 
     @PatchMapping("/{id}")

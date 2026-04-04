@@ -4,7 +4,9 @@ import com.iems.projectservice.annotation.RequireProjectPermission;
 import com.iems.projectservice.dto.request.CreateIssueDto;
 import com.iems.projectservice.dto.request.UpdateIssueDto;
 import com.iems.projectservice.dto.response.ApiResponseDto;
+import com.iems.projectservice.dto.response.IssueImportResultDto;
 import com.iems.projectservice.dto.response.IssueResponseDto;
+import com.iems.projectservice.dto.response.PagedResponseDto;
 import com.iems.projectservice.entity.enums.ProjectPermission;
 import com.iems.projectservice.service.IssueService;
 import com.iems.projectservice.service.ProjectService;
@@ -13,8 +15,11 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -45,6 +50,46 @@ public class IssueController {
             log.error("Error creating issue", e);
             return ResponseEntity.badRequest().body(new ApiResponseDto<>("error", e.getMessage(), null));
         }
+    }
+
+    @PostMapping(value = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Import issues from Excel")
+    @RequireProjectPermission(ProjectPermission.ISSUE_CREATE)
+    public ResponseEntity<ApiResponseDto<IssueImportResultDto>> importIssues(
+            @PathVariable UUID projectId,
+            @RequestPart("file") MultipartFile file) {
+        try {
+            UUID userId = projectService.getUserIdFromRequest();
+            IssueImportResultDto result = issueService.importIssuesFromExcel(projectId, file, userId);
+            return ResponseEntity.ok(new ApiResponseDto<>("success", "Issues imported successfully", result));
+        } catch (Exception e) {
+            log.error("Error importing issues", e);
+            return ResponseEntity.badRequest().body(new ApiResponseDto<>("error", e.getMessage(), null));
+        }
+    }
+
+    @GetMapping("/import-template")
+    @Operation(summary = "Download issue import template")
+    @RequireProjectPermission(ProjectPermission.ISSUE_READ)
+    public ResponseEntity<byte[]> downloadImportTemplate(@PathVariable UUID projectId) {
+        byte[] content = issueService.generateImportTemplate(projectId);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=issue-import-template.xlsx")
+                .contentType(MediaType.parseMediaType(
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(content);
+    }
+
+    @GetMapping("/export")
+    @Operation(summary = "Export issues to Excel")
+    @RequireProjectPermission(ProjectPermission.ISSUE_READ)
+    public ResponseEntity<byte[]> exportIssues(@PathVariable UUID projectId) {
+        byte[] content = issueService.exportIssuesToExcel(projectId);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=issues-export.xlsx")
+                .contentType(MediaType.parseMediaType(
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(content);
     }
 
     @PatchMapping("/{issueId}")
@@ -99,6 +144,21 @@ public class IssueController {
     public ResponseEntity<ApiResponseDto<List<IssueResponseDto>>> getIssues(@PathVariable UUID projectId) {
         try {
             List<IssueResponseDto> issues = issueService.getIssuesByProject(projectId);
+            return ResponseEntity.ok(new ApiResponseDto<>("success", "Issues retrieved successfully", issues));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(new ApiResponseDto<>("error", e.getMessage(), null));
+        }
+    }
+
+    @GetMapping("/paged")
+    @Operation(summary = "Get issues in project with pagination")
+    @RequireProjectPermission(ProjectPermission.ISSUE_READ)
+    public ResponseEntity<ApiResponseDto<PagedResponseDto<IssueResponseDto>>> getIssuesPaged(
+            @PathVariable UUID projectId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "8") int size) {
+        try {
+            PagedResponseDto<IssueResponseDto> issues = issueService.getIssuesByProjectPaged(projectId, page, size);
             return ResponseEntity.ok(new ApiResponseDto<>("success", "Issues retrieved successfully", issues));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(new ApiResponseDto<>("error", e.getMessage(), null));

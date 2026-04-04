@@ -50,4 +50,12 @@ public class ProjectDocument {
 
     @Column(name = "parent_id")
     private UUID parentId;
+
+    @Column(name = "allow_embedded", nullable = false, columnDefinition = "boolean default false")
+    @Builder.Default
+    private Boolean allowEmbedded = false;
+
+    @Column(name = "ai_indexed", nullable = false, columnDefinition = "boolean default false")
+    @Builder.Default
+    private Boolean aiIndexed = false;
 }

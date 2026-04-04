@@ -1,8 +1,10 @@
 package com.iems.projectservice.controller;
 
 import com.iems.projectservice.annotation.RequireProjectPermission;
+import com.iems.projectservice.dto.request.BatchProjectMemberRequest;
 import com.iems.projectservice.dto.request.ProjectMemberDto;
 import com.iems.projectservice.dto.response.ApiResponseDto;
+import com.iems.projectservice.dto.response.BatchOperationResultDto;
 import com.iems.projectservice.dto.response.ProjectMemberResponseDto;
 import com.iems.projectservice.entity.ProjectMember;
 import com.iems.projectservice.entity.enums.ProjectPermission;
@@ -43,6 +45,31 @@ public class ProjectMemberController {
                     .body(new ApiResponseDto<>("success", "Member added successfully", member));
         } catch (Exception e) {
             log.error("Error adding member", e);
+            return ResponseEntity.badRequest()
+                    .body(new ApiResponseDto<>("error", e.getMessage(), null));
+        }
+    }
+
+    @PostMapping("/batch")
+    @Operation(summary = "Add members to project in batch")
+    @RequireProjectPermission(ProjectPermission.MEMBER_INVITE)
+    public ResponseEntity<ApiResponseDto<BatchOperationResultDto<ProjectMember>>> addMembersBatch(
+            @PathVariable UUID projectId,
+            @RequestBody BatchProjectMemberRequest request) {
+        try {
+            UUID currentUserId = projectService.getUserIdFromRequest();
+            List<ProjectMember> added = projectMemberService.addMembersToProject(projectId, request.getMembers(),
+                    currentUserId);
+            int requestedCount = request.getMembers() == null ? 0 : request.getMembers().size();
+            BatchOperationResultDto<ProjectMember> result = new BatchOperationResultDto<>(
+                    requestedCount,
+                    added.size(),
+                    Math.max(0, requestedCount - added.size()),
+                    added);
+            return ResponseEntity.status(HttpStatus.CREATED)
+                    .body(new ApiResponseDto<>("success", "Members batch processed successfully", result));
+        } catch (Exception e) {
+            log.error("Error adding members in batch", e);
             return ResponseEntity.badRequest()
                     .body(new ApiResponseDto<>("error", e.getMessage(), null));
         }

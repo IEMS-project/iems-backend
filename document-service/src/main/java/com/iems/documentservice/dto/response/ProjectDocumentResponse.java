@@ -23,4 +23,6 @@ public class ProjectDocumentResponse {
     private String downloadUrl;
     private Boolean isFolder;
     private UUID parentId;
+    private Boolean allowEmbedded;
+    private Boolean aiIndexed;
 }

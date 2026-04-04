@@ -62,6 +62,51 @@ public class ProjectMemberService {
     }
 
     @Transactional
+    public List<ProjectMember> addMembersToProject(UUID projectId, List<UUID> accountIds, UUID roleId,
+            UUID assignedBy) {
+        List<ProjectMember> created = new ArrayList<>();
+        for (UUID accountId : accountIds) {
+            if (accountId == null) {
+                continue;
+            }
+            if (projectMemberRepository.existsByProjectIdAndAccountId(projectId, accountId)) {
+                continue;
+            }
+            ProjectMember member = new ProjectMember();
+            member.setProjectId(projectId);
+            member.setAccountId(accountId);
+            member.setRoleId(roleId);
+            member.setJoinedAt(LocalDateTime.now());
+            member.setAssignedByAccountId(assignedBy);
+            created.add(projectMemberRepository.save(member));
+        }
+        return created;
+    }
+
+    @Transactional
+    public List<ProjectMember> addMembersToProject(UUID projectId,
+            List<com.iems.projectservice.dto.request.ProjectMemberDto> members,
+            UUID assignedBy) {
+        List<ProjectMember> created = new ArrayList<>();
+        for (com.iems.projectservice.dto.request.ProjectMemberDto memberDto : members) {
+            if (memberDto == null || memberDto.getAccountId() == null || memberDto.getRoleId() == null) {
+                continue;
+            }
+            if (projectMemberRepository.existsByProjectIdAndAccountId(projectId, memberDto.getAccountId())) {
+                continue;
+            }
+            ProjectMember member = new ProjectMember();
+            member.setProjectId(projectId);
+            member.setAccountId(memberDto.getAccountId());
+            member.setRoleId(memberDto.getRoleId());
+            member.setJoinedAt(LocalDateTime.now());
+            member.setAssignedByAccountId(assignedBy);
+            created.add(projectMemberRepository.save(member));
+        }
+        return created;
+    }
+
+    @Transactional
     public void removeMember(UUID projectId, UUID accountId) {
         ProjectMember member = projectMemberRepository.findByProjectIdAndAccountId(projectId, accountId)
                 .orElseThrow(() -> new AppException(ProjectErrorCode.MEMBER_NOT_FOUND));
