@@ -12,6 +12,7 @@ import com.iems.iamservice.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -81,6 +82,22 @@ public class UserController {
         return ResponseEntity.ok(ApiResponseDto.<List<UserBasicInfoDto>>builder()
                 .status("success")
                 .message("Users retrieved successfully")
+                .data(users)
+                .build());
+    }
+
+    @Operation(summary = "Search users basic info", description = "Search users by name/email with pagination and optional exclusion list")
+    @GetMapping("/basic-infos/search")
+    public ResponseEntity<ApiResponseDto<Page<UserBasicInfoDto>>> searchUserBasicInfos(
+            @RequestParam(defaultValue = "") String q,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) List<UUID> excludeAccountIds
+    ) {
+        Page<UserBasicInfoDto> users = service.searchUserBasicInfos(q, page, size, excludeAccountIds);
+        return ResponseEntity.ok(ApiResponseDto.<Page<UserBasicInfoDto>>builder()
+                .status("success")
+                .message("Users searched successfully")
                 .data(users)
                 .build());
     }

@@ -13,6 +13,9 @@ import com.iems.iamservice.repository.AccountRepository;
 import com.iems.iamservice.entity.Account;
 import com.iems.iamservice.entity.enums.UserRole;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -124,6 +127,24 @@ public class UserService {
                             user.getImage()
                     ))
                     .toList();
+        } catch (Exception ex) {
+            throw new AppException(ErrorCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    public Page<UserBasicInfoDto> searchUserBasicInfos(String query, int page, int size, List<UUID> excludeAccountIds) {
+        try {
+            String normalizedQuery = query == null ? "" : query.trim().toLowerCase();
+            int normalizedPage = Math.max(page, 0);
+            int normalizedSize = Math.min(Math.max(size, 1), 50);
+
+                Pageable pageable = PageRequest.of(normalizedPage, normalizedSize);
+
+            if (excludeAccountIds == null || excludeAccountIds.isEmpty()) {
+                return repository.searchBasicInfos(normalizedQuery, pageable);
+            }
+
+            return repository.searchBasicInfosExcluding(normalizedQuery, excludeAccountIds, pageable);
         } catch (Exception ex) {
             throw new AppException(ErrorCode.INTERNAL_SERVER_ERROR);
         }
