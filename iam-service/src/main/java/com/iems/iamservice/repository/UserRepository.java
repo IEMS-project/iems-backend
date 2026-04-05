@@ -15,9 +15,13 @@ import java.util.UUID;
 
 public interface UserRepository extends JpaRepository<User, UUID> {
     Optional<User> findByAccountId(UUID accountId);
+
     Optional<User> findByEmail(String email);
+
     boolean existsByEmail(String email);
+
     boolean existsByAccountId(UUID accountId);
+
     List<User> findByAccountIdIn(Set<UUID> accountIds);
 
     @Query("""
@@ -37,8 +41,7 @@ public interface UserRepository extends JpaRepository<User, UUID> {
             """)
     Page<UserBasicInfoDto> searchBasicInfos(
             @Param("keyword") String keyword,
-            Pageable pageable
-    );
+            Pageable pageable);
 
     @Query("""
             SELECT new com.iems.iamservice.dto.response.UserBasicInfoDto(
@@ -59,6 +62,5 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     Page<UserBasicInfoDto> searchBasicInfosExcluding(
             @Param("keyword") String keyword,
             @Param("excludeAccountIds") List<UUID> excludeAccountIds,
-            Pageable pageable
-    );
+            Pageable pageable);
 }
