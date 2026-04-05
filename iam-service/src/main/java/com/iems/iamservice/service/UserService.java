@@ -13,6 +13,9 @@ import com.iems.iamservice.repository.AccountRepository;
 import com.iems.iamservice.entity.Account;
 import com.iems.iamservice.entity.enums.UserRole;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -25,17 +28,18 @@ import java.util.stream.Collectors;
 public class UserService {
     @Autowired
     private UserRepository repository;
-    
+
     @Autowired
     private AccountRepository accountRepository;
-    
+
     @Autowired
     private AccountService accountService;
 
     /**
      * Create user with account
+     * 
      * @deprecated Use AuthService.register() instead for new user registration
-     * This method creates Account first, then User profile
+     *             This method creates Account first, then User profile
      */
     @Deprecated
     public UserResponseDto createUser(CreateUserDto userRequest) {
@@ -44,17 +48,16 @@ public class UserService {
             if (userRequest.getUsername() == null || userRequest.getPassword() == null) {
                 throw new AppException(ErrorCode.INVALID_REQUEST);
             }
-            
+
             // Create Account first
-            com.iems.iamservice.dto.request.CreateAccountDto accountRequest = 
-                new com.iems.iamservice.dto.request.CreateAccountDto();
+            com.iems.iamservice.dto.request.CreateAccountDto accountRequest = new com.iems.iamservice.dto.request.CreateAccountDto();
             accountRequest.setUsername(userRequest.getUsername());
             accountRequest.setEmail(userRequest.getEmail());
             accountRequest.setPassword(userRequest.getPassword());
             accountRequest.setRoleCodes(userRequest.getRoleCodes());
-            
+
             var createdAccount = accountService.createUser(accountRequest);
-            
+
             // Create User profile with accountId
             User user = convertToUser(userRequest);
             user.setAccountId(createdAccount.getId());
@@ -121,9 +124,26 @@ public class UserService {
                             user.getAccountId(),
                             user.getFirstName() + " " + user.getLastName(),
                             user.getEmail(),
-                            user.getImage()
-                    ))
+                            user.getImage()))
                     .toList();
+        } catch (Exception ex) {
+            throw new AppException(ErrorCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    public Page<UserBasicInfoDto> searchUserBasicInfos(String query, int page, int size, List<UUID> excludeAccountIds) {
+        try {
+            String normalizedQuery = query == null ? "" : query.trim().toLowerCase();
+            int normalizedPage = Math.max(page, 0);
+            int normalizedSize = Math.min(Math.max(size, 1), 50);
+
+            Pageable pageable = PageRequest.of(normalizedPage, normalizedSize);
+
+            if (excludeAccountIds == null || excludeAccountIds.isEmpty()) {
+                return repository.searchBasicInfos(normalizedQuery, pageable);
+            }
+
+            return repository.searchBasicInfosExcluding(normalizedQuery, excludeAccountIds, pageable);
         } catch (Exception ex) {
             throw new AppException(ErrorCode.INTERNAL_SERVER_ERROR);
         }
@@ -137,11 +157,11 @@ public class UserService {
                     .filter(account -> account.getRole() == UserRole.ADMIN)
                     .map(Account::getId)
                     .collect(Collectors.toSet());
-            
+
             if (accountIds.isEmpty()) {
                 return List.of();
             }
-            
+
             // Get users by accountIds
             return repository.findAll()
                     .stream()
@@ -150,8 +170,7 @@ public class UserService {
                             user.getAccountId(),
                             user.getFirstName() + " " + user.getLastName(),
                             user.getEmail(),
-                            user.getImage()
-                    ))
+                            user.getImage()))
                     .toList();
         } catch (Exception ex) {
             throw new AppException(ErrorCode.INTERNAL_SERVER_ERROR);
@@ -228,7 +247,8 @@ public class UserService {
     }
 
     public User convertToUser(CreateUserDto userRequest) {
-        if (userRequest == null) return null;
+        if (userRequest == null)
+            return null;
         User user = new User();
         user.setFirstName(userRequest.getFirstName());
         user.setLastName(userRequest.getLastName());
@@ -242,7 +262,8 @@ public class UserService {
     }
 
     public UserResponseDto convertToUserResponse(User user) {
-        if (user == null) return null;
+        if (user == null)
+            return null;
         return new UserResponseDto(
                 user.getAccountId(),
                 user.getFirstName(),
@@ -252,26 +273,36 @@ public class UserService {
                 user.getPhone(),
                 user.getDob(),
                 user.getGender(),
-                user.getImage()
-        );
+                user.getImage());
     }
 
     private void applyUpdates(User user, UpdateUserDto userRequest) {
-        if (userRequest.getFirstName() != null) user.setFirstName(userRequest.getFirstName());
-        if (userRequest.getLastName() != null) user.setLastName(userRequest.getLastName());
-        if (userRequest.getEmail() != null) user.setEmail(userRequest.getEmail());
-        if (userRequest.getAddress() != null) user.setAddress(userRequest.getAddress());
-        if (userRequest.getPhone() != null) user.setPhone(userRequest.getPhone());
-        if (userRequest.getDob() != null) user.setDob(userRequest.getDob());
-        if (userRequest.getGender() != null) user.setGender(userRequest.getGender());
-        if (userRequest.getImage() != null) user.setImage(userRequest.getImage());
+        if (userRequest.getFirstName() != null)
+            user.setFirstName(userRequest.getFirstName());
+        if (userRequest.getLastName() != null)
+            user.setLastName(userRequest.getLastName());
+        if (userRequest.getEmail() != null)
+            user.setEmail(userRequest.getEmail());
+        if (userRequest.getAddress() != null)
+            user.setAddress(userRequest.getAddress());
+        if (userRequest.getPhone() != null)
+            user.setPhone(userRequest.getPhone());
+        if (userRequest.getDob() != null)
+            user.setDob(userRequest.getDob());
+        if (userRequest.getGender() != null)
+            user.setGender(userRequest.getGender());
+        if (userRequest.getImage() != null)
+            user.setImage(userRequest.getImage());
 
     }
 
     private void applySelfProfileUpdates(User user, CreateUserDto userRequest) {
-        if (userRequest.getAddress() != null) user.setAddress(userRequest.getAddress());
-        if (userRequest.getPhone() != null) user.setPhone(userRequest.getPhone());
-        if (userRequest.getImage() != null) user.setImage(userRequest.getImage());
+        if (userRequest.getAddress() != null)
+            user.setAddress(userRequest.getAddress());
+        if (userRequest.getPhone() != null)
+            user.setPhone(userRequest.getPhone());
+        if (userRequest.getImage() != null)
+            user.setImage(userRequest.getImage());
     }
 
     public Optional<UserResponseDto> updateAvatar(UUID id, String imageUrl) {
