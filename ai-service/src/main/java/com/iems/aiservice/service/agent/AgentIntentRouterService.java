@@ -1,0 +1,132 @@
+package com.iems.aiservice.service.agent;
+
+import com.iems.aiservice.model.agent.AgentDecision;
+import com.iems.aiservice.model.agent.AgentIntent;
+import org.springframework.stereotype.Service;
+
+import java.text.Normalizer;
+import java.util.Set;
+
+@Service
+public class AgentIntentRouterService {
+
+    private static final Set<String> ISSUE_ACTION_TERMS = Set.of(
+            "tao issue", "create issue", "cap nhat issue", "update issue", "chuyen trang thai", "assign",
+            "doi assignee", "them comment", "close issue", "mo issue", "chuyen issue", "doi status",
+            "chuyen sang", "move issue", "cap nhat trang thai", "doi trang thai", "mark done");
+
+    private static final Set<String> ISSUE_ANALYSIS_TERMS = Set.of(
+            "phan tich", "root cause", "nguyen nhan", "rui ro", "risk", "duplicate", "trung lap", "blocker",
+            "stuck", "uu tien", "priority", "phan tich cong viec", "phan tich task", "workload", "tong quan cong viec");
+
+    private static final Set<String> SPRINT_TERMS = Set.of(
+            "sprint", "burndown", "worklog", "tien do", "velocity", "backlog", "qua han", "deadline");
+
+    private static final Set<String> ISSUE_QUERY_TERMS = Set.of(
+            "issue", "task", "cong viec", "my issues", "danh sach", "status", "assignee", "reporter",
+            "hom nay", "quan trong", "uu tien", "important", "today");
+
+    public AgentDecision route(String question) {
+        if (question == null || question.isBlank()) {
+            return new AgentDecision(AgentIntent.GENERAL_CHAT, 0.5, "empty_question");
+        }
+
+        String normalized = normalize(question);
+
+        if (containsAnyFuzzy(normalized, ISSUE_ACTION_TERMS)) {
+            return new AgentDecision(AgentIntent.ISSUE_ACTION, 0.88, "matched_issue_action_terms");
+        }
+        if (containsAnyFuzzy(normalized, ISSUE_ANALYSIS_TERMS)) {
+            return new AgentDecision(AgentIntent.ISSUE_ANALYSIS, 0.82, "matched_issue_analysis_terms");
+        }
+        if (containsAnyFuzzy(normalized, SPRINT_TERMS)) {
+            return new AgentDecision(AgentIntent.SPRINT_SUMMARY, 0.8, "matched_sprint_terms");
+        }
+        if (containsAnyFuzzy(normalized, ISSUE_QUERY_TERMS)) {
+            return new AgentDecision(AgentIntent.ISSUE_QUERY, 0.75, "matched_issue_query_terms");
+        }
+
+        return new AgentDecision(AgentIntent.GENERAL_CHAT, 0.68, "fallback_general_chat");
+    }
+
+    private static String normalize(String text) {
+        String lowered = text.toLowerCase().trim();
+        String decomposed = Normalizer.normalize(lowered, Normalizer.Form.NFD);
+        return decomposed.replaceAll("\\p{M}+", "");
+    }
+
+    private static boolean containsAnyFuzzy(String text, Set<String> terms) {
+        for (String term : terms) {
+            if (matchesTermFuzzy(text, term)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean matchesTermFuzzy(String text, String term) {
+        if (text.contains(term)) {
+            return true;
+        }
+
+        String compactText = text.replace(" ", "");
+        String compactTerm = term.replace(" ", "");
+        if (compactText.contains(compactTerm)) {
+            return true;
+        }
+
+        String[] textWords = text.split("\\s+");
+        String[] termWords = term.split("\\s+");
+
+        if (termWords.length == 1) {
+            for (String w : textWords) {
+                if (isSimilarWord(w, termWords[0])) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        for (String termWord : termWords) {
+            boolean found = false;
+            for (String textWord : textWords) {
+                if (isSimilarWord(textWord, termWord)) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean isSimilarWord(String a, String b) {
+        if (a.equals(b)) {
+            return true;
+        }
+        int maxLen = Math.max(a.length(), b.length());
+        int threshold = maxLen <= 5 ? 1 : 2;
+        return levenshtein(a, b) <= threshold;
+    }
+
+    private static int levenshtein(String a, String b) {
+        int[][] dp = new int[a.length() + 1][b.length() + 1];
+        for (int i = 0; i <= a.length(); i++) {
+            dp[i][0] = i;
+        }
+        for (int j = 0; j <= b.length(); j++) {
+            dp[0][j] = j;
+        }
+        for (int i = 1; i <= a.length(); i++) {
+            for (int j = 1; j <= b.length(); j++) {
+                int cost = a.charAt(i - 1) == b.charAt(j - 1) ? 0 : 1;
+                dp[i][j] = Math.min(
+                        Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1),
+                        dp[i - 1][j - 1] + cost);
+            }
+        }
+        return dp[a.length()][b.length()];
+    }
+}

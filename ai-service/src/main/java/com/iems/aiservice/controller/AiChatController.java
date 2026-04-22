@@ -1,15 +1,21 @@
 package com.iems.aiservice.controller;
 
 import com.iems.aiservice.config.AiProperties;
+import com.iems.aiservice.dto.AgentChatRequest;
+import com.iems.aiservice.dto.AgentChatResponse;
 import com.iems.aiservice.dto.ChatRequest;
 import com.iems.aiservice.dto.ChatResponse;
 import com.iems.aiservice.dto.HealthResponse;
 import com.iems.aiservice.entity.ChatMessage;
 import com.iems.aiservice.entity.Conversation;
+import com.iems.aiservice.model.agent.AgentDecision;
+import com.iems.aiservice.model.agent.AgentIntent;
 import com.iems.aiservice.service.ChatHistoryService;
 import com.iems.aiservice.service.DocumentContextService;
 import com.iems.aiservice.service.JwtService;
 import com.iems.aiservice.service.OllamaChatService;
+import com.iems.aiservice.service.agent.AgentIntentRouterService;
+import com.iems.aiservice.service.agent.AgentOrchestratorService;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
@@ -44,14 +50,49 @@ public class AiChatController {
     private final JwtService jwtService;
     private final ChatHistoryService chatHistoryService;
     private final DocumentContextService documentContextService;
+    private final AgentOrchestratorService agentOrchestratorService;
+    private final AgentIntentRouterService agentIntentRouterService;
 
     public AiChatController(OllamaChatService ollamaChatService, AiProperties aiProperties, JwtService jwtService,
-            ChatHistoryService chatHistoryService, DocumentContextService documentContextService) {
+            ChatHistoryService chatHistoryService, DocumentContextService documentContextService,
+            AgentOrchestratorService agentOrchestratorService,
+            AgentIntentRouterService agentIntentRouterService) {
         this.ollamaChatService = ollamaChatService;
         this.aiProperties = aiProperties;
         this.jwtService = jwtService;
         this.chatHistoryService = chatHistoryService;
         this.documentContextService = documentContextService;
+        this.agentOrchestratorService = agentOrchestratorService;
+        this.agentIntentRouterService = agentIntentRouterService;
+    }
+
+    @PostMapping("/chat/agent")
+    public ResponseEntity<AgentChatResponse> chatAgent(
+            @Valid @RequestBody AgentChatRequest request,
+            @RequestHeader("Authorization") String authorization) {
+        String userId = extractUserIdFromAuthorization(authorization);
+
+        String conversationId = chatHistoryService.ensureConversation(
+                request.conversationId(), userId, request.question(), request.projectId());
+        chatHistoryService.saveMessage(conversationId, "user", request.question());
+
+        String documentContext = documentContextService.buildDocumentContext(
+                request.projectId(), request.selectedDocumentIds(), request.question());
+        String conversationContext = chatHistoryService.buildRecentConversationContext(conversationId);
+
+        AgentChatResponse response = agentOrchestratorService.handle(
+                userId,
+                conversationId,
+                request,
+                authorization,
+                documentContext,
+                conversationContext,
+                aiProperties.getModel());
+
+        chatHistoryService.saveMessage(conversationId, "assistant", response.answer());
+        chatHistoryService.updateTimestamp(conversationId);
+
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/chat")
@@ -75,11 +116,22 @@ public class AiChatController {
                 conversationId);
         log.info("Chat memory conversationId={} memoryChars={}", conversationId, conversationContext.length());
 
-        String answer = ollamaChatService.ask(
+        AgentChatRequest agentRequest = new AgentChatRequest(
                 request.question(),
-                request.selectedDocumentIds(),
+                conversationId,
+                request.projectId(),
+                request.selectedDocumentIds());
+
+        AgentChatResponse agentResponse = agentOrchestratorService.handle(
+                userId,
+                conversationId,
+                agentRequest,
+                authorization,
                 documentContext,
-                conversationContext);
+                conversationContext,
+                aiProperties.getModel());
+
+        String answer = agentResponse.answer();
         chatHistoryService.saveMessage(conversationId, "assistant", answer);
         chatHistoryService.updateTimestamp(conversationId);
 
@@ -118,6 +170,36 @@ public class AiChatController {
 
         CompletableFuture.runAsync(() -> {
             try {
+                AgentDecision decision = agentIntentRouterService.route(request.question());
+                if (decision.intent() == AgentIntent.ISSUE_QUERY
+                        || decision.intent() == AgentIntent.ISSUE_ACTION
+                        || decision.intent() == AgentIntent.ISSUE_ANALYSIS) {
+                    AgentChatRequest agentRequest = new AgentChatRequest(
+                            request.question(),
+                            conversationId,
+                            request.projectId(),
+                            request.selectedDocumentIds());
+                    AgentChatResponse agentResponse = agentOrchestratorService.handle(
+                            userId,
+                            conversationId,
+                            agentRequest,
+                            authorization,
+                            documentContext,
+                            conversationContext,
+                            aiProperties.getModel());
+
+                    String answer = agentResponse.answer() == null ? "" : agentResponse.answer();
+                    fullAnswer.append(answer);
+                    emitter.send(SseEmitter.event().data(Map.of(
+                            "type", "chunk",
+                            "content", answer)));
+                    chatHistoryService.saveMessage(conversationId, "assistant", fullAnswer.toString());
+                    chatHistoryService.updateTimestamp(conversationId);
+                    emitter.send(SseEmitter.event().data(Map.of("type", "end")));
+                    emitter.complete();
+                    return;
+                }
+
                 ollamaChatService.streamAsk(request.question(), request.selectedDocumentIds(), documentContext,
                         conversationContext,
                         chunk -> {
@@ -223,5 +305,35 @@ public class AiChatController {
     @GetMapping("/health")
     public ResponseEntity<HealthResponse> health() {
         return ResponseEntity.ok(new HealthResponse("ai-service", "UP", aiProperties.getModel()));
+    }
+
+    @GetMapping("/options")
+    public ResponseEntity<?> getQuickOptions(
+            @RequestHeader("Authorization") String authorization,
+            @RequestParam(value = "projectId", required = false) String projectId) {
+        extractUserIdFromAuthorization(authorization);
+
+        List<Map<String, String>> options = List.of(
+                Map.of(
+                        "id", "important_my_tasks",
+                        "label", "Cong viec quan trong cua toi",
+                        "prompt", "Lay cac cong viec quan trong cua toi hom nay"),
+                Map.of(
+                        "id", "analysis",
+                        "label", "Phan tich cong viec",
+                        "prompt", "Phan tich cong viec hien tai va de xuat uu tien"),
+                Map.of(
+                        "id", "move_to_in_progress",
+                        "label", "Chuyen issue sang In Progress",
+                        "prompt", "Chuyen issue IEMS-1 sang In Progress"),
+                Map.of(
+                        "id", "move_to_done",
+                        "label", "Chuyen issue sang Done",
+                        "prompt", "Chuyen issue IEMS-1 sang Done"));
+
+        return ResponseEntity.ok(Map.of(
+                "success", true,
+                "projectId", projectId == null ? "" : projectId,
+                "options", options));
     }
 }
