@@ -31,10 +31,6 @@ build/
 
 ### VS Code ###
 .vscode/
-iam-service/src/main/resources/application.properties
-ai-service/src/main/resources/application.properties
-api-gateway/src/main/resources/application.properties
-document-service/src/main/resources/application.properties
-iam-service/src/main/resources/application.properties
-iam-service/src/main/resources/application.properties
-iam-service/src/main/resources/application.properties
+# Environment variables
+**/.env
+.env

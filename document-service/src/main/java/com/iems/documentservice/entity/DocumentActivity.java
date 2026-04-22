@@ -21,7 +21,8 @@ import java.util.UUID;
 @AllArgsConstructor
 @Entity
 @Table(name = "document_activity")
-public class DocumentActivity {
+public class
+DocumentActivity {
 
     @Id
     @UuidGenerator(style = UuidGenerator.Style.RANDOM)
