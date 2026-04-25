@@ -9,6 +9,7 @@ import com.iems.projectservice.dto.response.ProjectMemberResponseDto;
 import com.iems.projectservice.entity.ProjectMember;
 import com.iems.projectservice.entity.enums.ProjectPermission;
 import com.iems.projectservice.service.ProjectMemberService;
+import com.iems.projectservice.service.ProjectPermissionChecker;
 import com.iems.projectservice.service.ProjectService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -30,6 +31,8 @@ public class ProjectMemberController {
 
     private final ProjectMemberService projectMemberService;
     private final ProjectService projectService;
+    private final ProjectPermissionChecker projectPermissionChecker;
+
 
     @PostMapping
     @Operation(summary = "Add member to project")
@@ -138,4 +141,23 @@ public class ProjectMemberController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
+
+    @GetMapping("/permissions/{permission}/check")
+    @Operation(summary = "Check if current user has a specific permission in the project")
+    public ResponseEntity<Void> checkPermission(
+            @PathVariable UUID projectId,
+            @PathVariable ProjectPermission permission) {
+        try {
+            UUID currentUserId = projectService.getUserIdFromRequest();
+            boolean hasPermission = projectPermissionChecker.hasPermission(projectId, currentUserId, permission);
+            if (hasPermission) {
+                return ResponseEntity.ok().build();
+            }
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        } catch (Exception e) {
+            log.error("Error checking permission", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
 }

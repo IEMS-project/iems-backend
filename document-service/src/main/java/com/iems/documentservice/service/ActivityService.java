@@ -12,6 +12,7 @@ import com.iems.documentservice.exception.AppException;
 import com.iems.documentservice.exception.DocumentErrorCode;
 import com.iems.documentservice.repository.DocumentActivityRepository;
 import com.iems.documentservice.repository.FolderRepository;
+import com.iems.documentservice.repository.ProjectDocumentRepository;
 import com.iems.documentservice.repository.StoredFileRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,6 +34,7 @@ public class ActivityService {
     private final PermissionHelper permissionHelper;
     private final FolderRepository folderRepository;
     private final StoredFileRepository storedFileRepository;
+    private final ProjectDocumentRepository projectDocumentRepository;
     private final UserServiceFeignClient userServiceFeignClient;
     private final ObjectMapper objectMapper;
 
@@ -40,12 +42,14 @@ public class ActivityService {
                            PermissionHelper permissionHelper,
                            FolderRepository folderRepository,
                            StoredFileRepository storedFileRepository,
+                           ProjectDocumentRepository projectDocumentRepository,
                            UserServiceFeignClient userServiceFeignClient,
                            ObjectMapper objectMapper) {
         this.documentActivityRepository = documentActivityRepository;
         this.permissionHelper = permissionHelper;
         this.folderRepository = folderRepository;
         this.storedFileRepository = storedFileRepository;
+        this.projectDocumentRepository = projectDocumentRepository;
         this.userServiceFeignClient = userServiceFeignClient;
         this.objectMapper = objectMapper;
     }
@@ -78,13 +82,20 @@ public class ActivityService {
         UUID requesterId = permissionHelper.getCurrentUserId();
 
         if ("FOLDER".equals(normalizedType)) {
-            folderRepository.findById(targetId)
-                    .orElseThrow(() -> new AppException(DocumentErrorCode.FOLDER_NOT_FOUND));
-            permissionHelper.enforceFolderReadPermission(targetId, requesterId);
+            if (folderRepository.existsById(targetId)) {
+                permissionHelper.enforceFolderReadPermission(targetId, requesterId);
+            } else if (!projectDocumentRepository.existsById(targetId)) {
+                throw new AppException(DocumentErrorCode.FOLDER_NOT_FOUND);
+            }
+            // If it's a project folder, project-scoped permission is checked at controller level via AOP
         } else {
-            StoredFile file = storedFileRepository.findById(targetId)
-                    .orElseThrow(() -> new AppException(DocumentErrorCode.FILE_NOT_FOUND));
-            permissionHelper.enforceReadPermission(file, requesterId);
+            var fileOpt = storedFileRepository.findById(targetId);
+            if (fileOpt.isPresent()) {
+                permissionHelper.enforceReadPermission(fileOpt.get(), requesterId);
+            } else if (!projectDocumentRepository.existsById(targetId)) {
+                throw new AppException(DocumentErrorCode.FILE_NOT_FOUND);
+            }
+            // If it's a project file, project-scoped permission is checked at controller level via AOP
         }
 
         List<DocumentActivity> activities = documentActivityRepository.findByTargetIdAndTargetTypeOrderByCreatedAtDesc(targetId, normalizedType);

@@ -40,7 +40,13 @@ public enum ProjectPermission {
     // ── Members ───────────────────────────────────────────────────
     MEMBER_INVITE("Invite members"),
     MEMBER_REMOVE("Remove members"),
-    MEMBER_ROLE_ASSIGN("Assign member roles");
+    MEMBER_ROLE_ASSIGN("Assign member roles"),
+
+    // ── Documents ──────────────────────────────────────────────────
+    DOCUMENT_VIEW("View project documents"),
+    DOCUMENT_MODIFY("Modify project documents");
+
+
 
     private final String displayName;
 }

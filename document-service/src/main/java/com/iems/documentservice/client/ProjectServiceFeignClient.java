@@ -15,9 +15,17 @@ import java.util.UUID;
 public interface ProjectServiceFeignClient {
 
     /**
-     * Check if the current JWT user is a member of the given project.
-     * Returns 200 if member, 403 if not.
+     * Check if the current JWT user has a specific permission in the project.
+     */
+    @GetMapping("/projects/{projectId}/members/permissions/{permission}/check")
+    ResponseEntity<Void> checkPermission(
+            @PathVariable("projectId") UUID projectId,
+            @PathVariable("permission") String permission);
+
+    /**
+     * Check if the current user is a member of the project.
      */
     @GetMapping("/projects/{projectId}/members/check")
     ResponseEntity<Void> checkMembership(@PathVariable("projectId") UUID projectId);
+
 }
