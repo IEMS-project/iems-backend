@@ -142,6 +142,10 @@ public class RoleService {
     }
 
     public List<ProjectPermission> getRolePermissions(UUID roleId) {
+        Role role = getRoleById(roleId);
+        if (Boolean.TRUE.equals(role.getIsDefault())) {
+            return getAllPermissions();
+        }
         return rolePermissionRepository.findByRoleId(roleId)
                 .stream().map(RolePermission::getPermission).collect(Collectors.toList());
     }

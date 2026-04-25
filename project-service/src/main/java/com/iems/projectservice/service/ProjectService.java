@@ -95,7 +95,9 @@ public class ProjectService {
                         || permission.name().startsWith("WORKFLOW_")
                         || permission.name().startsWith("ROLE_")
                         || permission.name().startsWith("SPRINT_")
-                        || permission.name().startsWith("MEMBER_"))
+                        || permission.name().startsWith("MEMBER_")
+                        || permission.name().equals("DOCUMENT_VIEW")
+                        || permission.name().equals("DOCUMENT_MODIFY"))
                 .toList();
         roleService.assignInitialPermissionsForNewRole(adminRole.getId(), defaultPermissions);
         log.debug("createProject stage=role_setup durationMs={}", System.currentTimeMillis() - startMs);

@@ -121,6 +121,13 @@ public class ProjectPermissionChecker {
                         ProjectPermission.SPRINT_UPDATE);
                     case SPRINT_DELETE -> Arrays.asList(
                         ProjectPermission.SPRINT_DELETE);
+            case DOCUMENT_VIEW -> Arrays.asList(
+                    ProjectPermission.DOCUMENT_VIEW,
+                    ProjectPermission.DOCUMENT_MODIFY);
+            case DOCUMENT_MODIFY -> Arrays.asList(
+                    ProjectPermission.DOCUMENT_MODIFY);
+
+
             default -> List.of(requested);
         };
     }

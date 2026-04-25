@@ -33,6 +33,7 @@ public class ProjectDocumentService {
     private final ObjectStorageService objectStorageService;
     private final PermissionHelper permissionHelper;
     private final AiServiceFeignClient aiServiceFeignClient;
+    private final ActivityService activityService;
 
     private void requireProjectMember(UUID projectId) {
         try {
@@ -73,6 +74,9 @@ public class ProjectDocumentService {
                 .createdAt(OffsetDateTime.now())
                 .build());
 
+        activityService.log("FOLDER", doc.getId(), "documents.activity.item.created",
+                java.util.Map.of("itemName", name));
+
         return toResponse(doc);
     }
 
@@ -94,6 +98,8 @@ public class ProjectDocumentService {
                             .uploadedBy(userId)
                             .createdAt(OffsetDateTime.now())
                             .build());
+                    activityService.log("FOLDER", docsFolder.getId(), "documents.activity.item.created",
+                            java.util.Map.of("itemName", DEFAULT_DOCS_FOLDER_NAME));
                     return toResponse(docsFolder);
                 });
     }
@@ -105,7 +111,10 @@ public class ProjectDocumentService {
                 .orElseThrow(() -> new AppException(DocumentErrorCode.FILE_NOT_FOUND));
 
         doc.setFileName(newName);
-        return toResponse(projectDocumentRepository.save(doc));
+        ProjectDocument saved = projectDocumentRepository.save(doc);
+        activityService.log(doc.getIsFolder() ? "FOLDER" : "FILE", doc.getId(),
+                "documents.activity.item.renamed", java.util.Map.of("newName", newName));
+        return toResponse(saved);
     }
 
     @Transactional
@@ -139,7 +148,10 @@ public class ProjectDocumentService {
                 .orElseThrow(() -> new AppException(DocumentErrorCode.FILE_NOT_FOUND));
 
         doc.setParentId(targetParentId);
-        return toResponse(projectDocumentRepository.save(doc));
+        ProjectDocument saved = projectDocumentRepository.save(doc);
+        activityService.log(doc.getIsFolder() ? "FOLDER" : "FILE", doc.getId(),
+                "documents.activity.item.moved");
+        return toResponse(saved);
     }
 
     @Transactional
@@ -174,6 +186,9 @@ public class ProjectDocumentService {
                 .aiIndexed(allowEmbedded && ragSupported)
                 .build());
 
+        activityService.log("FILE", doc.getId(), "documents.activity.item.created",
+                java.util.Map.of("itemName", file.getOriginalFilename()));
+
         log.info(
                 "Uploaded document id={} projectId={} fileName={} fileType={} allowEmbedded={} ragSupported={} aiIndexed={}",
                 doc.getId(),
@@ -205,6 +220,8 @@ public class ProjectDocumentService {
             throw new AppException(DocumentErrorCode.PERMISSION_DENIED);
         }
 
+        activityService.log(doc.getIsFolder() ? "FOLDER" : "FILE", doc.getId(),
+                "documents.activity.item.deleted");
         deleteRecursive(projectId, doc);
     }
 
@@ -315,5 +332,9 @@ public class ProjectDocumentService {
                 || normalizedFileType.contains("json")
                 || normalizedFileType.contains("xml")
                 || normalizedFileType.contains("markdown");
+    }
+
+    public List<com.iems.documentservice.dto.response.DocumentActivityResponse> listActivities(UUID docId, String type) {
+        return activityService.listActivities(docId, type);
     }
 }

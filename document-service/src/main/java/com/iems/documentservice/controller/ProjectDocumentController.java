@@ -1,6 +1,9 @@
 package com.iems.documentservice.controller;
 
+import com.iems.documentservice.annotation.RequireDocumentPermission;
+import com.iems.documentservice.entity.enums.ProjectPermission;
 import com.iems.documentservice.dto.response.ApiResponseDto;
+
 import com.iems.documentservice.dto.response.ProjectDocumentResponse;
 import com.iems.documentservice.service.ProjectDocumentService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -24,7 +27,9 @@ public class ProjectDocumentController {
 
     @GetMapping
     @Operation(summary = "List all documents in a project (members only)")
+    @RequireDocumentPermission(ProjectPermission.DOCUMENT_VIEW)
     public ResponseEntity<ApiResponseDto<List<ProjectDocumentResponse>>> listDocuments(
+
             @PathVariable UUID projectId) {
         List<ProjectDocumentResponse> docs = projectDocumentService.listDocuments(projectId);
         return ResponseEntity.ok(new ApiResponseDto<>(200, "Documents retrieved", docs));
@@ -32,7 +37,9 @@ public class ProjectDocumentController {
 
     @GetMapping("/embeddable")
     @Operation(summary = "List AI query-ready documents in a project (members only)")
+    @RequireDocumentPermission(ProjectPermission.DOCUMENT_VIEW)
     public ResponseEntity<ApiResponseDto<List<ProjectDocumentResponse>>> listEmbeddableDocuments(
+
             @PathVariable UUID projectId) {
         List<ProjectDocumentResponse> docs = projectDocumentService.listEmbeddableDocuments(projectId);
         return ResponseEntity.ok(new ApiResponseDto<>(200, "AI query-ready documents retrieved", docs));
@@ -40,7 +47,9 @@ public class ProjectDocumentController {
 
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "Upload a document to the project (members only)")
+    @RequireDocumentPermission(ProjectPermission.DOCUMENT_MODIFY)
     public ResponseEntity<ApiResponseDto<ProjectDocumentResponse>> uploadDocument(
+
             @PathVariable UUID projectId,
             @RequestParam(required = false) UUID folderId,
             @RequestParam(defaultValue = "false") boolean allowEmbedded,
@@ -51,7 +60,9 @@ public class ProjectDocumentController {
 
     @PostMapping("/folders")
     @Operation(summary = "Create a project folder")
+    @RequireDocumentPermission(ProjectPermission.DOCUMENT_MODIFY)
     public ResponseEntity<ApiResponseDto<ProjectDocumentResponse>> createFolder(
+
             @PathVariable UUID projectId,
             @RequestBody com.iems.documentservice.dto.request.CreateFolderRequest request) {
         ProjectDocumentResponse doc = projectDocumentService.createFolder(projectId, request.getName(),
@@ -69,7 +80,9 @@ public class ProjectDocumentController {
 
     @PutMapping("/{docId}/rename")
     @Operation(summary = "Rename a project document/folder")
+    @RequireDocumentPermission(ProjectPermission.DOCUMENT_MODIFY)
     public ResponseEntity<ApiResponseDto<ProjectDocumentResponse>> renameDocument(
+
             @PathVariable UUID projectId,
             @PathVariable UUID docId,
             @RequestBody com.iems.documentservice.dto.request.RenameRequest request) {
@@ -79,7 +92,9 @@ public class ProjectDocumentController {
 
     @PutMapping("/{docId}/move")
     @Operation(summary = "Move a project document/folder")
+    @RequireDocumentPermission(ProjectPermission.DOCUMENT_MODIFY)
     public ResponseEntity<ApiResponseDto<ProjectDocumentResponse>> moveDocument(
+
             @PathVariable UUID projectId,
             @PathVariable UUID docId,
             @RequestParam(required = false) UUID parentId) {
@@ -89,7 +104,9 @@ public class ProjectDocumentController {
 
     @PutMapping("/{docId}/allow-embedded")
     @Operation(summary = "Enable or disable AI embedding for a file")
+    @RequireDocumentPermission(ProjectPermission.DOCUMENT_MODIFY)
     public ResponseEntity<ApiResponseDto<ProjectDocumentResponse>> setAllowEmbedded(
+
             @PathVariable UUID projectId,
             @PathVariable UUID docId,
             @RequestParam boolean allowEmbedded) {
@@ -99,7 +116,9 @@ public class ProjectDocumentController {
 
     @DeleteMapping("/{docId}")
     @Operation(summary = "Delete a project document (uploader only)")
+    @RequireDocumentPermission(ProjectPermission.DOCUMENT_MODIFY)
     public ResponseEntity<ApiResponseDto<Object>> deleteDocument(
+
             @PathVariable UUID projectId,
             @PathVariable UUID docId) throws Exception {
         projectDocumentService.deleteDocument(projectId, docId);
@@ -108,10 +127,23 @@ public class ProjectDocumentController {
 
     @GetMapping("/{docId}/link")
     @Operation(summary = "Get a presigned download link for a document (members only)")
+    @RequireDocumentPermission(ProjectPermission.DOCUMENT_VIEW)
     public ResponseEntity<ApiResponseDto<ProjectDocumentResponse>> getDownloadLink(
+
             @PathVariable UUID projectId,
             @PathVariable UUID docId) throws Exception {
         ProjectDocumentResponse doc = projectDocumentService.getDownloadLink(projectId, docId);
         return ResponseEntity.ok(new ApiResponseDto<>(200, "Download link generated", doc));
+    }
+
+    @GetMapping("/{docId}/activities")
+    @Operation(summary = "List activities for a project document/folder (members only)")
+    @RequireDocumentPermission(ProjectPermission.DOCUMENT_VIEW)
+    public ResponseEntity<ApiResponseDto<List<com.iems.documentservice.dto.response.DocumentActivityResponse>>> listActivities(
+            @PathVariable UUID projectId,
+            @PathVariable UUID docId,
+            @RequestParam(defaultValue = "FILE") String type) {
+        List<com.iems.documentservice.dto.response.DocumentActivityResponse> activities = projectDocumentService.listActivities(docId, type);
+        return ResponseEntity.ok(new ApiResponseDto<>(200, "Activities retrieved", activities));
     }
 }
