@@ -3,11 +3,14 @@ package com.iems.projectservice.service;
 import com.iems.projectservice.dto.request.CreateSprintDto;
 import com.iems.projectservice.dto.request.UpdateSprintDto;
 import com.iems.projectservice.entity.Issue;
+import com.iems.projectservice.entity.ProjectMember;
 import com.iems.projectservice.entity.Sprint;
 import com.iems.projectservice.entity.enums.SprintStatus;
 import com.iems.projectservice.exception.AppException;
 import com.iems.projectservice.exception.ProjectErrorCode;
 import com.iems.projectservice.repository.IssueRepository;
+import com.iems.projectservice.repository.ProjectMemberRepository;
+import com.iems.projectservice.repository.ProjectRepository;
 import com.iems.projectservice.repository.SprintRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,9 +29,19 @@ public class SprintService {
     private final SprintRepository sprintRepository;
     private final IssueRepository issueRepository;
     private final ActivityLogService activityLogService;
+    private final ProjectRepository projectRepository;
+    private final ProjectMemberRepository projectMemberRepository;
+    private final SubscriptionLimitService subscriptionLimitService;
+    private final NotificationPublisher notificationPublisher;
+    private final ActorNameResolver actorNameResolver;
 
     public Sprint createSprint(UUID projectId, CreateSprintDto dto, UUID userId) {
         List<Sprint> existing = sprintRepository.findByProjectIdOrderBySortOrderAsc(projectId);
+
+        // Check sprint limit based on project owner's subscription
+        String ownerSub = projectRepository.findById(projectId)
+                .map(p -> p.getOwnerSubscription()).orElse("FREE");
+        subscriptionLimitService.checkCanCreateSprint(existing.size(), ownerSub);
         
         Sprint sprint = new Sprint();
         sprint.setProjectId(projectId);
@@ -88,6 +101,20 @@ public class SprintService {
         Sprint saved = sprintRepository.save(sprint);
         activityLogService.log(sprint.getProjectId(), null, userId, "SPRINT_STARTED",
                 "Started sprint: " + sprint.getName());
+
+        // Notify all project members
+        try {
+            var project = projectRepository.findById(sprint.getProjectId()).orElse(null);
+            String projectName = project != null ? project.getName() : "";
+            String actorName = actorNameResolver.resolve(userId);
+            List<UUID> memberIds = projectMemberRepository.findByProjectId(sprint.getProjectId())
+                    .stream().map(ProjectMember::getAccountId).toList();
+            notificationPublisher.notifySprintStarted(memberIds, userId, actorName,
+                    saved.getId(), saved.getName(), saved.getProjectId(), projectName);
+        } catch (Exception e) {
+            log.warn("Failed to send sprint started notifications: {}", e.getMessage());
+        }
+
         return saved;
     }
 
@@ -113,6 +140,20 @@ public class SprintService {
         Sprint saved = sprintRepository.save(sprint);
         activityLogService.log(sprint.getProjectId(), null, userId, "SPRINT_COMPLETED",
                 "Completed sprint: " + sprint.getName() + ". " + incompleteIssues.size() + " issues moved to backlog.");
+
+        // Notify all project members
+        try {
+            var project = projectRepository.findById(sprint.getProjectId()).orElse(null);
+            String projectName = project != null ? project.getName() : "";
+            String actorName = actorNameResolver.resolve(userId);
+            List<UUID> memberIds = projectMemberRepository.findByProjectId(sprint.getProjectId())
+                    .stream().map(ProjectMember::getAccountId).toList();
+            notificationPublisher.notifySprintCompleted(memberIds, userId, actorName,
+                    saved.getId(), saved.getName(), saved.getProjectId(), projectName);
+        } catch (Exception e) {
+            log.warn("Failed to send sprint completed notifications: {}", e.getMessage());
+        }
+
         return saved;
     }
 

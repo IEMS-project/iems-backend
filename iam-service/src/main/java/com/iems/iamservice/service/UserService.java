@@ -321,4 +321,17 @@ public class UserService {
             throw new AppException(ErrorCode.INTERNAL_SERVER_ERROR);
         }
     }
+
+    public String getNotificationPreferences(UUID accountId) {
+        return repository.findByAccountId(accountId)
+                .map(User::getNotificationPreferences)
+                .orElse(null);
+    }
+
+    public void updateNotificationPreferences(UUID accountId, String preferencesJson) {
+        repository.findByAccountId(accountId).ifPresent(user -> {
+            user.setNotificationPreferences(preferencesJson);
+            repository.save(user);
+        });
+    }
 }

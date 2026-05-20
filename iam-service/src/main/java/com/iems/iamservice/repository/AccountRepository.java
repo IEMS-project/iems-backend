@@ -1,10 +1,12 @@
 package com.iems.iamservice.repository;
 
 import com.iems.iamservice.entity.Account;
+import com.iems.iamservice.entity.enums.SubscriptionType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -21,6 +23,9 @@ public interface AccountRepository extends JpaRepository<Account, UUID> {
      */
     @Query("SELECT u FROM Account u WHERE u.username = :usernameOrEmail OR u.email = :usernameOrEmail")
     Optional<Account> findByUsernameOrEmail(@Param("usernameOrEmail") String usernameOrEmail);
+
+    /** Find all accounts with a given subscription type (used by scheduler). */
+    List<Account> findBySubscriptionType(SubscriptionType subscriptionType);
 }
 
 

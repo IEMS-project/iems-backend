@@ -28,4 +28,6 @@ public class UpdateIssueDto {
         this.assigneeId = assigneeId;
         this.assigneeIdSet = true;
     }
+
+    private java.util.List<UUID> labelIds;
 }

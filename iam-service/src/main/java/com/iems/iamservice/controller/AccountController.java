@@ -1,10 +1,9 @@
 package com.iems.iamservice.controller;
 
-
-
 import com.iems.iamservice.dto.ApiResponseDto;
 import com.iems.iamservice.dto.request.*;
 import com.iems.iamservice.dto.response.AccountResponseDto;
+import com.iems.iamservice.entity.Account;
 import com.iems.iamservice.service.AccountService;
 import com.iems.iamservice.service.UserRolePermissionService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -13,6 +12,8 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
@@ -161,6 +162,68 @@ public class AccountController {
         return ResponseEntity.ok(ApiResponseDto.<Void>builder()
                 .status("success")
                 .message("User deleted successfully")
+                .build());
+    }
+
+    // ─── Subscription endpoints ───────────────────────────────────────────────
+
+    @GetMapping("/me/subscription")
+    @Operation(summary = "Get my subscription", description = "Get current user's subscription status")
+    public ResponseEntity<ApiResponseDto<AccountResponseDto>> getMySubscription() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        String username = auth.getName();
+        log.info("Getting subscription for user: {}", username);
+
+        Account account = accountService.findByUsernameOrEmail(username)
+                .orElseThrow();
+        return ResponseEntity.ok(ApiResponseDto.<AccountResponseDto>builder()
+                .status("success")
+                .message("Subscription info retrieved successfully")
+                .data(accountService.toUserResponse(account))
+                .build());
+    }
+
+    @PostMapping("/me/upgrade")
+    @Operation(summary = "Upgrade to Premium", description = "Upgrade current account to Premium subscription")
+    public ResponseEntity<ApiResponseDto<AccountResponseDto>> upgradeToPremium(
+            @Valid @RequestBody UpgradeSubscriptionDto dto) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        String username = auth.getName();
+        log.info("Upgrading to premium for user: {} for {} days", username, dto.getDurationDays());
+
+        Account account = accountService.findByUsernameOrEmail(username).orElseThrow();
+        Account upgraded = accountService.upgradeToPremium(account.getId(), dto.getDurationDays());
+
+        return ResponseEntity.ok(ApiResponseDto.<AccountResponseDto>builder()
+                .status("success")
+                .message("Account upgraded to Premium successfully")
+                .data(accountService.toUserResponse(upgraded))
+                .build());
+    }
+
+    @PostMapping("/{id}/downgrade")
+    @Operation(summary = "Downgrade to Free (Admin)", description = "Admin: downgrade a user account to Free")
+    public ResponseEntity<ApiResponseDto<AccountResponseDto>> downgradeToFree(@PathVariable UUID id) {
+        log.info("Admin downgrading account {} to FREE", id);
+        Account downgraded = accountService.downgradeToFree(id);
+        return ResponseEntity.ok(ApiResponseDto.<AccountResponseDto>builder()
+                .status("success")
+                .message("Account downgraded to Free")
+                .data(accountService.toUserResponse(downgraded))
+                .build());
+    }
+
+    @PostMapping("/{id}/upgrade")
+    @Operation(summary = "Upgrade to Premium (Admin)", description = "Admin: upgrade a user account to Premium for N days")
+    public ResponseEntity<ApiResponseDto<AccountResponseDto>> upgradeAccountToPremium(
+            @PathVariable UUID id,
+            @Valid @RequestBody UpgradeSubscriptionDto dto) {
+        log.info("Admin upgrading account {} to PREMIUM for {} days", id, dto.getDurationDays());
+        Account upgraded = accountService.upgradeToPremium(id, dto.getDurationDays());
+        return ResponseEntity.ok(ApiResponseDto.<AccountResponseDto>builder()
+                .status("success")
+                .message("Account upgraded to Premium successfully")
+                .data(accountService.toUserResponse(upgraded))
                 .build());
     }
 }

@@ -1,5 +1,6 @@
 package com.iems.iamservice.dto.response;
 
+import com.iems.iamservice.entity.enums.SubscriptionType;
 import lombok.Data;
 
 import java.time.Instant;
@@ -16,6 +17,8 @@ public class AccountResponseDto {
     private Instant createdAt;
     private Set<String> roles;
     private Set<String> permissions;
+    private SubscriptionType subscriptionType;
+    private Instant premiumUntil;
 }
 
 

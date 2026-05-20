@@ -105,9 +105,10 @@ public class AuthService {
             // Get roles information
             Set<String> roles = userRolePermissionService.getUserRoles(user.getId());
 
-            // Create tokens with roles
+            // Create tokens with roles and subscription info
             String accessToken = jwtService.generateTokenWithUserInfo(
-                    user.getId(), user.getUsername(), user.getEmail(), roles);
+                    user.getId(), user.getUsername(), user.getEmail(), roles,
+                    user.getSubscriptionType(), user.getPremiumUntil());
             String refreshToken = jwtService.generateRefreshTokenWithUserId(
                     user.getId(), user.getUsername());
 
@@ -182,9 +183,10 @@ public class AuthService {
             // Get roles information
             Set<String> roles = userRolePermissionService.getUserRoles(user.getId());
 
-            // Create new access token with roles
+            // Create new access token with roles and subscription info
             String newAccessToken = jwtService.generateTokenWithUserInfo(
-                    user.getId(), user.getUsername(), user.getEmail(), roles);
+                    user.getId(), user.getUsername(), user.getEmail(), roles,
+                    user.getSubscriptionType(), user.getPremiumUntil());
 
             // Create new refresh token
             String newRefreshToken = jwtService.generateRefreshTokenWithUserId(
@@ -363,7 +365,8 @@ public class AuthService {
         }
 
         String accessToken = jwtService.generateTokenWithUserInfo(
-                account.getId(), account.getUsername(), account.getEmail(), roles);
+                account.getId(), account.getUsername(), account.getEmail(), roles,
+                account.getSubscriptionType(), account.getPremiumUntil());
         String refreshToken = jwtService.generateRefreshTokenWithUserId(
                 account.getId(), account.getUsername());
 

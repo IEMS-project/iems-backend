@@ -35,4 +35,8 @@ public class IssueResponseDto {
     /** Enriched user info — null if user ID is null or lookup fails */
     private UserInfoDto assignee;
     private UserInfoDto reporter;
+    private java.util.Set<LabelDto> labels;
+
+    private String statusName;
+    private String statusCategory;
 }

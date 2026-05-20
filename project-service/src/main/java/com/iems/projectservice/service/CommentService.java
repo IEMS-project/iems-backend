@@ -6,9 +6,13 @@ import com.iems.projectservice.dto.request.AccountIdsDto;
 import com.iems.projectservice.dto.response.CommentResponseDto;
 import com.iems.projectservice.dto.response.UserDetailDto;
 import com.iems.projectservice.entity.Comment;
+import com.iems.projectservice.entity.Issue;
+import com.iems.projectservice.entity.Project;
 import com.iems.projectservice.exception.AppException;
 import com.iems.projectservice.exception.ProjectErrorCode;
 import com.iems.projectservice.repository.CommentRepository;
+import com.iems.projectservice.repository.IssueRepository;
+import com.iems.projectservice.repository.ProjectRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -16,6 +20,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Service
@@ -26,14 +32,62 @@ public class CommentService {
     private final CommentRepository commentRepository;
     private final UserServiceFeignClient userServiceFeignClient;
     private final ObjectMapper objectMapper;
+    private final NotificationPublisher notificationPublisher;
+    private final IssueRepository issueRepository;
+    private final ProjectRepository projectRepository;
+    private final ActorNameResolver actorNameResolver;
 
+    @Transactional
     public Comment addComment(UUID issueId, UUID authorId, String content, UUID parentCommentId) {
         Comment comment = new Comment();
         comment.setIssueId(issueId);
         comment.setAuthorId(authorId);
         comment.setContent(content);
         comment.setParentCommentId(parentCommentId);
-        return commentRepository.save(comment);
+        Comment saved = commentRepository.save(comment);
+
+        // Notify mentioned users
+        try {
+            List<UUID> mentionedIds = extractMentionedUserIds(content);
+            if (!mentionedIds.isEmpty()) {
+                Issue issue = issueRepository.findById(issueId).orElse(null);
+                if (issue != null) {
+                    Project project = projectRepository.findById(issue.getProjectId()).orElse(null);
+                    String actorName = actorNameResolver.resolve(authorId);
+                    notificationPublisher.notifyMentioned(
+                            mentionedIds,
+                            authorId,
+                            actorName,
+                            issue.getIssueKey(),
+                            issue.getTitle(),
+                            issueId,
+                            saved.getId(),
+                            issue.getProjectId(),
+                            project != null ? project.getName() : "Unknown"
+                    );
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Failed to send mention notifications: {}", e.getMessage());
+        }
+
+        return saved;
+    }
+
+    private List<UUID> extractMentionedUserIds(String content) {
+        if (content == null || content.isBlank()) return List.of();
+        List<UUID> ids = new ArrayList<>();
+        // Match @[Name](userId)
+        Pattern pattern = Pattern.compile("@\\[[^\\]]+\\]\\(([^)]+)\\)");
+        Matcher matcher = pattern.matcher(content);
+        while (matcher.find()) {
+            try {
+                ids.add(UUID.fromString(matcher.group(1)));
+            } catch (IllegalArgumentException e) {
+                // Ignore invalid UUIDs
+            }
+        }
+        return ids;
     }
 
     public Comment updateComment(UUID commentId, String content, UUID userId) {

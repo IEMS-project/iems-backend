@@ -4,9 +4,7 @@ import com.iems.iamservice.dto.request.CreateAccountDto;
 import com.iems.iamservice.dto.request.UpdateAccountDto;
 import com.iems.iamservice.dto.response.AccountResponseDto;
 import com.iems.iamservice.entity.Account;
-
-
-// import com.iems.iamservice.entity.Permission;
+import com.iems.iamservice.entity.enums.SubscriptionType;
 import com.iems.iamservice.exception.AppException;
 import com.iems.iamservice.exception.ErrorCode;
 import com.iems.iamservice.repository.AccountRepository;
@@ -217,6 +215,38 @@ public class AccountService {
     }
 
     /**
+     * Upgrade account to Premium
+     * @param id account ID
+     * @param durationDays number of days of premium (e.g. 30 for monthly)
+     */
+    @Transactional
+    public Account upgradeToPremium(UUID id, int durationDays) {
+        Account account = findById(id);
+        Instant now = Instant.now();
+        // If still premium, extend from current premiumUntil; else start from now
+        Instant base = (account.getPremiumUntil() != null && account.getPremiumUntil().isAfter(now))
+                ? account.getPremiumUntil() : now;
+        account.setSubscriptionType(SubscriptionType.PREMIUM);
+        account.setPremiumUntil(base.plusSeconds((long) durationDays * 24 * 60 * 60));
+        Account saved = accountRepository.save(account);
+        log.info("Account {} upgraded to PREMIUM until {}", id, saved.getPremiumUntil());
+        return saved;
+    }
+
+    /**
+     * Downgrade account to Free
+     */
+    @Transactional
+    public Account downgradeToFree(UUID id) {
+        Account account = findById(id);
+        account.setSubscriptionType(SubscriptionType.FREE);
+        account.setPremiumUntil(null);
+        Account saved = accountRepository.save(account);
+        log.info("Account {} downgraded to FREE", id);
+        return saved;
+    }
+
+    /**
      * Convert Account entity to AccountResponseDto
      */
     public AccountResponseDto toUserResponse(Account user) {
@@ -228,6 +258,8 @@ public class AccountService {
         dto.setEnabled(user.getEnabled());
         dto.setCreatedAt(user.getCreatedAt());
         dto.setRoles(userRolePermissionService.getUserRoles(user.getId()));
+        dto.setSubscriptionType(user.getSubscriptionType());
+        dto.setPremiumUntil(user.getPremiumUntil());
         // dto.setPermissions(userRolePermissionService.getAllUserPermissions(user.getId()).stream()
         // .map(Permission::getCode)
         //         .collect(Collectors.toSet()));
@@ -235,5 +267,3 @@ public class AccountService {
     }
 
 }
-
-

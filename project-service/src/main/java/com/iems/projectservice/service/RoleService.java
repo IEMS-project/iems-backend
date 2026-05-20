@@ -6,6 +6,7 @@ import com.iems.projectservice.entity.RolePermission;
 import com.iems.projectservice.entity.enums.ProjectPermission;
 import com.iems.projectservice.exception.AppException;
 import com.iems.projectservice.exception.ProjectErrorCode;
+import com.iems.projectservice.repository.ProjectRepository;
 import com.iems.projectservice.repository.RolePermissionRepository;
 import com.iems.projectservice.repository.RoleRepository;
 import lombok.RequiredArgsConstructor;
@@ -25,11 +26,37 @@ public class RoleService {
 
     private final RoleRepository roleRepository;
     private final RolePermissionRepository rolePermissionRepository;
+    private final ProjectRepository projectRepository;
+    private final SubscriptionLimitService subscriptionLimitService;
 
     public Role createRole(UUID projectId, CreateRoleDto dto) {
+        String ownerSub = projectRepository.findById(projectId)
+                .map(p -> p.getOwnerSubscription()).orElse("FREE");
+
+        // Count only non-default (custom) roles — the initial Admin role doesn't count
+        long customRoleCount = roleRepository.findByProjectId(projectId).stream()
+                .filter(r -> !Boolean.TRUE.equals(r.getIsDefault()))
+                .count();
+        subscriptionLimitService.checkCanCreateCustomRole(customRoleCount, ownerSub);
+
         if (roleRepository.existsByProjectIdAndName(projectId, dto.getName())) {
             throw new AppException(ProjectErrorCode.ROLE_ALREADY_EXISTS);
         }
+        return buildAndSaveRole(projectId, dto);
+    }
+
+    /**
+     * Internal init-only path — bypasses the subscription limit check.
+     * Used by ProjectService when creating the default Admin role during project setup.
+     */
+    public Role createRoleSkipLimitCheck(UUID projectId, CreateRoleDto dto) {
+        if (roleRepository.existsByProjectIdAndName(projectId, dto.getName())) {
+            throw new AppException(ProjectErrorCode.ROLE_ALREADY_EXISTS);
+        }
+        return buildAndSaveRole(projectId, dto);
+    }
+
+    private Role buildAndSaveRole(UUID projectId, CreateRoleDto dto) {
         Role role = new Role();
         role.setProjectId(projectId);
         role.setName(dto.getName());

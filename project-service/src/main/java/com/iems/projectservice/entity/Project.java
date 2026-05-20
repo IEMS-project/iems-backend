@@ -47,6 +47,24 @@ public class Project {
     @Column(name = "created_by_account_id", nullable = false)
     private UUID createdByAccountId;
 
+    /**
+     * Cached subscription type of the project owner (manager).
+     * Populated when the project is created and updated when the manager upgrades/downgrades.
+     * Values: "FREE" | "PREMIUM"
+     */
+    @Column(name = "owner_subscription", length = 20, nullable = false)
+    private String ownerSubscription = "FREE";
+
+    /**
+     * When true the project is in read-only mode because the owner's premium expired
+     * and the project violates FREE-tier limits.
+     */
+    @Column(name = "locked", nullable = false)
+    private boolean locked = false;
+
+    @Column(name = "lock_reason", length = 500)
+    private String lockReason;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

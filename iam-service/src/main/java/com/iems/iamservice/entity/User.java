@@ -56,6 +56,13 @@ public class User {
     @Column(columnDefinition = "TEXT")
     private String image;
 
+    /**
+     * JSON string storing notification preferences.
+     * Example: {"emailAssigned":true,"emailMemberAdded":true,"emailDueSoon":true,"inAppToast":true}
+     */
+    @Column(name = "notification_preferences", columnDefinition = "TEXT")
+    private String notificationPreferences;
+
     @Column(nullable = false)
     @Builder.Default
     private Instant createdAt = Instant.now();

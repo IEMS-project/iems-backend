@@ -10,11 +10,12 @@ import com.iems.projectservice.dto.response.*;
 import com.iems.projectservice.entity.Project;
 import com.iems.projectservice.entity.ProjectMember;
 import com.iems.projectservice.entity.Role;
+import com.iems.projectservice.entity.Workflow;
 import com.iems.projectservice.entity.enums.ProjectPermission;
 import com.iems.projectservice.entity.enums.ProjectStatus;
 import com.iems.projectservice.exception.AppException;
 import com.iems.projectservice.exception.ProjectErrorCode;
-import com.iems.projectservice.repository.ProjectRepository;
+import com.iems.projectservice.repository.*;
 import com.iems.projectservice.security.JwtUserDetails;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +29,9 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.*;
@@ -39,6 +43,23 @@ import java.util.stream.Collectors;
 public class ProjectService {
 
     private final ProjectRepository projectRepository;
+    private final ProjectMemberRepository projectMemberRepository;
+    private final MemberPermissionRepository memberPermissionRepository;
+    private final RoleRepository roleRepository;
+    private final RolePermissionRepository rolePermissionRepository;
+    private final WorkflowRepository workflowRepository;
+    private final WorkflowStatusRepository workflowStatusRepository;
+    private final WorkflowTransitionRepository workflowTransitionRepository;
+    private final IssueRepository issueRepository;
+    private final CommentRepository commentRepository;
+    private final AttachmentRepository attachmentRepository;
+    private final IssueStatusHistoryRepository issueStatusHistoryRepository;
+    private final IssueTypeRepository issueTypeRepository;
+    private final IssuePriorityRepository issuePriorityRepository;
+    private final SprintRepository sprintRepository;
+    private final LabelRepository labelRepository;
+    private final ActivityLogRepository activityLogRepository;
+    private final ProjectRepositoryRepository projectRepositoryRepository;
     private final ProjectMemberService projectMemberService;
     private final RoleService roleService;
     private final WorkflowService workflowService;
@@ -46,6 +67,7 @@ public class ProjectService {
     private final DocumentServiceFeignClient documentServiceFeignClient;
     private final UserServiceFeignClient userServiceFeignClient;
     private final ObjectMapper objectMapper;
+    private final SubscriptionLimitService subscriptionLimitService;
 
     public UUID getUserIdFromRequest() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
@@ -59,6 +81,12 @@ public class ProjectService {
         final String authHeader = extractAuthorizationHeader();
         final long startMs = System.currentTimeMillis();
 
+        // ── Subscription guard: limit how many projects a user can own ──────
+        UUID currentUserId = getUserIdFromRequest();
+        long ownedCount = projectRepository.countByManagerAccountId(currentUserId);
+        subscriptionLimitService.checkCanCreateProject(ownedCount);
+        // ────────────────────────────────────────────────────────────────────
+
         if (projectRepository.existsByName(dto.getName())) {
             throw new AppException(ProjectErrorCode.PROJECT_NAME_EXISTS);
         }
@@ -66,9 +94,10 @@ public class ProjectService {
             throw new AppException(ProjectErrorCode.PROJECT_KEY_EXISTS);
         }
 
-        UUID currentUserId = getUserIdFromRequest();
-
         ProjectStatus status = dto.getStatus() != null ? dto.getStatus() : ProjectStatus.PLANNING;
+
+        // Snapshot owner subscription so project-level limits don't need Feign calls later
+        String ownerSubscription = subscriptionLimitService.getCurrentUserSubscription();
 
         Project project = new Project();
         project.setName(dto.getName());
@@ -79,6 +108,7 @@ public class ProjectService {
         project.setManagerAccountId(currentUserId);
         project.setCreatedByAccountId(currentUserId);
         project.setStatus(status);
+        project.setOwnerSubscription(ownerSubscription);
 
         Project savedProject = projectRepository.save(project);
 
@@ -87,7 +117,7 @@ public class ProjectService {
         adminRoleDto.setName("Admin");
         adminRoleDto.setDescription("Project administrator with full access");
         adminRoleDto.setIsDefault(true);
-        Role adminRole = roleService.createRole(savedProject.getId(), adminRoleDto);
+        Role adminRole = roleService.createRoleSkipLimitCheck(savedProject.getId(), adminRoleDto);
 
         List<ProjectPermission> defaultPermissions = Arrays.stream(ProjectPermission.values())
                 .filter(permission -> permission.name().startsWith("PROJECT_")
@@ -168,15 +198,63 @@ public class ProjectService {
         return projectRepository.save(project);
     }
 
+    @Transactional
     public void deleteProject(UUID projectId) {
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new AppException(ProjectErrorCode.PROJECT_NOT_FOUND));
+        UUID currentUserId = getUserIdFromRequest();
+        if (!currentUserId.equals(project.getCreatedByAccountId())) {
+            throw new AppException(ProjectErrorCode.PERMISSION_DENIED);
+        }
+
+        List<UUID> issueIds = issueRepository.findIdsByProjectId(projectId);
+        if (!issueIds.isEmpty()) {
+            attachmentRepository.deleteByIssueIdIn(issueIds);
+            commentRepository.deleteByIssueIdIn(issueIds);
+        }
+        issueStatusHistoryRepository.deleteByProjectId(projectId);
+        issueRepository.deleteIssueLabelsByProjectId(projectId);
+        issueRepository.deleteByProjectId(projectId);
+
+        issueTypeRepository.deleteByProjectId(projectId);
+        issuePriorityRepository.deleteByProjectId(projectId);
+        labelRepository.deleteByProjectId(projectId);
+        sprintRepository.deleteByProjectId(projectId);
+
+        List<UUID> workflowIds = workflowRepository.findByProjectId(projectId)
+                .stream()
+                .map(Workflow::getId)
+                .toList();
+        if (!workflowIds.isEmpty()) {
+            workflowTransitionRepository.deleteByWorkflowIdIn(workflowIds);
+            workflowStatusRepository.deleteByWorkflowIdIn(workflowIds);
+        }
+        workflowRepository.deleteByProjectId(projectId);
+
+        List<UUID> roleIds = roleRepository.findByProjectId(projectId)
+                .stream()
+                .map(Role::getId)
+                .toList();
+        if (!roleIds.isEmpty()) {
+            rolePermissionRepository.deleteByRoleIdIn(roleIds);
+        }
+        memberPermissionRepository.deleteByProjectId(projectId);
+        projectMemberRepository.deleteByProjectId(projectId);
+        roleRepository.deleteByProjectId(projectId);
+
+        projectRepositoryRepository.deleteByProjectId(projectId);
+        activityLogRepository.deleteByProjectId(projectId);
+
         projectRepository.delete(project);
     }
 
     public Project getProjectById(UUID projectId) {
-        return projectRepository.findById(projectId)
+        Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new AppException(ProjectErrorCode.PROJECT_NOT_FOUND));
+        if (project.isLocked()) {
+            throw new AppException(ProjectErrorCode.PROJECT_LOCKED);
+        }
+        return project;
     }
 
     public List<Project> getAllProjects() {
@@ -231,9 +309,20 @@ public class ProjectService {
         }).collect(Collectors.toList());
     }
 
-    public List<Project> getMyProjects() {
+    public PagedResponseDto<Project> getMyProjects(int page, int size) {
         UUID accountId = getUserIdFromRequest();
-        return projectRepository.findByMemberAccountId(accountId);
+        int safePage = Math.max(page, 0);
+        int safeSize = Math.max(1, Math.min(size, 200));
+        PageRequest pageable = PageRequest.of(safePage, safeSize, Sort.by(Sort.Direction.DESC, "createdAt"));
+        Page<Project> result = projectRepository.findByOwnerOrMember(accountId, pageable);
+
+        return new PagedResponseDto<>(
+                result.getContent(),
+                result.getNumber(),
+                result.getSize(),
+                result.getTotalElements(),
+                result.getTotalPages(),
+                result.isLast());
     }
 
     public List<ProjectInfoResponse> getProjectsByID(ProjectIdsDto projectIds) {

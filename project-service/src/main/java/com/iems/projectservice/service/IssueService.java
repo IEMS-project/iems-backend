@@ -68,6 +68,10 @@ public class IssueService {
     private final ActivityLogService activityLogService;
     private final UserServiceFeignClient userServiceFeignClient;
     private final ObjectMapper objectMapper;
+    private final SubscriptionLimitService subscriptionLimitService;
+    private final NotificationPublisher notificationPublisher;
+    private final ActorNameResolver actorNameResolver;
+    private final LabelRepository labelRepository;
 
     // ── User enrichment helpers ──────────────────────────────────────────────
 
@@ -121,6 +125,13 @@ public class IssueService {
                 .updatedAt(issue.getUpdatedAt())
                 .assignee(issue.getAssigneeId() != null ? toUserInfo(userMap.get(issue.getAssigneeId())) : null)
                 .reporter(issue.getReporterId() != null ? toUserInfo(userMap.get(issue.getReporterId())) : null)
+                .labels(issue.getLabels().stream()
+                        .map(l -> new com.iems.projectservice.dto.response.LabelDto(l.getId(), l.getName(), l.getColor()))
+                        .collect(Collectors.toSet()))
+                .statusName(issue.getStatusId() != null ? 
+                    workflowStatusRepository.findById(issue.getStatusId()).map(WorkflowStatus::getName).orElse(null) : null)
+                .statusCategory(issue.getStatusId() != null ? 
+                    workflowStatusRepository.findById(issue.getStatusId()).map(s -> s.getCategory().name()).orElse(null) : null)
                 .build();
     }
 
@@ -152,6 +163,15 @@ public class IssueService {
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new AppException(ProjectErrorCode.PROJECT_NOT_FOUND));
 
+        // Check project lock
+        if (project.isLocked()) {
+            throw new AppException(ProjectErrorCode.PROJECT_LOCKED);
+        }
+
+        // Check issue limit based on project owner's subscription
+        long currentIssueCount = issueRepository.countByProjectId(projectId);
+        subscriptionLimitService.checkCanCreateIssue(currentIssueCount, project.getOwnerSubscription());
+
         long count = issueRepository.countByProjectId(projectId);
         String issueKey = project.getProjectKey() + "-" + (count + 1);
 
@@ -160,6 +180,19 @@ public class IssueService {
         int nextSortOrder = issueRepository.findMaxSortOrderByProjectId(projectId).orElse(0) + 1;
 
         Issue saved = createIssueEntity(projectId, dto, reporterId, issueKey, defaultStatusId, nextSortOrder, true);
+
+        // Notify assignee if different from reporter
+        if (saved.getAssigneeId() != null && !saved.getAssigneeId().equals(reporterId)) {
+            try {
+                String reporterName = actorNameResolver.resolve(reporterId);
+                notificationPublisher.notifyIssueAssigned(
+                        saved.getAssigneeId(), reporterId, reporterName,
+                        saved.getIssueKey(), saved.getTitle(), saved.getId(),
+                        projectId, project.getName());
+            } catch (Exception e) {
+                log.warn("Failed to send issue assigned notification: {}", e.getMessage());
+            }
+        }
 
         return enrich(saved);
     }
@@ -193,6 +226,11 @@ public class IssueService {
         issue.setStoryPoints(dto.getStoryPoints());
         issue.setSortOrder(sortOrder);
         issue.setDueDate(dto.getDueDate());
+
+        if (dto.getLabelIds() != null && !dto.getLabelIds().isEmpty()) {
+            List<Label> labels = labelRepository.findAllById(dto.getLabelIds());
+            issue.setLabels(new HashSet<>(labels));
+        }
 
         Issue saved = issueRepository.save(issue);
 
@@ -229,6 +267,18 @@ public class IssueService {
                 } else {
                     activityLogService.log(issue.getProjectId(), issueId, userId, "ISSUE_ASSIGNED",
                             "Assigned issue " + issue.getIssueKey());
+                    // Notify new assignee
+                    try {
+                        var project = projectRepository.findById(issue.getProjectId()).orElse(null);
+                        String projectName = project != null ? project.getName() : "";
+                        String actorName = actorNameResolver.resolve(userId);
+                        notificationPublisher.notifyIssueAssigned(
+                                nextAssigneeId, userId, actorName,
+                                issue.getIssueKey(), issue.getTitle(), issue.getId(),
+                                issue.getProjectId(), projectName);
+                    } catch (Exception e) {
+                        log.warn("Failed to send issue assigned notification: {}", e.getMessage());
+                    }
                 }
             }
         }
@@ -242,6 +292,11 @@ public class IssueService {
             issue.setSortOrder(dto.getSortOrder());
         if (dto.getDueDate() != null)
             issue.setDueDate(dto.getDueDate());
+
+        if (dto.getLabelIds() != null) {
+            List<Label> labels = labelRepository.findAllById(dto.getLabelIds());
+            issue.setLabels(new HashSet<>(labels));
+        }
 
         if (dto.getStatusId() != null && !dto.getStatusId().equals(issue.getStatusId())) {
             changeStatus(issue, dto.getStatusId(), userId);

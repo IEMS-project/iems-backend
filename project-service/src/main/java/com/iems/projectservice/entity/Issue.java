@@ -71,4 +71,12 @@ public class Issue {
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+        name = "issue_labels",
+        joinColumns = @JoinColumn(name = "issue_id"),
+        inverseJoinColumns = @JoinColumn(name = "label_id")
+    )
+    private java.util.Set<Label> labels = new java.util.HashSet<>();
 }

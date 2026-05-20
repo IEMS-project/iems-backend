@@ -19,4 +19,6 @@ public interface MemberPermissionRepository extends JpaRepository<MemberPermissi
             UUID projectId, UUID accountId, ProjectPermission permission);
 
     void deleteByProjectIdAndAccountId(UUID projectId, UUID accountId);
+
+        void deleteByProjectId(UUID projectId);
 }

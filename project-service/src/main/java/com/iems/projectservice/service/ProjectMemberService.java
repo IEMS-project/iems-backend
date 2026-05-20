@@ -10,6 +10,7 @@ import com.iems.projectservice.entity.Role;
 import com.iems.projectservice.exception.AppException;
 import com.iems.projectservice.exception.ProjectErrorCode;
 import com.iems.projectservice.repository.ProjectMemberRepository;
+import com.iems.projectservice.repository.ProjectRepository;
 import com.iems.projectservice.repository.RoleRepository;
 import com.iems.projectservice.repository.MemberPermissionRepository;
 import lombok.RequiredArgsConstructor;
@@ -32,12 +33,22 @@ public class ProjectMemberService {
     private final MemberPermissionRepository memberPermissionRepository;
     private final UserServiceFeignClient userServiceFeignClient;
     private final ObjectMapper objectMapper;
+    private final ProjectRepository projectRepository;
+    private final SubscriptionLimitService subscriptionLimitService;
+    private final NotificationPublisher notificationPublisher;
+    private final ActorNameResolver actorNameResolver;
 
     @Transactional
     public ProjectMember addMemberToProject(UUID projectId, UUID accountId, UUID roleId) {
         if (projectMemberRepository.existsByProjectIdAndAccountId(projectId, accountId)) {
             throw new AppException(ProjectErrorCode.PROJECT_MEMBER_ALREADY_EXISTS);
         }
+        // Check member limit based on project owner's subscription
+        String ownerSub = projectRepository.findById(projectId)
+                .map(p -> p.getOwnerSubscription()).orElse("FREE");
+        long memberCount = projectMemberRepository.countByProjectId(projectId);
+        subscriptionLimitService.checkCanAddMember(memberCount, ownerSub);
+
         ProjectMember member = new ProjectMember();
         member.setProjectId(projectId);
         member.setAccountId(accountId);
@@ -52,26 +63,47 @@ public class ProjectMemberService {
         if (projectMemberRepository.existsByProjectIdAndAccountId(projectId, accountId)) {
             throw new AppException(ProjectErrorCode.PROJECT_MEMBER_ALREADY_EXISTS);
         }
+        // Check member limit (skip for initial project creation where member == owner)
+        if (!accountId.equals(assignedBy)) {
+            String ownerSub = projectRepository.findById(projectId)
+                    .map(p -> p.getOwnerSubscription()).orElse("FREE");
+            long memberCount = projectMemberRepository.countByProjectId(projectId);
+            subscriptionLimitService.checkCanAddMember(memberCount, ownerSub);
+        }
         ProjectMember member = new ProjectMember();
         member.setProjectId(projectId);
         member.setAccountId(accountId);
         member.setRoleId(roleId);
         member.setJoinedAt(LocalDateTime.now());
         member.setAssignedByAccountId(assignedBy);
-        return projectMemberRepository.save(member);
+        ProjectMember saved = projectMemberRepository.save(member);
+
+        // Notify added member (skip if adding yourself)
+        try {
+            var project = projectRepository.findById(projectId).orElse(null);
+            String projectName = project != null ? project.getName() : "";
+            String actorName = actorNameResolver.resolve(assignedBy);
+            notificationPublisher.notifyMemberAdded(accountId, assignedBy, actorName, projectId, projectName);
+        } catch (Exception e) {
+            log.warn("Failed to send member added notification: {}", e.getMessage());
+        }
+
+        return saved;
     }
 
     @Transactional
     public List<ProjectMember> addMembersToProject(UUID projectId, List<UUID> accountIds, UUID roleId,
             UUID assignedBy) {
+        String ownerSub = projectRepository.findById(projectId)
+                .map(p -> p.getOwnerSubscription()).orElse("FREE");
+        long memberCount = projectMemberRepository.countByProjectId(projectId);
+
         List<ProjectMember> created = new ArrayList<>();
         for (UUID accountId : accountIds) {
-            if (accountId == null) {
-                continue;
-            }
-            if (projectMemberRepository.existsByProjectIdAndAccountId(projectId, accountId)) {
-                continue;
-            }
+            if (accountId == null) continue;
+            if (projectMemberRepository.existsByProjectIdAndAccountId(projectId, accountId)) continue;
+            // Check limit before each insert (count grows as batch progresses)
+            subscriptionLimitService.checkCanAddMember(memberCount, ownerSub);
             ProjectMember member = new ProjectMember();
             member.setProjectId(projectId);
             member.setAccountId(accountId);
@@ -79,6 +111,7 @@ public class ProjectMemberService {
             member.setJoinedAt(LocalDateTime.now());
             member.setAssignedByAccountId(assignedBy);
             created.add(projectMemberRepository.save(member));
+            memberCount++;
         }
         return created;
     }
@@ -87,14 +120,16 @@ public class ProjectMemberService {
     public List<ProjectMember> addMembersToProject(UUID projectId,
             List<com.iems.projectservice.dto.request.ProjectMemberDto> members,
             UUID assignedBy) {
+        String ownerSub = projectRepository.findById(projectId)
+                .map(p -> p.getOwnerSubscription()).orElse("FREE");
+        long memberCount = projectMemberRepository.countByProjectId(projectId);
+
         List<ProjectMember> created = new ArrayList<>();
         for (com.iems.projectservice.dto.request.ProjectMemberDto memberDto : members) {
-            if (memberDto == null || memberDto.getAccountId() == null || memberDto.getRoleId() == null) {
-                continue;
-            }
-            if (projectMemberRepository.existsByProjectIdAndAccountId(projectId, memberDto.getAccountId())) {
-                continue;
-            }
+            if (memberDto == null || memberDto.getAccountId() == null || memberDto.getRoleId() == null) continue;
+            if (projectMemberRepository.existsByProjectIdAndAccountId(projectId, memberDto.getAccountId())) continue;
+            // Check limit before each insert (count grows as batch progresses)
+            subscriptionLimitService.checkCanAddMember(memberCount, ownerSub);
             ProjectMember member = new ProjectMember();
             member.setProjectId(projectId);
             member.setAccountId(memberDto.getAccountId());
@@ -102,6 +137,7 @@ public class ProjectMemberService {
             member.setJoinedAt(LocalDateTime.now());
             member.setAssignedByAccountId(assignedBy);
             created.add(projectMemberRepository.save(member));
+            memberCount++;
         }
         return created;
     }

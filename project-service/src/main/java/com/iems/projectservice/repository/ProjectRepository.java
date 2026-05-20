@@ -2,6 +2,8 @@ package com.iems.projectservice.repository;
 
 import com.iems.projectservice.entity.Project;
 import com.iems.projectservice.entity.enums.ProjectStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -29,8 +31,20 @@ public interface ProjectRepository extends JpaRepository<Project, UUID> {
     
     @Query("SELECT DISTINCT p FROM Project p JOIN ProjectMember pm ON pm.projectId = p.id WHERE pm.accountId = :accountId")
     List<Project> findByMemberAccountId(@Param("accountId") UUID accountId);
+
+        @Query(value = "SELECT DISTINCT p FROM Project p LEFT JOIN ProjectMember pm ON pm.projectId = p.id " +
+            "WHERE p.managerAccountId = :accountId OR pm.accountId = :accountId",
+            countQuery = "SELECT COUNT(DISTINCT p.id) FROM Project p LEFT JOIN ProjectMember pm ON pm.projectId = p.id " +
+                "WHERE p.managerAccountId = :accountId OR pm.accountId = :accountId")
+        Page<Project> findByOwnerOrMember(@Param("accountId") UUID accountId, Pageable pageable);
     
     boolean existsByName(String name);
     
     boolean existsByProjectKey(String projectKey);
+
+    /** Count projects where the given account is the manager (owner). */
+    long countByManagerAccountId(UUID managerAccountId);
+
+    /** Find locked projects owned by a given manager (for scheduled lock checks). */
+    List<Project> findByManagerAccountIdAndLocked(UUID managerAccountId, boolean locked);
 }

@@ -15,4 +15,6 @@ public interface WorkflowStatusRepository extends JpaRepository<WorkflowStatus, 
     List<WorkflowStatus> findByWorkflowIdInAndCategory(List<UUID> workflowIds, StatusCategory category);
 
     void deleteByWorkflowId(UUID workflowId);
+
+    void deleteByWorkflowIdIn(List<UUID> workflowIds);
 }

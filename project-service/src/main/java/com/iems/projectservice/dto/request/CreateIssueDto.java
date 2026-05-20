@@ -23,4 +23,5 @@ public class CreateIssueDto {
     private UUID sprintId;
     private Integer storyPoints;
     private LocalDate dueDate;
+    private java.util.List<UUID> labelIds;
 }

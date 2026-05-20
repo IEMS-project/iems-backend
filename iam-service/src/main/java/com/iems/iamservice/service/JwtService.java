@@ -1,5 +1,6 @@
 package com.iems.iamservice.service;
 
+import com.iems.iamservice.entity.enums.SubscriptionType;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
@@ -118,6 +119,33 @@ public class JwtService {
     }
 
     /**
+     * Create access token with userId, roles, and subscription info
+     */
+    public String generateTokenWithUserInfo(UUID userId, String username, String email,
+                                            Set<String> roles, SubscriptionType subscriptionType, Instant premiumUntil) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("userId", userId.toString());
+        claims.put("email", email);
+        claims.put("roles", roles);
+        claims.put("type", "access");
+        claims.put("subscriptionType", subscriptionType != null ? subscriptionType.name() : SubscriptionType.FREE.name());
+        if (premiumUntil != null) {
+            claims.put("premiumUntil", premiumUntil.toEpochMilli());
+        }
+
+        Instant now = Instant.now();
+        Instant expirationTime = now.plus(jwtExpiration, ChronoUnit.SECONDS);
+
+        return Jwts.builder()
+                .setClaims(claims)
+                .setSubject(username)
+                .setIssuedAt(Date.from(now))
+                .setExpiration(Date.from(expirationTime))
+                .signWith(getSignInKey(), SignatureAlgorithm.HS256)
+                .compact();
+    }
+
+    /**
      * Create refresh token with userId from user-service
      */
     public String generateRefreshTokenWithUserId(UUID userId, String username) {
@@ -177,6 +205,24 @@ public class JwtService {
         Claims claims = extractAllClaims(token);
         List<String> rolesList = claims.get("roles", List.class);
         return rolesList != null ? Set.copyOf(rolesList) : Set.of();
+    }
+
+    /**
+     * Get subscriptionType from token
+     */
+    public String extractSubscriptionType(String token) {
+        Claims claims = extractAllClaims(token);
+        String sub = claims.get("subscriptionType", String.class);
+        return sub != null ? sub : SubscriptionType.FREE.name();
+    }
+
+    /**
+     * Get premiumUntil (epoch milli) from token, returns null if not present
+     */
+    public Instant extractPremiumUntil(String token) {
+        Claims claims = extractAllClaims(token);
+        Long epochMilli = claims.get("premiumUntil", Long.class);
+        return epochMilli != null ? Instant.ofEpochMilli(epochMilli) : null;
     }
 
     /**

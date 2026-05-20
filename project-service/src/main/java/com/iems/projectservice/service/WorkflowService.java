@@ -10,6 +10,7 @@ import com.iems.projectservice.entity.WorkflowTransition;
 import com.iems.projectservice.entity.enums.StatusCategory;
 import com.iems.projectservice.exception.AppException;
 import com.iems.projectservice.exception.ProjectErrorCode;
+import com.iems.projectservice.repository.ProjectRepository;
 import com.iems.projectservice.repository.WorkflowRepository;
 import com.iems.projectservice.repository.WorkflowStatusRepository;
 import com.iems.projectservice.repository.WorkflowTransitionRepository;
@@ -29,9 +30,16 @@ public class WorkflowService {
     private final WorkflowRepository workflowRepository;
     private final WorkflowStatusRepository workflowStatusRepository;
     private final WorkflowTransitionRepository workflowTransitionRepository;
+    private final ProjectRepository projectRepository;
+    private final SubscriptionLimitService subscriptionLimitService;
 
     // --- Workflow CRUD ---
     public Workflow createWorkflow(UUID projectId, CreateWorkflowDto dto) {
+        // Requires Premium — free projects cannot create custom workflows
+        String ownerSub = projectRepository.findById(projectId)
+                .map(p -> p.getOwnerSubscription()).orElse("FREE");
+        subscriptionLimitService.checkCanModifyWorkflow(ownerSub);
+
         Workflow wf = new Workflow();
         wf.setProjectId(projectId);
         wf.setName(dto.getName());
@@ -43,6 +51,10 @@ public class WorkflowService {
     public Workflow updateWorkflow(UUID workflowId, CreateWorkflowDto dto) {
         Workflow wf = workflowRepository.findById(workflowId)
                 .orElseThrow(() -> new AppException(ProjectErrorCode.WORKFLOW_NOT_FOUND));
+        // Requires Premium to modify
+        String ownerSub = projectRepository.findById(wf.getProjectId())
+                .map(p -> p.getOwnerSubscription()).orElse("FREE");
+        subscriptionLimitService.checkCanModifyWorkflow(ownerSub);
         if (dto.getName() != null)
             wf.setName(dto.getName());
         if (dto.getDescription() != null)
@@ -56,6 +68,10 @@ public class WorkflowService {
     public void deleteWorkflow(UUID workflowId) {
         Workflow wf = workflowRepository.findById(workflowId)
                 .orElseThrow(() -> new AppException(ProjectErrorCode.WORKFLOW_NOT_FOUND));
+        // Requires Premium to delete
+        String ownerSub = projectRepository.findById(wf.getProjectId())
+                .map(p -> p.getOwnerSubscription()).orElse("FREE");
+        subscriptionLimitService.checkCanModifyWorkflow(ownerSub);
         workflowTransitionRepository.deleteByWorkflowId(workflowId);
         workflowStatusRepository.deleteByWorkflowId(workflowId);
         workflowRepository.delete(wf);
@@ -72,8 +88,12 @@ public class WorkflowService {
 
     // --- Status CRUD ---
     public WorkflowStatus addStatus(UUID workflowId, CreateWorkflowStatusDto dto) {
-        workflowRepository.findById(workflowId)
+        Workflow wf = workflowRepository.findById(workflowId)
                 .orElseThrow(() -> new AppException(ProjectErrorCode.WORKFLOW_NOT_FOUND));
+        // Requires Premium
+        String ownerSub = projectRepository.findById(wf.getProjectId())
+                .map(p -> p.getOwnerSubscription()).orElse("FREE");
+        subscriptionLimitService.checkCanModifyWorkflow(ownerSub);
 
         List<WorkflowStatus> existing = workflowStatusRepository.findByWorkflowIdOrderBySortOrderAsc(workflowId);
         int nextOrder = dto.getSortOrder() != null ? dto.getSortOrder() : existing.size();
@@ -90,6 +110,12 @@ public class WorkflowService {
     public WorkflowStatus updateStatus(UUID statusId, CreateWorkflowStatusDto dto) {
         WorkflowStatus status = workflowStatusRepository.findById(statusId)
                 .orElseThrow(() -> new AppException(ProjectErrorCode.WORKFLOW_STATUS_NOT_FOUND));
+        // Requires Premium — look up the project via the workflow
+        workflowRepository.findById(status.getWorkflowId()).ifPresent(wf -> {
+            String ownerSub = projectRepository.findById(wf.getProjectId())
+                    .map(p -> p.getOwnerSubscription()).orElse("FREE");
+            subscriptionLimitService.checkCanModifyWorkflow(ownerSub);
+        });
         if (dto.getName() != null)
             status.setName(dto.getName());
         if (dto.getCategory() != null)
@@ -104,6 +130,12 @@ public class WorkflowService {
     public void deleteStatus(UUID statusId) {
         WorkflowStatus status = workflowStatusRepository.findById(statusId)
                 .orElseThrow(() -> new AppException(ProjectErrorCode.WORKFLOW_STATUS_NOT_FOUND));
+        // Requires Premium
+        workflowRepository.findById(status.getWorkflowId()).ifPresent(wf -> {
+            String ownerSub = projectRepository.findById(wf.getProjectId())
+                    .map(p -> p.getOwnerSubscription()).orElse("FREE");
+            subscriptionLimitService.checkCanModifyWorkflow(ownerSub);
+        });
         workflowStatusRepository.delete(status);
     }
 
@@ -113,8 +145,12 @@ public class WorkflowService {
 
     @Transactional
     public List<WorkflowStatus> syncStatuses(UUID workflowId, List<WorkflowStatusSyncItemDto> items) {
-        workflowRepository.findById(workflowId)
+        Workflow wf = workflowRepository.findById(workflowId)
                 .orElseThrow(() -> new AppException(ProjectErrorCode.WORKFLOW_NOT_FOUND));
+        // Requires Premium
+        String ownerSub = projectRepository.findById(wf.getProjectId())
+                .map(p -> p.getOwnerSubscription()).orElse("FREE");
+        subscriptionLimitService.checkCanModifyWorkflow(ownerSub);
 
         List<WorkflowStatusSyncItemDto> safeItems = items != null ? items : List.of();
         List<WorkflowStatus> existing = workflowStatusRepository.findByWorkflowIdOrderBySortOrderAsc(workflowId);
@@ -172,8 +208,12 @@ public class WorkflowService {
 
     // --- Transition CRUD ---
     public WorkflowTransition addTransition(UUID workflowId, CreateWorkflowTransitionDto dto) {
-        workflowRepository.findById(workflowId)
+        Workflow wf = workflowRepository.findById(workflowId)
                 .orElseThrow(() -> new AppException(ProjectErrorCode.WORKFLOW_NOT_FOUND));
+        // Requires Premium
+        String ownerSub = projectRepository.findById(wf.getProjectId())
+                .map(p -> p.getOwnerSubscription()).orElse("FREE");
+        subscriptionLimitService.checkCanModifyWorkflow(ownerSub);
 
         WorkflowTransition t = new WorkflowTransition();
         t.setWorkflowId(workflowId);
@@ -186,6 +226,12 @@ public class WorkflowService {
     public void deleteTransition(UUID transitionId) {
         WorkflowTransition t = workflowTransitionRepository.findById(transitionId)
                 .orElseThrow(() -> new AppException(ProjectErrorCode.WORKFLOW_TRANSITION_NOT_FOUND));
+        // Requires Premium
+        workflowRepository.findById(t.getWorkflowId()).ifPresent(wf -> {
+            String ownerSub = projectRepository.findById(wf.getProjectId())
+                    .map(p -> p.getOwnerSubscription()).orElse("FREE");
+            subscriptionLimitService.checkCanModifyWorkflow(ownerSub);
+        });
         workflowTransitionRepository.delete(t);
     }
 

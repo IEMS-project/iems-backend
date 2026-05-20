@@ -71,6 +71,11 @@ public enum ErrorCode {
     ROLE_REPLACEMENT_FAILED("Replacing user's roles failed", HttpStatus.INTERNAL_SERVER_ERROR),
     MULTIPLE_ROLES_NOT_ALLOWED("User can only have one role", HttpStatus.BAD_REQUEST),
 
+    // Subscription Errors
+    SUBSCRIPTION_NOT_FOUND("Subscription not found", HttpStatus.NOT_FOUND),
+    ALREADY_PREMIUM("Account is already premium", HttpStatus.CONFLICT),
+    NOT_PREMIUM("Account is not premium", HttpStatus.BAD_REQUEST),
+
     // System Errors
     INTERNAL_SERVER_ERROR("Internal server error", HttpStatus.INTERNAL_SERVER_ERROR),
     DATABASE_ERROR("Database error", HttpStatus.INTERNAL_SERVER_ERROR),

@@ -11,4 +11,5 @@ import java.util.UUID;
 public interface AttachmentRepository extends JpaRepository<Attachment, UUID> {
     List<Attachment> findByIssueId(UUID issueId);
     void deleteByIssueId(UUID issueId);
+    void deleteByIssueIdIn(List<UUID> issueIds);
 }

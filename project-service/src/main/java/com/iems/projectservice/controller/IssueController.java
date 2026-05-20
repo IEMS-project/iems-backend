@@ -8,6 +8,7 @@ import com.iems.projectservice.dto.response.IssueImportResultDto;
 import com.iems.projectservice.dto.response.IssueResponseDto;
 import com.iems.projectservice.dto.response.PagedResponseDto;
 import com.iems.projectservice.entity.enums.ProjectPermission;
+import com.iems.projectservice.exception.AppException;
 import com.iems.projectservice.service.IssueService;
 import com.iems.projectservice.service.ProjectService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -40,16 +41,11 @@ public class IssueController {
     @RequireProjectPermission(ProjectPermission.ISSUE_CREATE)
     public ResponseEntity<ApiResponseDto<IssueResponseDto>> createIssue(
             @PathVariable UUID projectId,
-            @Valid @RequestBody CreateIssueDto dto) {
-        try {
-            UUID userId = projectService.getUserIdFromRequest();
-            IssueResponseDto issue = issueService.createIssue(projectId, dto, userId);
-            return ResponseEntity.status(HttpStatus.CREATED)
-                    .body(new ApiResponseDto<>("success", "Issue created successfully", issue));
-        } catch (Exception e) {
-            log.error("Error creating issue", e);
-            return ResponseEntity.badRequest().body(new ApiResponseDto<>("error", e.getMessage(), null));
-        }
+            @Valid @RequestBody CreateIssueDto dto) throws AppException {
+        UUID userId = projectService.getUserIdFromRequest();
+        IssueResponseDto issue = issueService.createIssue(projectId, dto, userId);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(new ApiResponseDto<>("success", "Issue created successfully", issue));
     }
 
     @PostMapping(value = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -57,15 +53,10 @@ public class IssueController {
     @RequireProjectPermission(ProjectPermission.ISSUE_CREATE)
     public ResponseEntity<ApiResponseDto<IssueImportResultDto>> importIssues(
             @PathVariable UUID projectId,
-            @RequestPart("file") MultipartFile file) {
-        try {
-            UUID userId = projectService.getUserIdFromRequest();
-            IssueImportResultDto result = issueService.importIssuesFromExcel(projectId, file, userId);
-            return ResponseEntity.ok(new ApiResponseDto<>("success", "Issues imported successfully", result));
-        } catch (Exception e) {
-            log.error("Error importing issues", e);
-            return ResponseEntity.badRequest().body(new ApiResponseDto<>("error", e.getMessage(), null));
-        }
+            @RequestPart("file") MultipartFile file) throws AppException {
+        UUID userId = projectService.getUserIdFromRequest();
+        IssueImportResultDto result = issueService.importIssuesFromExcel(projectId, file, userId);
+        return ResponseEntity.ok(new ApiResponseDto<>("success", "Issues imported successfully", result));
     }
 
     @GetMapping("/import-template")
@@ -98,15 +89,10 @@ public class IssueController {
     public ResponseEntity<ApiResponseDto<IssueResponseDto>> updateIssue(
             @PathVariable UUID projectId,
             @PathVariable UUID issueId,
-            @Valid @RequestBody UpdateIssueDto dto) {
-        try {
-            UUID userId = projectService.getUserIdFromRequest();
-            IssueResponseDto issue = issueService.updateIssue(issueId, dto, userId);
-            return ResponseEntity.ok(new ApiResponseDto<>("success", "Issue updated successfully", issue));
-        } catch (Exception e) {
-            log.error("Error updating issue", e);
-            return ResponseEntity.badRequest().body(new ApiResponseDto<>("error", e.getMessage(), null));
-        }
+            @Valid @RequestBody UpdateIssueDto dto) throws AppException {
+        UUID userId = projectService.getUserIdFromRequest();
+        IssueResponseDto issue = issueService.updateIssue(issueId, dto, userId);
+        return ResponseEntity.ok(new ApiResponseDto<>("success", "Issue updated successfully", issue));
     }
 
     @DeleteMapping("/{issueId}")
@@ -114,14 +100,9 @@ public class IssueController {
     @RequireProjectPermission(ProjectPermission.ISSUE_DELETE)
     public ResponseEntity<ApiResponseDto<Void>> deleteIssue(
             @PathVariable UUID projectId,
-            @PathVariable UUID issueId) {
-        try {
-            issueService.deleteIssue(issueId);
-            return ResponseEntity.ok(new ApiResponseDto<>("success", "Issue deleted successfully", null));
-        } catch (Exception e) {
-            log.error("Error deleting issue", e);
-            return ResponseEntity.badRequest().body(new ApiResponseDto<>("error", e.getMessage(), null));
-        }
+            @PathVariable UUID issueId) throws AppException {
+        issueService.deleteIssue(issueId);
+        return ResponseEntity.ok(new ApiResponseDto<>("success", "Issue deleted successfully", null));
     }
 
     @GetMapping("/{issueId}")
@@ -129,25 +110,17 @@ public class IssueController {
     @RequireProjectPermission(ProjectPermission.ISSUE_READ)
     public ResponseEntity<ApiResponseDto<IssueResponseDto>> getIssue(
             @PathVariable UUID projectId,
-            @PathVariable UUID issueId) {
-        try {
-            IssueResponseDto issue = issueService.getIssueById(issueId);
-            return ResponseEntity.ok(new ApiResponseDto<>("success", "Issue retrieved successfully", issue));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(new ApiResponseDto<>("error", e.getMessage(), null));
-        }
+            @PathVariable UUID issueId) throws AppException {
+        IssueResponseDto issue = issueService.getIssueById(issueId);
+        return ResponseEntity.ok(new ApiResponseDto<>("success", "Issue retrieved successfully", issue));
     }
 
     @GetMapping
     @Operation(summary = "Get all issues in project")
     @RequireProjectPermission(ProjectPermission.ISSUE_READ)
-    public ResponseEntity<ApiResponseDto<List<IssueResponseDto>>> getIssues(@PathVariable UUID projectId) {
-        try {
-            List<IssueResponseDto> issues = issueService.getIssuesByProject(projectId);
-            return ResponseEntity.ok(new ApiResponseDto<>("success", "Issues retrieved successfully", issues));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(new ApiResponseDto<>("error", e.getMessage(), null));
-        }
+    public ResponseEntity<ApiResponseDto<List<IssueResponseDto>>> getIssues(@PathVariable UUID projectId) throws AppException {
+        List<IssueResponseDto> issues = issueService.getIssuesByProject(projectId);
+        return ResponseEntity.ok(new ApiResponseDto<>("success", "Issues retrieved successfully", issues));
     }
 
     @GetMapping("/paged")
@@ -156,25 +129,17 @@ public class IssueController {
     public ResponseEntity<ApiResponseDto<PagedResponseDto<IssueResponseDto>>> getIssuesPaged(
             @PathVariable UUID projectId,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "8") int size) {
-        try {
-            PagedResponseDto<IssueResponseDto> issues = issueService.getIssuesByProjectPaged(projectId, page, size);
-            return ResponseEntity.ok(new ApiResponseDto<>("success", "Issues retrieved successfully", issues));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(new ApiResponseDto<>("error", e.getMessage(), null));
-        }
+            @RequestParam(defaultValue = "8") int size) throws AppException {
+        PagedResponseDto<IssueResponseDto> issues = issueService.getIssuesByProjectPaged(projectId, page, size);
+        return ResponseEntity.ok(new ApiResponseDto<>("success", "Issues retrieved successfully", issues));
     }
 
     @GetMapping("/backlog")
     @Operation(summary = "Get product backlog (issues not in any sprint)")
     @RequireProjectPermission(ProjectPermission.ISSUE_READ)
-    public ResponseEntity<ApiResponseDto<List<IssueResponseDto>>> getBacklog(@PathVariable UUID projectId) {
-        try {
-            List<IssueResponseDto> issues = issueService.getBacklog(projectId);
-            return ResponseEntity.ok(new ApiResponseDto<>("success", "Backlog retrieved successfully", issues));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(new ApiResponseDto<>("error", e.getMessage(), null));
-        }
+    public ResponseEntity<ApiResponseDto<List<IssueResponseDto>>> getBacklog(@PathVariable UUID projectId) throws AppException {
+        List<IssueResponseDto> issues = issueService.getBacklog(projectId);
+        return ResponseEntity.ok(new ApiResponseDto<>("success", "Backlog retrieved successfully", issues));
     }
 
     @GetMapping("/{issueId}/children")
@@ -182,13 +147,9 @@ public class IssueController {
     @RequireProjectPermission(ProjectPermission.ISSUE_READ)
     public ResponseEntity<ApiResponseDto<List<IssueResponseDto>>> getChildIssues(
             @PathVariable UUID projectId,
-            @PathVariable UUID issueId) {
-        try {
-            List<IssueResponseDto> children = issueService.getChildIssues(issueId);
-            return ResponseEntity.ok(new ApiResponseDto<>("success", "Child issues retrieved successfully", children));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(new ApiResponseDto<>("error", e.getMessage(), null));
-        }
+            @PathVariable UUID issueId) throws AppException {
+        List<IssueResponseDto> children = issueService.getChildIssues(issueId);
+        return ResponseEntity.ok(new ApiResponseDto<>("success", "Child issues retrieved successfully", children));
     }
 
     @PatchMapping("/{issueId}/assign")
@@ -197,16 +158,12 @@ public class IssueController {
     public ResponseEntity<ApiResponseDto<IssueResponseDto>> assignIssue(
             @PathVariable UUID projectId,
             @PathVariable UUID issueId,
-            @RequestParam UUID assigneeId) {
-        try {
-            UUID userId = projectService.getUserIdFromRequest();
-            UpdateIssueDto dto = new UpdateIssueDto();
-            dto.setAssigneeId(assigneeId);
-            IssueResponseDto issue = issueService.updateIssue(issueId, dto, userId);
-            return ResponseEntity.ok(new ApiResponseDto<>("success", "Issue assigned successfully", issue));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(new ApiResponseDto<>("error", e.getMessage(), null));
-        }
+            @RequestParam UUID assigneeId) throws AppException {
+        UUID userId = projectService.getUserIdFromRequest();
+        UpdateIssueDto dto = new UpdateIssueDto();
+        dto.setAssigneeId(assigneeId);
+        IssueResponseDto issue = issueService.updateIssue(issueId, dto, userId);
+        return ResponseEntity.ok(new ApiResponseDto<>("success", "Issue assigned successfully", issue));
     }
 
     @PatchMapping("/{issueId}/status")
@@ -215,16 +172,12 @@ public class IssueController {
     public ResponseEntity<ApiResponseDto<IssueResponseDto>> changeStatus(
             @PathVariable UUID projectId,
             @PathVariable UUID issueId,
-            @RequestParam UUID statusId) {
-        try {
-            UUID userId = projectService.getUserIdFromRequest();
-            UpdateIssueDto dto = new UpdateIssueDto();
-            dto.setStatusId(statusId);
-            IssueResponseDto issue = issueService.updateIssue(issueId, dto, userId);
-            return ResponseEntity.ok(new ApiResponseDto<>("success", "Issue status updated successfully", issue));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(new ApiResponseDto<>("error", e.getMessage(), null));
-        }
+            @RequestParam UUID statusId) throws AppException {
+        UUID userId = projectService.getUserIdFromRequest();
+        UpdateIssueDto dto = new UpdateIssueDto();
+        dto.setStatusId(statusId);
+        IssueResponseDto issue = issueService.updateIssue(issueId, dto, userId);
+        return ResponseEntity.ok(new ApiResponseDto<>("success", "Issue status updated successfully", issue));
     }
 
     @PatchMapping("/{issueId}/sprint")
@@ -233,14 +186,10 @@ public class IssueController {
     public ResponseEntity<ApiResponseDto<IssueResponseDto>> moveToSprint(
             @PathVariable UUID projectId,
             @PathVariable UUID issueId,
-            @RequestParam UUID sprintId) {
-        try {
-            UUID userId = projectService.getUserIdFromRequest();
-            IssueResponseDto issue = issueService.addToSprint(issueId, sprintId, userId);
-            return ResponseEntity.ok(new ApiResponseDto<>("success", "Issue moved to sprint successfully", issue));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(new ApiResponseDto<>("error", e.getMessage(), null));
-        }
+            @RequestParam UUID sprintId) throws AppException {
+        UUID userId = projectService.getUserIdFromRequest();
+        IssueResponseDto issue = issueService.addToSprint(issueId, sprintId, userId);
+        return ResponseEntity.ok(new ApiResponseDto<>("success", "Issue moved to sprint successfully", issue));
     }
 
     @DeleteMapping("/{issueId}/sprint")
@@ -248,26 +197,18 @@ public class IssueController {
     @RequireProjectPermission(ProjectPermission.ISSUE_UPDATE)
     public ResponseEntity<ApiResponseDto<IssueResponseDto>> removeFromSprint(
             @PathVariable UUID projectId,
-            @PathVariable UUID issueId) {
-        try {
-            UUID userId = projectService.getUserIdFromRequest();
-            IssueResponseDto issue = issueService.removeFromSprint(issueId, userId);
-            return ResponseEntity.ok(new ApiResponseDto<>("success", "Issue removed from sprint successfully", issue));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(new ApiResponseDto<>("error", e.getMessage(), null));
-        }
+            @PathVariable UUID issueId) throws AppException {
+        UUID userId = projectService.getUserIdFromRequest();
+        IssueResponseDto issue = issueService.removeFromSprint(issueId, userId);
+        return ResponseEntity.ok(new ApiResponseDto<>("success", "Issue removed from sprint successfully", issue));
     }
 
     @GetMapping("/my-issues")
     @Operation(summary = "Get my assigned issues")
     @RequireProjectPermission(ProjectPermission.ISSUE_READ)
-    public ResponseEntity<ApiResponseDto<List<IssueResponseDto>>> getMyIssues(@PathVariable UUID projectId) {
-        try {
-            UUID userId = projectService.getUserIdFromRequest();
-            List<IssueResponseDto> issues = issueService.getMyIssues(userId);
-            return ResponseEntity.ok(new ApiResponseDto<>("success", "My issues retrieved successfully", issues));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(new ApiResponseDto<>("error", e.getMessage(), null));
-        }
+    public ResponseEntity<ApiResponseDto<List<IssueResponseDto>>> getMyIssues(@PathVariable UUID projectId) throws AppException {
+        UUID userId = projectService.getUserIdFromRequest();
+        List<IssueResponseDto> issues = issueService.getMyIssues(userId);
+        return ResponseEntity.ok(new ApiResponseDto<>("success", "My issues retrieved successfully", issues));
     }
 }

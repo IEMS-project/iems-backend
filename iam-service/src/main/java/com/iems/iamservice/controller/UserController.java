@@ -240,4 +240,63 @@ public class UserController {
                                 .data(users)
                                 .build());
         }
+
+        @Operation(summary = "Get my notification preferences")
+        @GetMapping("/me/notification-preferences")
+        public ResponseEntity<ApiResponseDto<java.util.Map<String, Object>>> getMyNotificationPreferences() {
+                UUID accountId = getCurrentAccountId();
+                String prefsJson = service.getNotificationPreferences(accountId);
+                java.util.Map<String, Object> result = new java.util.HashMap<>();
+                if (prefsJson != null && !prefsJson.isBlank()) {
+                        try {
+                                com.fasterxml.jackson.databind.ObjectMapper om = new com.fasterxml.jackson.databind.ObjectMapper();
+                                result = om.readValue(prefsJson, new com.fasterxml.jackson.core.type.TypeReference<java.util.Map<String, Object>>(){});
+                        } catch (Exception e) {
+                                log.warn("Failed to parse notification preferences: {}", e.getMessage());
+                        }
+                }
+                result.putIfAbsent("emailAssigned", true);
+                result.putIfAbsent("emailMemberAdded", true);
+                result.putIfAbsent("emailDueSoon", true);
+                result.putIfAbsent("inAppToast", true);
+                return ResponseEntity.ok(ApiResponseDto.<java.util.Map<String, Object>>builder()
+                                .status("success").message("Preferences retrieved").data(result).build());
+        }
+
+        @Operation(summary = "Get notification preferences by account ID")
+        @GetMapping("/by-account/{accountId}/notification-preferences")
+        public ResponseEntity<ApiResponseDto<java.util.Map<String, Object>>> getNotificationPreferencesByAccountId(@PathVariable UUID accountId) {
+                String prefsJson = service.getNotificationPreferences(accountId);
+                java.util.Map<String, Object> result = new java.util.HashMap<>();
+                if (prefsJson != null && !prefsJson.isBlank()) {
+                        try {
+                                com.fasterxml.jackson.databind.ObjectMapper om = new com.fasterxml.jackson.databind.ObjectMapper();
+                                result = om.readValue(prefsJson, new com.fasterxml.jackson.core.type.TypeReference<java.util.Map<String, Object>>(){});
+                        } catch (Exception e) {
+                                log.warn("Failed to parse notification preferences: {}", e.getMessage());
+                        }
+                }
+                result.putIfAbsent("emailAssigned", true);
+                result.putIfAbsent("emailMemberAdded", true);
+                result.putIfAbsent("emailDueSoon", true);
+                result.putIfAbsent("inAppToast", true);
+                return ResponseEntity.ok(ApiResponseDto.<java.util.Map<String, Object>>builder()
+                                .status("success").message("Preferences retrieved").data(result).build());
+        }
+
+        @Operation(summary = "Update my notification preferences")
+        @PatchMapping("/me/notification-preferences")
+        public ResponseEntity<ApiResponseDto<Void>> updateMyNotificationPreferences(
+                        @RequestBody java.util.Map<String, Object> preferences) {
+                UUID accountId = getCurrentAccountId();
+                try {
+                        com.fasterxml.jackson.databind.ObjectMapper om = new com.fasterxml.jackson.databind.ObjectMapper();
+                        service.updateNotificationPreferences(accountId, om.writeValueAsString(preferences));
+                        return ResponseEntity.ok(ApiResponseDto.<Void>builder()
+                                        .status("success").message("Preferences updated").build());
+                } catch (Exception e) {
+                        log.error("Failed to update notification preferences: {}", e.getMessage());
+                        return ResponseEntity.internalServerError().build();
+                }
+        }
 }

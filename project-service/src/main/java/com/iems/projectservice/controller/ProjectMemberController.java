@@ -8,6 +8,7 @@ import com.iems.projectservice.dto.response.BatchOperationResultDto;
 import com.iems.projectservice.dto.response.ProjectMemberResponseDto;
 import com.iems.projectservice.entity.ProjectMember;
 import com.iems.projectservice.entity.enums.ProjectPermission;
+import com.iems.projectservice.exception.AppException;
 import com.iems.projectservice.service.ProjectMemberService;
 import com.iems.projectservice.service.ProjectPermissionChecker;
 import com.iems.projectservice.service.ProjectService;
@@ -33,24 +34,17 @@ public class ProjectMemberController {
     private final ProjectService projectService;
     private final ProjectPermissionChecker projectPermissionChecker;
 
-
     @PostMapping
     @Operation(summary = "Add member to project")
     @RequireProjectPermission(ProjectPermission.MEMBER_INVITE)
     public ResponseEntity<ApiResponseDto<ProjectMember>> addMember(
             @PathVariable UUID projectId,
-            @RequestBody ProjectMemberDto dto) {
-        try {
-            UUID currentUserId = projectService.getUserIdFromRequest();
-            ProjectMember member = projectMemberService.addMemberToProject(
-                    projectId, dto.getAccountId(), dto.getRoleId(), currentUserId);
-            return ResponseEntity.status(HttpStatus.CREATED)
-                    .body(new ApiResponseDto<>("success", "Member added successfully", member));
-        } catch (Exception e) {
-            log.error("Error adding member", e);
-            return ResponseEntity.badRequest()
-                    .body(new ApiResponseDto<>("error", e.getMessage(), null));
-        }
+            @RequestBody ProjectMemberDto dto) throws AppException {
+        UUID currentUserId = projectService.getUserIdFromRequest();
+        ProjectMember member = projectMemberService.addMemberToProject(
+                projectId, dto.getAccountId(), dto.getRoleId(), currentUserId);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(new ApiResponseDto<>("success", "Member added successfully", member));
     }
 
     @PostMapping("/batch")
@@ -58,24 +52,18 @@ public class ProjectMemberController {
     @RequireProjectPermission(ProjectPermission.MEMBER_INVITE)
     public ResponseEntity<ApiResponseDto<BatchOperationResultDto<ProjectMember>>> addMembersBatch(
             @PathVariable UUID projectId,
-            @RequestBody BatchProjectMemberRequest request) {
-        try {
-            UUID currentUserId = projectService.getUserIdFromRequest();
-            List<ProjectMember> added = projectMemberService.addMembersToProject(projectId, request.getMembers(),
-                    currentUserId);
-            int requestedCount = request.getMembers() == null ? 0 : request.getMembers().size();
-            BatchOperationResultDto<ProjectMember> result = new BatchOperationResultDto<>(
-                    requestedCount,
-                    added.size(),
-                    Math.max(0, requestedCount - added.size()),
-                    added);
-            return ResponseEntity.status(HttpStatus.CREATED)
-                    .body(new ApiResponseDto<>("success", "Members batch processed successfully", result));
-        } catch (Exception e) {
-            log.error("Error adding members in batch", e);
-            return ResponseEntity.badRequest()
-                    .body(new ApiResponseDto<>("error", e.getMessage(), null));
-        }
+            @RequestBody BatchProjectMemberRequest request) throws AppException {
+        UUID currentUserId = projectService.getUserIdFromRequest();
+        List<ProjectMember> added = projectMemberService.addMembersToProject(projectId, request.getMembers(),
+                currentUserId);
+        int requestedCount = request.getMembers() == null ? 0 : request.getMembers().size();
+        BatchOperationResultDto<ProjectMember> result = new BatchOperationResultDto<>(
+                requestedCount,
+                added.size(),
+                Math.max(0, requestedCount - added.size()),
+                added);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(new ApiResponseDto<>("success", "Members batch processed successfully", result));
     }
 
     @DeleteMapping("/{accountId}")
@@ -83,15 +71,9 @@ public class ProjectMemberController {
     @RequireProjectPermission(ProjectPermission.MEMBER_REMOVE)
     public ResponseEntity<ApiResponseDto<Void>> removeMember(
             @PathVariable UUID projectId,
-            @PathVariable UUID accountId) {
-        try {
-            projectMemberService.removeMember(projectId, accountId);
-            return ResponseEntity.ok(new ApiResponseDto<>("success", "Member removed successfully", null));
-        } catch (Exception e) {
-            log.error("Error removing member", e);
-            return ResponseEntity.badRequest()
-                    .body(new ApiResponseDto<>("error", e.getMessage(), null));
-        }
+            @PathVariable UUID accountId) throws AppException {
+        projectMemberService.removeMember(projectId, accountId);
+        return ResponseEntity.ok(new ApiResponseDto<>("success", "Member removed successfully", null));
     }
 
     @PatchMapping("/{accountId}/role")
@@ -100,29 +82,17 @@ public class ProjectMemberController {
     public ResponseEntity<ApiResponseDto<ProjectMember>> updateMemberRole(
             @PathVariable UUID projectId,
             @PathVariable UUID accountId,
-            @RequestParam UUID roleId) {
-        try {
-            ProjectMember member = projectMemberService.updateMemberRole(projectId, accountId, roleId);
-            return ResponseEntity.ok(new ApiResponseDto<>("success", "Member role updated successfully", member));
-        } catch (Exception e) {
-            log.error("Error updating member role", e);
-            return ResponseEntity.badRequest()
-                    .body(new ApiResponseDto<>("error", e.getMessage(), null));
-        }
+            @RequestParam UUID roleId) throws AppException {
+        ProjectMember member = projectMemberService.updateMemberRole(projectId, accountId, roleId);
+        return ResponseEntity.ok(new ApiResponseDto<>("success", "Member role updated successfully", member));
     }
 
     @GetMapping
     @Operation(summary = "Get project members")
     @RequireProjectPermission(ProjectPermission.PROJECT_READ)
-    public ResponseEntity<ApiResponseDto<List<ProjectMemberResponseDto>>> getMembers(@PathVariable UUID projectId) {
-        try {
-            List<ProjectMemberResponseDto> members = projectMemberService.getProjectMembersEnriched(projectId);
-            return ResponseEntity.ok(new ApiResponseDto<>("success", "Members retrieved successfully", members));
-        } catch (Exception e) {
-            log.error("Error getting members", e);
-            return ResponseEntity.badRequest()
-                    .body(new ApiResponseDto<>("error", e.getMessage(), null));
-        }
+    public ResponseEntity<ApiResponseDto<List<ProjectMemberResponseDto>>> getMembers(@PathVariable UUID projectId) throws AppException {
+        List<ProjectMemberResponseDto> members = projectMemberService.getProjectMembersEnriched(projectId);
+        return ResponseEntity.ok(new ApiResponseDto<>("success", "Members retrieved successfully", members));
     }
 
     @GetMapping("/check")
@@ -159,5 +129,4 @@ public class ProjectMemberController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
-
 }

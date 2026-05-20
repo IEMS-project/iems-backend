@@ -18,7 +18,8 @@ public class GlobalExceptionHandler {
         ProjectErrorCode errorCode = ex.getErrorCode();
         ApiResponseDto<String> response = new ApiResponseDto<>(
                 errorCode.getHttpStatus().name(),
-                errorCode.getMessage(),
+                // Use the custom message if provided, else fall back to the error code default
+                ex.getMessage() != null ? ex.getMessage() : errorCode.getMessage(),
                 null
         );
         return new ResponseEntity<>(response, errorCode.getHttpStatus());
@@ -49,8 +50,20 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
     }
 
+    /**
+     * Catch-all handler.
+     * IMPORTANT: if the exception is actually an AppException that was caught and
+     * re-thrown by a controller's generic "catch (Exception e)" block, we re-throw it
+     * here so the handleAppException method above processes it with the correct HTTP status
+     * (e.g. 402 for PREMIUM_REQUIRED) instead of collapsing everything to 500/400.
+     */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponseDto<String>> handleGlobalException(Exception ex, WebRequest request) throws Exception {
+        // Let AppException reach its dedicated handler
+        if (ex instanceof AppException) {
+            throw ex;
+        }
+
         String path = request.getDescription(false);
         if (path.contains("/api-docs") || path.contains("/swagger-ui")) {
             throw ex;

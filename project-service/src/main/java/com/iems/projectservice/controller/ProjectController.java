@@ -5,10 +5,12 @@ import com.iems.projectservice.dto.request.CreateProjectDto;
 import com.iems.projectservice.dto.request.ProjectIdsDto;
 import com.iems.projectservice.dto.request.UpdateProjectDto;
 import com.iems.projectservice.dto.response.ApiResponseDto;
+import com.iems.projectservice.dto.response.PagedResponseDto;
 import com.iems.projectservice.dto.response.ProjectInfoResponse;
 import com.iems.projectservice.dto.response.ProjectTableDto;
 import com.iems.projectservice.entity.Project;
 import com.iems.projectservice.entity.enums.ProjectPermission;
+import com.iems.projectservice.exception.AppException;
 import com.iems.projectservice.service.ProjectService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -33,16 +35,10 @@ public class ProjectController {
 
     @PostMapping
     @Operation(summary = "Create a new project")
-    public ResponseEntity<ApiResponseDto<Project>> createProject(@Valid @RequestBody CreateProjectDto dto) {
-        try {
-            Project project = projectService.createProject(dto);
-            return ResponseEntity.status(HttpStatus.CREATED)
-                    .body(new ApiResponseDto<>("success", "Project created successfully", project));
-        } catch (Exception e) {
-            log.error("Error creating project", e);
-            return ResponseEntity.badRequest()
-                    .body(new ApiResponseDto<>("error", e.getMessage(), null));
-        }
+    public ResponseEntity<ApiResponseDto<Project>> createProject(@Valid @RequestBody CreateProjectDto dto) throws AppException {
+        Project project = projectService.createProject(dto);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(new ApiResponseDto<>("success", "Project created successfully", project));
     }
 
     @PatchMapping("/{projectId}")
@@ -50,95 +46,55 @@ public class ProjectController {
     @RequireProjectPermission(ProjectPermission.PROJECT_UPDATE)
     public ResponseEntity<ApiResponseDto<Project>> updateProject(
             @PathVariable UUID projectId,
-            @Valid @RequestBody UpdateProjectDto dto) {
-        try {
-            Project project = projectService.updateProject(projectId, dto);
-            return ResponseEntity.ok(new ApiResponseDto<>("success", "Project updated successfully", project));
-        } catch (Exception e) {
-            log.error("Error updating project", e);
-            return ResponseEntity.badRequest()
-                    .body(new ApiResponseDto<>("error", e.getMessage(), null));
-        }
+            @Valid @RequestBody UpdateProjectDto dto) throws AppException {
+        Project project = projectService.updateProject(projectId, dto);
+        return ResponseEntity.ok(new ApiResponseDto<>("success", "Project updated successfully", project));
     }
 
     @DeleteMapping("/{projectId}")
     @Operation(summary = "Delete project")
     @RequireProjectPermission(ProjectPermission.PROJECT_DELETE)
-    public ResponseEntity<ApiResponseDto<Void>> deleteProject(@PathVariable UUID projectId) {
-        try {
-            projectService.deleteProject(projectId);
-            return ResponseEntity.ok(new ApiResponseDto<>("success", "Project deleted successfully", null));
-        } catch (Exception e) {
-            log.error("Error deleting project", e);
-            return ResponseEntity.badRequest()
-                    .body(new ApiResponseDto<>("error", e.getMessage(), null));
-        }
+    public ResponseEntity<ApiResponseDto<Void>> deleteProject(@PathVariable UUID projectId) throws AppException {
+        projectService.deleteProject(projectId);
+        return ResponseEntity.ok(new ApiResponseDto<>("success", "Project deleted successfully", null));
     }
 
     @GetMapping("/{projectId}")
     @Operation(summary = "Get project by ID")
     @RequireProjectPermission(ProjectPermission.PROJECT_READ)
-    public ResponseEntity<ApiResponseDto<Project>> getProject(@PathVariable UUID projectId) {
-        try {
-            Project project = projectService.getProjectById(projectId);
-            return ResponseEntity.ok(new ApiResponseDto<>("success", "Project retrieved successfully", project));
-        } catch (Exception e) {
-            log.error("Error getting project", e);
-            return ResponseEntity.badRequest()
-                    .body(new ApiResponseDto<>("error", e.getMessage(), null));
-        }
+    public ResponseEntity<ApiResponseDto<Project>> getProject(@PathVariable UUID projectId) throws AppException {
+        Project project = projectService.getProjectById(projectId);
+        return ResponseEntity.ok(new ApiResponseDto<>("success", "Project retrieved successfully", project));
     }
 
     @GetMapping("/all")
     @Operation(summary = "Get all projects")
-    public ResponseEntity<ApiResponseDto<List<Project>>> getAllProjects() {
-        try {
-            List<Project> projects = projectService.getAllProjects();
-            return ResponseEntity.ok(new ApiResponseDto<>("success", "All projects retrieved successfully", projects));
-        } catch (Exception e) {
-            log.error("Error getting all projects", e);
-            return ResponseEntity.badRequest()
-                    .body(new ApiResponseDto<>("error", e.getMessage(), null));
-        }
+    public ResponseEntity<ApiResponseDto<List<Project>>> getAllProjects() throws AppException {
+        List<Project> projects = projectService.getAllProjects();
+        return ResponseEntity.ok(new ApiResponseDto<>("success", "All projects retrieved successfully", projects));
     }
 
     @GetMapping("/table")
     @Operation(summary = "Get projects table with manager info")
-    public ResponseEntity<ApiResponseDto<List<ProjectTableDto>>> getProjectsTable() {
-        try {
-            List<ProjectTableDto> projects = projectService.getProjectsTable();
-            return ResponseEntity.ok(new ApiResponseDto<>("success", "Projects retrieved successfully", projects));
-        } catch (Exception e) {
-            log.error("Error getting projects table", e);
-            return ResponseEntity.badRequest()
-                    .body(new ApiResponseDto<>("error", e.getMessage(), null));
-        }
+    public ResponseEntity<ApiResponseDto<List<ProjectTableDto>>> getProjectsTable() throws AppException {
+        List<ProjectTableDto> projects = projectService.getProjectsTable();
+        return ResponseEntity.ok(new ApiResponseDto<>("success", "Projects retrieved successfully", projects));
     }
 
     @GetMapping("/my-projects")
     @Operation(summary = "Get my projects")
-    public ResponseEntity<ApiResponseDto<List<Project>>> getMyProjects() {
-        try {
-            List<Project> projects = projectService.getMyProjects();
-            return ResponseEntity.ok(new ApiResponseDto<>("success", "User projects retrieved successfully", projects));
-        } catch (Exception e) {
-            log.error("Error getting user projects", e);
-            return ResponseEntity.badRequest()
-                    .body(new ApiResponseDto<>("error", e.getMessage(), null));
-        }
+    public ResponseEntity<ApiResponseDto<PagedResponseDto<Project>>> getMyProjects(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) throws AppException {
+        PagedResponseDto<Project> projects = projectService.getMyProjects(page, size);
+        return ResponseEntity.ok(new ApiResponseDto<>("success", "User projects retrieved successfully", projects));
     }
 
     @PostMapping("/by-ids")
     @Operation(summary = "Get projects by IDs")
     public ResponseEntity<ApiResponseDto<List<ProjectInfoResponse>>> getProjectsByID(
-            @RequestBody ProjectIdsDto request) {
-        try {
-            List<ProjectInfoResponse> data = projectService.getProjectsByID(request);
-            return ResponseEntity.ok(new ApiResponseDto<>("success", "Projects retrieved successfully", data));
-        } catch (Exception e) {
-            log.error("Error getting projects", e);
-            return ResponseEntity.badRequest()
-                    .body(new ApiResponseDto<>("error", e.getMessage(), null));
-        }
+            @RequestBody ProjectIdsDto request) throws AppException {
+        List<ProjectInfoResponse> data = projectService.getProjectsByID(request);
+        return ResponseEntity.ok(new ApiResponseDto<>("success", "Projects retrieved successfully", data));
     }
 }

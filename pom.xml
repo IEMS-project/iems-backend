@@ -42,6 +42,7 @@
 		<module>project-service</module>
 		<module>chat-service</module>
 		<module>ai-service</module>
+		<module>notification-service</module>
 	</modules>
 
 	<build>

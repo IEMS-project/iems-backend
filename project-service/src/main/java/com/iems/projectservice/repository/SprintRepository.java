@@ -14,4 +14,9 @@ public interface SprintRepository extends JpaRepository<Sprint, UUID> {
     List<Sprint> findByProjectIdOrderBySortOrderAsc(UUID projectId);
     Optional<Sprint> findByProjectIdAndStatus(UUID projectId, SprintStatus status);
     boolean existsByProjectIdAndStatus(UUID projectId, SprintStatus status);
+
+    /** Count total sprints in a project (for subscription limit check). */
+    long countByProjectId(UUID projectId);
+
+    void deleteByProjectId(UUID projectId);
 }

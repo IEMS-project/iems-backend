@@ -22,4 +22,9 @@ public interface ProjectMemberRepository extends JpaRepository<ProjectMember, UU
     boolean existsByProjectIdAndAccountId(UUID projectId, UUID accountId);
     
     void deleteByProjectIdAndAccountId(UUID projectId, UUID accountId);
+
+    void deleteByProjectId(UUID projectId);
+
+    /** Count how many members a project currently has. */
+    long countByProjectId(UUID projectId);
 }

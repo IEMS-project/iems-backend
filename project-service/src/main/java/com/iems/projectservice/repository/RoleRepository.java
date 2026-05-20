@@ -14,4 +14,7 @@ public interface RoleRepository extends JpaRepository<Role, UUID> {
     Optional<Role> findByProjectIdAndName(UUID projectId, String name);
     Optional<Role> findByProjectIdAndIsDefaultTrue(UUID projectId);
     boolean existsByProjectIdAndName(UUID projectId, String name);
+    long countByProjectId(UUID projectId);
+
+    void deleteByProjectId(UUID projectId);
 }

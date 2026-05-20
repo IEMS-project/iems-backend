@@ -19,4 +19,6 @@ public interface IssueStatusHistoryRepository extends JpaRepository<IssueStatusH
     List<IssueStatusHistory> findBySprintIdOrderByChangedAtAsc(UUID sprintId);
 
     List<IssueStatusHistory> findByIssueIdInOrderByChangedAtAsc(Set<UUID> issueIds);
+
+    void deleteByProjectId(UUID projectId);
 }

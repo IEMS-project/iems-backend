@@ -48,7 +48,15 @@ public enum ProjectErrorCode {
     COMMENT_NOT_FOUND("Comment not found", HttpStatus.NOT_FOUND),
     ATTACHMENT_NOT_FOUND("Attachment not found", HttpStatus.NOT_FOUND),
 
-    USER_NOT_FOUND("User not found", HttpStatus.NOT_FOUND);
+    USER_NOT_FOUND("User not found", HttpStatus.NOT_FOUND),
+
+    // Subscription & Limit Errors
+    PROJECT_LIMIT_EXCEEDED("You have reached the maximum number of projects for your plan", HttpStatus.PAYMENT_REQUIRED),
+    MEMBER_LIMIT_EXCEEDED("This project has reached the maximum number of members for its plan", HttpStatus.PAYMENT_REQUIRED),
+    ISSUE_LIMIT_EXCEEDED("This project has reached the maximum number of issues for its plan", HttpStatus.PAYMENT_REQUIRED),
+    SPRINT_LIMIT_EXCEEDED("This project has reached the maximum number of sprints for its plan", HttpStatus.PAYMENT_REQUIRED),
+    PREMIUM_REQUIRED("This feature requires a Premium subscription", HttpStatus.PAYMENT_REQUIRED),
+    PROJECT_LOCKED("This project is locked due to an expired premium subscription", HttpStatus.FORBIDDEN);
 
     private final String message;
     private final HttpStatus httpStatus;

@@ -12,4 +12,6 @@ public interface IssuePriorityRepository extends JpaRepository<IssuePriority, UU
     List<IssuePriority> findByProjectIdOrderBySortOrderAsc(UUID projectId);
 
     long countByProjectId(UUID projectId);
+
+    void deleteByProjectId(UUID projectId);
 }
