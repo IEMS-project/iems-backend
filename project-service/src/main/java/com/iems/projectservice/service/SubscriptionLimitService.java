@@ -2,6 +2,8 @@ package com.iems.projectservice.service;
 
 import com.iems.projectservice.exception.AppException;
 import com.iems.projectservice.exception.ProjectErrorCode;
+import com.iems.projectservice.entity.SubscriptionLimitSettings;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -18,7 +20,10 @@ import org.springframework.stereotype.Service;
  */
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class SubscriptionLimitService {
+
+    private final SubscriptionLimitSettingsService settingsService;
 
     // ── Limits ────────────────────────────────────────────────────────────────
 
@@ -98,7 +103,7 @@ public class SubscriptionLimitService {
      */
     public void checkCanCreateProject(long currentOwnedCount) {
         boolean premium = isCurrentUserPremium();
-        int limit = premium ? PREMIUM_MAX_OWNED_PROJECTS : FREE_MAX_OWNED_PROJECTS;
+        int limit = settingsFor(premium).getMaxOwnedProjects();
         if (currentOwnedCount >= limit) {
             log.warn("Project creation blocked: owned={}, limit={}, premium={}", currentOwnedCount, limit, premium);
             throw new AppException(ProjectErrorCode.PROJECT_LIMIT_EXCEEDED,
@@ -114,7 +119,7 @@ public class SubscriptionLimitService {
      */
     public void checkCanAddMember(long currentMemberCount, String ownerSubscription) {
         boolean premium = isProjectPremium(ownerSubscription);
-        int limit = premium ? PREMIUM_MAX_MEMBERS_PER_PROJECT : FREE_MAX_MEMBERS_PER_PROJECT;
+        int limit = settingsFor(premium).getMaxMembersPerProject();
         if (currentMemberCount >= limit) {
             log.warn("Member add blocked: count={}, limit={}, ownerSub={}", currentMemberCount, limit, ownerSubscription);
             throw new AppException(ProjectErrorCode.MEMBER_LIMIT_EXCEEDED,
@@ -130,7 +135,7 @@ public class SubscriptionLimitService {
      */
     public void checkCanCreateIssue(long currentIssueCount, String ownerSubscription) {
         boolean premium = isProjectPremium(ownerSubscription);
-        int limit = premium ? PREMIUM_MAX_ISSUES_PER_PROJECT : FREE_MAX_ISSUES_PER_PROJECT;
+        int limit = settingsFor(premium).getMaxIssuesPerProject();
         if (currentIssueCount >= limit) {
             log.warn("Issue creation blocked: count={}, limit={}, ownerSub={}", currentIssueCount, limit, ownerSubscription);
             throw new AppException(ProjectErrorCode.ISSUE_LIMIT_EXCEEDED,
@@ -146,7 +151,7 @@ public class SubscriptionLimitService {
      */
     public void checkCanCreateSprint(long currentSprintCount, String ownerSubscription) {
         boolean premium = isProjectPremium(ownerSubscription);
-        int limit = premium ? PREMIUM_MAX_SPRINTS_PER_PROJECT : FREE_MAX_SPRINTS_PER_PROJECT;
+        int limit = settingsFor(premium).getMaxSprintsPerProject();
         if (currentSprintCount >= limit) {
             log.warn("Sprint creation blocked: count={}, limit={}, ownerSub={}", currentSprintCount, limit, ownerSubscription);
             throw new AppException(ProjectErrorCode.SPRINT_LIMIT_EXCEEDED,
@@ -161,7 +166,8 @@ public class SubscriptionLimitService {
      * @param ownerSubscription subscription of the project owner
      */
     public void checkCanCreateCustomWorkflow(String ownerSubscription) {
-        if (!isProjectPremium(ownerSubscription)) {
+        SubscriptionLimitSettings settings = settingsFor(isProjectPremium(ownerSubscription));
+        if (!Boolean.TRUE.equals(settings.getCustomWorkflowEnabled())) {
             throw new AppException(ProjectErrorCode.PREMIUM_REQUIRED,
                     "Custom workflows are available for Premium projects only. The project owner needs to upgrade to Premium.");
         }
@@ -176,10 +182,11 @@ public class SubscriptionLimitService {
     public static final int FREE_MAX_CUSTOM_ROLES = 2;
 
     public void checkCanCreateCustomRole(long currentCustomRoleCount, String ownerSubscription) {
-        if (isProjectPremium(ownerSubscription)) return;
-        if (currentCustomRoleCount >= FREE_MAX_CUSTOM_ROLES) {
+        SubscriptionLimitSettings settings = settingsFor(isProjectPremium(ownerSubscription));
+        int limit = settings.getMaxCustomRolesPerProject();
+        if (currentCustomRoleCount >= limit) {
             throw new AppException(ProjectErrorCode.PREMIUM_REQUIRED,
-                    "Free projects may only have " + FREE_MAX_CUSTOM_ROLES + " custom roles. "
+                    "This project may only have " + limit + " custom roles. "
                     + "Upgrade to Premium to create more.");
         }
     }
@@ -190,7 +197,8 @@ public class SubscriptionLimitService {
      * @param ownerSubscription subscription of the project owner
      */
     public void checkBurndownAccess(String ownerSubscription) {
-        if (!isProjectPremium(ownerSubscription)) {
+        SubscriptionLimitSettings settings = settingsFor(isProjectPremium(ownerSubscription));
+        if (!Boolean.TRUE.equals(settings.getBurndownEnabled())) {
             throw new AppException(ProjectErrorCode.PREMIUM_REQUIRED,
                     "Burndown chart is available for Premium projects only. The project owner needs to upgrade to Premium.");
         }
@@ -201,7 +209,8 @@ public class SubscriptionLimitService {
      * Free projects can only READ the default workflow.
      */
     public void checkCanModifyWorkflow(String ownerSubscription) {
-        if (!isProjectPremium(ownerSubscription)) {
+        SubscriptionLimitSettings settings = settingsFor(isProjectPremium(ownerSubscription));
+        if (!Boolean.TRUE.equals(settings.getCustomWorkflowEnabled())) {
             throw new AppException(ProjectErrorCode.PREMIUM_REQUIRED,
                     "Modifying workflows (statuses, transitions) is available for Premium projects only. "
                     + "The project owner needs to upgrade to Premium.");
@@ -212,7 +221,8 @@ public class SubscriptionLimitService {
      * Project-level: block any write operation on issue priorities for free projects.
      */
     public void checkCanModifyIssuePriority(String ownerSubscription) {
-        if (!isProjectPremium(ownerSubscription)) {
+        SubscriptionLimitSettings settings = settingsFor(isProjectPremium(ownerSubscription));
+        if (!Boolean.TRUE.equals(settings.getIssueTypePriorityCustomizationEnabled())) {
             throw new AppException(ProjectErrorCode.PREMIUM_REQUIRED,
                     "Modifying issue priorities is available for Premium projects only. "
                     + "The project owner needs to upgrade to Premium.");
@@ -223,7 +233,8 @@ public class SubscriptionLimitService {
      * Project-level: block any write operation on issue types for free projects.
      */
     public void checkCanModifyIssueType(String ownerSubscription) {
-        if (!isProjectPremium(ownerSubscription)) {
+        SubscriptionLimitSettings settings = settingsFor(isProjectPremium(ownerSubscription));
+        if (!Boolean.TRUE.equals(settings.getIssueTypePriorityCustomizationEnabled())) {
             throw new AppException(ProjectErrorCode.PREMIUM_REQUIRED,
                     "Modifying issue types is available for Premium projects only. "
                     + "The project owner needs to upgrade to Premium.");
@@ -234,6 +245,10 @@ public class SubscriptionLimitService {
      * Returns the number of days of activity log history allowed for the project.
      */
     public int getActivityLogDaysLimit(String ownerSubscription) {
-        return isProjectPremium(ownerSubscription) ? 60 : 7;
+        return settingsFor(isProjectPremium(ownerSubscription)).getActivityLogDays();
+    }
+
+    public SubscriptionLimitSettings settingsFor(boolean premium) {
+        return settingsService.getSettings(premium ? "PREMIUM" : "FREE");
     }
 }

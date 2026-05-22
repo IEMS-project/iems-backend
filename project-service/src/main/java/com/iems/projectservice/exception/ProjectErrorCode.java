@@ -51,6 +51,7 @@ public enum ProjectErrorCode {
     USER_NOT_FOUND("User not found", HttpStatus.NOT_FOUND),
 
     // Subscription & Limit Errors
+    SUBSCRIPTION_LIMIT_SETTINGS_NOT_FOUND("Subscription limit settings not found", HttpStatus.NOT_FOUND),
     PROJECT_LIMIT_EXCEEDED("You have reached the maximum number of projects for your plan", HttpStatus.PAYMENT_REQUIRED),
     MEMBER_LIMIT_EXCEEDED("This project has reached the maximum number of members for its plan", HttpStatus.PAYMENT_REQUIRED),
     ISSUE_LIMIT_EXCEEDED("This project has reached the maximum number of issues for its plan", HttpStatus.PAYMENT_REQUIRED),

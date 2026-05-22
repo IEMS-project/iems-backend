@@ -73,8 +73,19 @@ public enum ErrorCode {
 
     // Subscription Errors
     SUBSCRIPTION_NOT_FOUND("Subscription not found", HttpStatus.NOT_FOUND),
+    SUBSCRIPTION_PLAN_CODE_EXISTS("Subscription plan code already exists", HttpStatus.CONFLICT),
+    SUBSCRIPTION_PLAN_IN_USE("Subscription plan already has payments", HttpStatus.CONFLICT),
     ALREADY_PREMIUM("Account is already premium", HttpStatus.CONFLICT),
     NOT_PREMIUM("Account is not premium", HttpStatus.BAD_REQUEST),
+
+    // Payment Errors
+    PAYMENT_INVALID_PLAN("Invalid premium plan", HttpStatus.BAD_REQUEST),
+    PAYMENT_INVALID_REQUEST("Invalid payment request", HttpStatus.BAD_REQUEST),
+    PAYMENT_TRANSACTION_NOT_FOUND("Payment transaction not found", HttpStatus.NOT_FOUND),
+    PAYMENT_CREATE_FAILED("Failed to create payment link", HttpStatus.SERVICE_UNAVAILABLE),
+
+    // Promotion Errors
+    PROMOTION_NOT_FOUND("Promotion not found", HttpStatus.NOT_FOUND),
 
     // System Errors
     INTERNAL_SERVER_ERROR("Internal server error", HttpStatus.INTERNAL_SERVER_ERROR),

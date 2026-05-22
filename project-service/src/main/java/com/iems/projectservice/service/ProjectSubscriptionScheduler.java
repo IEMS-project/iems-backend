@@ -30,6 +30,7 @@ public class ProjectSubscriptionScheduler {
     private final ProjectMemberRepository projectMemberRepository;
     private final IssueRepository issueRepository;
     private final SprintRepository sprintRepository;
+    private final SubscriptionLimitService subscriptionLimitService;
 
     /**
      * Run once every day at 02:00 to scan all previously-PREMIUM projects that have been
@@ -92,13 +93,14 @@ public class ProjectSubscriptionScheduler {
      */
     private boolean isViolatingFreeLimits(Project project) {
         long memberCount = projectMemberRepository.countByProjectId(project.getId());
-        if (memberCount > SubscriptionLimitService.FREE_MAX_MEMBERS_PER_PROJECT) return true;
+        var freeSettings = subscriptionLimitService.settingsFor(false);
+        if (memberCount > freeSettings.getMaxMembersPerProject()) return true;
 
         long issueCount = issueRepository.countByProjectId(project.getId());
-        if (issueCount > SubscriptionLimitService.FREE_MAX_ISSUES_PER_PROJECT) return true;
+        if (issueCount > freeSettings.getMaxIssuesPerProject()) return true;
 
         long sprintCount = sprintRepository.countByProjectId(project.getId());
-        if (sprintCount > SubscriptionLimitService.FREE_MAX_SPRINTS_PER_PROJECT) return true;
+        if (sprintCount > freeSettings.getMaxSprintsPerProject()) return true;
 
         return false;
     }

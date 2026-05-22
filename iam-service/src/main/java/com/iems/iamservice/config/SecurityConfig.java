@@ -45,9 +45,15 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/**").permitAll()
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
                         .requestMatchers("/swagger-ui.html", "/webjars/**").permitAll()
-                    .requestMatchers("/users/me", "/users/me/**").authenticated()
+                        .requestMatchers("/api/payments/payos/webhook").permitAll()
+                        .requestMatchers("/api/subscription-plans/active").permitAll()
+                        .requestMatchers("/api/promotions/active").permitAll()
                         // Admin endpoints
-                        .anyRequest().permitAll()
+                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                        .requestMatchers("/api/accounts/me/**").authenticated()
+                        .requestMatchers("/api/accounts/**").hasRole("ADMIN")
+                        .requestMatchers("/users/me", "/users/me/**").authenticated()
+                        .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
