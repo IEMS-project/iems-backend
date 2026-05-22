@@ -21,11 +21,13 @@ public class PromotionBannerService {
     private final PromotionBannerRepository promotionBannerRepository;
 
     public List<PromotionBannerResponse> listAll() {
-        return promotionBannerRepository.findAllByOrderByPriorityDescCreatedAtDesc().stream().map(this::toResponse).toList();
+        return promotionBannerRepository.findAllByOrderByPriorityDescCreatedAtDesc().stream().map(this::toResponse)
+                .toList();
     }
 
     public List<PromotionBannerResponse> listActive(String placement) {
-        return promotionBannerRepository.findActiveByPlacement(placement, Instant.now()).stream().map(this::toResponse).toList();
+        return promotionBannerRepository.findActiveByPlacement(placement, Instant.now()).stream().map(this::toResponse)
+                .toList();
     }
 
     @Transactional
@@ -75,7 +77,8 @@ public class PromotionBannerService {
     private PromotionBannerResponse toResponse(PromotionBanner banner) {
         return PromotionBannerResponse.builder()
                 .id(banner.getId()).title(banner.getTitle()).description(banner.getDescription())
-            .imageUrl(banner.getImageUrl()).ctaLabel(banner.getCtaLabel()).ctaUrl(banner.getCtaUrl()).placement(banner.getPlacement())
+                .imageUrl(banner.getImageUrl()).ctaLabel(banner.getCtaLabel()).ctaUrl(banner.getCtaUrl())
+                .placement(banner.getPlacement())
                 .priority(banner.getPriority()).active(banner.getActive()).startsAt(banner.getStartsAt())
                 .endsAt(banner.getEndsAt()).createdAt(banner.getCreatedAt()).updatedAt(banner.getUpdatedAt())
                 .build();
