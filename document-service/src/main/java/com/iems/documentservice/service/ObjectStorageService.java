@@ -21,6 +21,29 @@ public class ObjectStorageService {
     }
 
     /**
+     * Tạo chữ ký số (presigned upload signature) cho phép client upload trực tiếp lên Cloudinary.
+     */
+    public Map<String, Object> generateUploadSignature(String objectKey, long timestamp) {
+        Map<String, Object> params = new java.util.HashMap<>();
+        params.put("public_id", objectKey);
+        params.put("timestamp", timestamp);
+        
+        try {
+            String signature = cloudinary.apiSignRequest(params, cloudinary.config.apiSecret);
+            Map<String, Object> response = new java.util.HashMap<>();
+            response.put("signature", signature);
+            response.put("apiKey", cloudinary.config.apiKey);
+            response.put("cloudName", cloudinary.config.cloudName);
+            response.put("timestamp", timestamp);
+            response.put("publicId", objectKey);
+            response.put("uploadUrl", "https://api.cloudinary.com/v1_1/" + cloudinary.config.cloudName + "/raw/upload");
+            return response;
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to generate Cloudinary upload signature", e);
+        }
+    }
+
+    /**
      * Upload một file lên Cloudinary.
      * Tất cả file đều dùng resource_type = "raw" để hỗ trợ mọi loại file.
      * public_id = objectKey (giữ nguyên cấu trúc thư mục và tên file).
@@ -58,10 +81,13 @@ public class ObjectStorageService {
      * invalidate = true để xóa cache CDN.
      */
     public void delete(String objectKey) throws Exception {
-        cloudinary.uploader().destroy(objectKey, ObjectUtils.asMap(
-                "resource_type", "raw",
-                "invalidate", true
-        ));
+        executeWithRetry(() -> {
+            cloudinary.uploader().destroy(objectKey, ObjectUtils.asMap(
+                    "resource_type", "raw",
+                    "invalidate", true
+            ));
+            return null;
+        });
     }
 
     /**
@@ -109,22 +135,57 @@ public class ObjectStorageService {
     }
 
     private void uploadFile(String objectKey, Path file) throws Exception {
-        cloudinary.uploader().upload(file.toFile(), ObjectUtils.asMap(
-                "public_id", objectKey,
-                "resource_type", "raw",
-                "overwrite", true,
-                "invalidate", true
-        ));
+        executeWithRetry(() -> {
+            cloudinary.uploader().upload(file.toFile(), ObjectUtils.asMap(
+                    "public_id", objectKey,
+                    "resource_type", "raw",
+                    "overwrite", true,
+                    "invalidate", true
+            ));
+            return null;
+        });
     }
 
     @SuppressWarnings("unchecked")
     private String uploadFileAndGetUrl(String objectKey, Path file) throws Exception {
-        Map<String, Object> result = cloudinary.uploader().upload(file.toFile(), ObjectUtils.asMap(
-                "public_id", objectKey,
-                "resource_type", "raw",
-                "overwrite", true,
-                "invalidate", true
-        ));
-        return (String) result.get("secure_url");
+        return executeWithRetry(() -> {
+            Map<String, Object> result = cloudinary.uploader().upload(file.toFile(), ObjectUtils.asMap(
+                    "public_id", objectKey,
+                    "resource_type", "raw",
+                    "overwrite", true,
+                    "invalidate", true
+            ));
+            return (String) result.get("secure_url");
+        });
+    }
+
+    private <T> T executeWithRetry(RetryableAction<T> action) throws Exception {
+        int maxAttempts = 3;
+        long backoffMs = 500;
+        Exception lastException = null;
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+            try {
+                return action.execute();
+            } catch (Exception e) {
+                lastException = e;
+                if (attempt == maxAttempts) {
+                    break;
+                }
+                System.err.println("Cloudinary client transient error (attempt " + attempt + "): " + e.getMessage() + ". Retrying in " + backoffMs + "ms...");
+                try {
+                    Thread.sleep(backoffMs);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    throw e;
+                }
+                backoffMs *= 2; // Exponential backoff
+            }
+        }
+        throw lastException;
+    }
+
+    @FunctionalInterface
+    private interface RetryableAction<T> {
+        T execute() throws Exception;
     }
 }

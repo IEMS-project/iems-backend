@@ -6,6 +6,7 @@ import com.iems.documentservice.dto.request.RenameRequest;
 import com.iems.documentservice.dto.request.UpdateSharePermissionRequest;
 import com.iems.documentservice.dto.request.BatchDeleteRequest;
 import com.iems.documentservice.dto.request.BatchMoveRequest;
+import com.iems.documentservice.dto.request.RegisterFileMetadataRequest;
 import com.iems.documentservice.dto.response.ApiResponseDto;
 import com.iems.documentservice.dto.response.FileResponse;
 import com.iems.documentservice.dto.response.FolderResponse;
@@ -24,6 +25,8 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.InputStream;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -43,7 +46,6 @@ public class DriveController {
         FolderResponse data = driveService.createFolder(request);
         return ResponseEntity.ok(new ApiResponseDto<>(200, "Folder created", data));
     }
-
 
     @GetMapping("/folders")
     @Operation(summary = "List all folders of owner")
@@ -77,30 +79,47 @@ public class DriveController {
         return ResponseEntity.ok(new ApiResponseDto<>(200, "File uploaded", data));
     }
 
+    @PostMapping("/files/upload-signature")
+    @Operation(summary = "Generate direct upload signature for Cloudinary")
+    public ResponseEntity<ApiResponseDto<Map<String, Object>>> generateUploadSignature(
+            @RequestParam("fileName") String fileName,
+            @RequestParam(required = false) UUID folderId) {
+        Map<String, Object> data = driveService.generateUploadSignature(fileName, folderId);
+        return ResponseEntity.ok(new ApiResponseDto<>(200, "Signature generated", data));
+    }
+
+    @PostMapping("/files/register-metadata")
+    @Operation(summary = "Register file metadata after direct upload")
+    public ResponseEntity<ApiResponseDto<FileResponse>> registerMetadata(
+            @Valid @RequestBody RegisterFileMetadataRequest request) throws Exception {
+        FileResponse data = driveService.registerMetadata(request);
+        return ResponseEntity.ok(new ApiResponseDto<>(200, "File metadata registered", data));
+    }
+
     @PostMapping(value = "/files/upload-batch", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "Upload multiple files and return public URLs")
-    public ResponseEntity<ApiResponseDto<java.util.List<SimpleFileResponse>>> uploadFiles(
+    public ResponseEntity<ApiResponseDto<List<SimpleFileResponse>>> uploadFiles(
             @RequestParam(required = false) UUID folderId,
             @RequestPart("files") MultipartFile[] files) throws Exception {
-        java.util.List<SimpleFileResponse> data = driveService.uploadFilesAndBuildPublicUrls(folderId, files);
-        return ResponseEntity.ok(new ApiResponseDto<java.util.List<SimpleFileResponse>>(200, "Files uploaded", data));
+        List<SimpleFileResponse> data = driveService.uploadFilesAndBuildPublicUrls(folderId, files);
+        return ResponseEntity.ok(new ApiResponseDto<List<SimpleFileResponse>>(200, "Files uploaded", data));
     }
 
     @PostMapping(value = "/files/upload-public", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "Upload multiple files to public folder and return public URLs")
-    public ResponseEntity<ApiResponseDto<java.util.List<SimpleFileResponse>>> uploadFilesToPublic(
+    public ResponseEntity<ApiResponseDto<List<SimpleFileResponse>>> uploadFilesToPublic(
             @RequestPart("files") MultipartFile[] files) throws Exception {
-        java.util.List<SimpleFileResponse> data = driveService.uploadFilesToPublicFolder(files);
-        return ResponseEntity.ok(new ApiResponseDto<java.util.List<SimpleFileResponse>>(200, "Files uploaded to public folder", data));
+        List<SimpleFileResponse> data = driveService.uploadFilesToPublicFolder(files);
+        return ResponseEntity.ok(new ApiResponseDto<List<SimpleFileResponse>>(200, "Files uploaded to public folder", data));
     }
 
     @PostMapping(value = "/files/upload-chat", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "Upload chat media to conversation path and return public URLs")
-    public ResponseEntity<ApiResponseDto<java.util.List<SimpleFileResponse>>> uploadChatFiles(
+    public ResponseEntity<ApiResponseDto<List<SimpleFileResponse>>> uploadChatFiles(
             @RequestParam("conversationId") String conversationId,
             @RequestPart("files") MultipartFile[] files) throws Exception {
-        java.util.List<SimpleFileResponse> data = driveService.uploadChatFiles(conversationId, files);
-        return ResponseEntity.ok(new ApiResponseDto<java.util.List<SimpleFileResponse>>(200, "Chat files uploaded", data));
+        List<SimpleFileResponse> data = driveService.uploadChatFiles(conversationId, files);
+        return ResponseEntity.ok(new ApiResponseDto<List<SimpleFileResponse>>(200, "Chat files uploaded", data));
     }
 
     @GetMapping("/files/{id}/download")
@@ -303,5 +322,3 @@ public class DriveController {
         return ResponseEntity.ok(new ApiResponseDto<>(200, "Trash emptied successfully", null));
     }
 }
-
-

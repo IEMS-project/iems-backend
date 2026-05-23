@@ -2,6 +2,7 @@ package com.iems.documentservice.service;
 
 import com.iems.documentservice.dto.request.CreateFolderRequest;
 import com.iems.documentservice.dto.request.ShareRequest;
+import com.iems.documentservice.dto.request.RegisterFileMetadataRequest;
 import com.iems.documentservice.dto.response.*;
 import com.iems.documentservice.entity.Share;
 import com.iems.documentservice.entity.enums.Permission;
@@ -99,6 +100,17 @@ public class DriveService {
     @Transactional
     public FileResponse uploadFile(UUID folderId, MultipartFile file) throws Exception {
         FileResponse response = fileService.uploadFile(folderId, file);
+        activityService.log("FILE", response.getId(), "documents.activity.item.created", payload("itemName", response.getName()));
+        return response;
+    }
+
+    public Map<String, Object> generateUploadSignature(String fileName, UUID folderId) {
+        return fileService.generateUploadSignature(fileName, folderId);
+    }
+
+    @Transactional
+    public FileResponse registerMetadata(RegisterFileMetadataRequest request) {
+        FileResponse response = fileService.registerMetadata(request);
         activityService.log("FILE", response.getId(), "documents.activity.item.created", payload("itemName", response.getName()));
         return response;
     }
