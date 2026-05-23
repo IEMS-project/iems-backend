@@ -17,7 +17,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpHeaders;
-import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -105,14 +105,12 @@ public class DriveController {
 
     @GetMapping("/files/{id}/download")
     @Operation(summary = "Download file stream")
-    public ResponseEntity<byte[]> download(@PathVariable UUID id) throws Exception {
-        try (InputStream in = driveService.downloadStream(id)) {
-            byte[] bytes = in.readAllBytes();
-            return ResponseEntity.ok()
-                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + id + "\"")
-                    .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                    .body(bytes);
-        }
+    public ResponseEntity<InputStreamResource> download(@PathVariable UUID id) throws Exception {
+        InputStream in = driveService.downloadStream(id);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + id + "\"")
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .body(new InputStreamResource(in));
     }
 
     @GetMapping("/files/{id}/link")

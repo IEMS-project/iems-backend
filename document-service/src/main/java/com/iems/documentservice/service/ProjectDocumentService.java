@@ -15,10 +15,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.InputStream;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 @Service
 @RequiredArgsConstructor
@@ -27,6 +27,7 @@ public class ProjectDocumentService {
 
     private static final long MAX_UPLOAD_SIZE = 50L * 1024 * 1024;
     private static final String DEFAULT_DOCS_FOLDER_NAME = "docs";
+    private static final Pattern UNSAFE_FILE_NAME_CHARS = Pattern.compile("[^a-zA-Z0-9._-]");
 
     private final ProjectDocumentRepository projectDocumentRepository;
     private final ProjectServiceFeignClient projectServiceFeignClient;
@@ -165,11 +166,12 @@ public class ProjectDocumentService {
         if (file.getSize() > MAX_UPLOAD_SIZE) {
             throw new AppException(DocumentErrorCode.INVALID_REQUEST);
         }
+        if (file.isEmpty() || file.getOriginalFilename() == null || file.getOriginalFilename().isBlank()) {
+            throw new AppException(DocumentErrorCode.INVALID_REQUEST);
+        }
 
         String objectKey = buildProjectObjectKey(projectId, file.getOriginalFilename());
-        try (InputStream in = file.getInputStream()) {
-            objectStorageService.upload(objectKey, in, file.getSize(), file.getContentType());
-        }
+        objectStorageService.upload(objectKey, file);
 
         boolean ragSupported = isRagSupported(file.getOriginalFilename(), file.getContentType());
         ProjectDocument doc = projectDocumentRepository.save(ProjectDocument.builder()
@@ -313,7 +315,17 @@ public class ProjectDocumentService {
     }
 
     private String buildProjectObjectKey(UUID projectId, String fileName) {
-        return "document/projects/" + projectId + "/" + System.currentTimeMillis() + "-" + fileName;
+        return "document/projects/" + projectId + "/" + UUID.randomUUID() + "-" + safeFileName(fileName);
+    }
+
+    private String safeFileName(String fileName) {
+        String normalized = fileName == null ? "file" : fileName.replace('\\', '/');
+        int slash = normalized.lastIndexOf('/');
+        if (slash >= 0) {
+            normalized = normalized.substring(slash + 1);
+        }
+        normalized = UNSAFE_FILE_NAME_CHARS.matcher(normalized).replaceAll("_");
+        return normalized.isBlank() ? "file" : normalized;
     }
 
     private boolean isRagSupported(ProjectDocument doc) {

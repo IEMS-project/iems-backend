@@ -39,7 +39,7 @@ public class TrashService {
     public void softDeleteFile(UUID fileId) {
         UUID userId = permissionHelper.getCurrentUserId();
         StoredFile file = getFileOrThrow(fileId);
-        permissionHelper.enforceOwner(file.getOwnerId(), userId);
+        permissionHelper.enforceFileOwnerOrFolderOwner(file, userId);
         file.setDeletedAt(OffsetDateTime.now());
         storedFileRepository.save(file);
     }
@@ -48,23 +48,23 @@ public class TrashService {
     public void softDeleteFolder(UUID folderId) {
         UUID userId = permissionHelper.getCurrentUserId();
         Folder folder = getFolderOrThrow(folderId);
-        permissionHelper.enforceOwner(folder.getOwnerId(), userId);
-        softDeleteFolderRecursive(folder);
+        permissionHelper.enforceFolderOwnerOrParentOwner(folder, userId);
+        OffsetDateTime now = OffsetDateTime.now();
+        softDeleteFolderRecursive(folder, now);
     }
 
-    private void softDeleteFolderRecursive(Folder folder) {
-        OffsetDateTime now = OffsetDateTime.now();
-        // Soft-delete tất cả file trong folder
+    private void softDeleteFolderRecursive(Folder folder, OffsetDateTime deletionTime) {
+        // Soft-delete tất cả file trong folder chưa bị xóa
         storedFileRepository.findByFolderIdAndDeletedAtIsNull(folder.getId())
                 .forEach(f -> {
-                    f.setDeletedAt(now);
+                    f.setDeletedAt(deletionTime);
                     storedFileRepository.save(f);
                 });
-        // Đệ quy vào sub-folder
+        // Đệ quy vào sub-folder chưa bị xóa
         folderRepository.findByParentIdAndDeletedAtIsNull(folder.getId())
-                .forEach(this::softDeleteFolderRecursive);
+                .forEach(sub -> softDeleteFolderRecursive(sub, deletionTime));
         // Đánh dấu folder đã xóa
-        folder.setDeletedAt(now);
+        folder.setDeletedAt(deletionTime);
         folderRepository.save(folder);
     }
 
@@ -110,11 +110,11 @@ public class TrashService {
     public void restoreFile(UUID fileId) {
         UUID userId = permissionHelper.getCurrentUserId();
         StoredFile file = getFileOrThrow(fileId);
-        permissionHelper.enforceOwner(file.getOwnerId(), userId);
+        permissionHelper.enforceFileOwnerOrFolderOwner(file, userId);
         if (file.getDeletedAt() == null) throw new AppException(DocumentErrorCode.INVALID_REQUEST);
         // Nếu folder cha cũng đang bị xóa, restore folder cha trước
         if (file.getFolder() != null && file.getFolder().getDeletedAt() != null) {
-            restoreFolderRecursive(file.getFolder());
+            restoreFolderRecursive(file.getFolder(), file.getFolder().getDeletedAt());
         }
         file.setDeletedAt(null);
         storedFileRepository.save(file);
@@ -124,29 +124,34 @@ public class TrashService {
     public void restoreFolder(UUID folderId) {
         UUID userId = permissionHelper.getCurrentUserId();
         Folder folder = getFolderOrThrow(folderId);
-        permissionHelper.enforceOwner(folder.getOwnerId(), userId);
+        permissionHelper.enforceFolderOwnerOrParentOwner(folder, userId);
         if (folder.getDeletedAt() == null) throw new AppException(DocumentErrorCode.INVALID_REQUEST);
+        
+        OffsetDateTime deletionTime = folder.getDeletedAt();
+        
         // Nếu folder cha cũng đang bị xóa, restore folder cha trước
         if (folder.getParent() != null && folder.getParent().getDeletedAt() != null) {
-            restoreFolderRecursive(folder.getParent());
+            restoreFolderRecursive(folder.getParent(), folder.getParent().getDeletedAt());
         }
-        restoreFolderRecursive(folder);
+        restoreFolderRecursive(folder, deletionTime);
     }
 
-    private void restoreFolderRecursive(Folder folder) {
+    private void restoreFolderRecursive(Folder folder, OffsetDateTime deletionTime) {
         folder.setDeletedAt(null);
         folderRepository.save(folder);
-        // Restore các file bên trong
-        storedFileRepository.findByOwnerIdAndDeletedAtIsNotNull(folder.getOwnerId()).stream()
-                .filter(f -> f.getFolder() != null && f.getFolder().getId().equals(folder.getId()))
+        
+        // Chỉ phục hồi những file bên trong có cùng thời gian xóa (deletionTime) với folder cha
+        storedFileRepository.findByFolderId(folder.getId()).stream()
+                .filter(f -> deletionTime.equals(f.getDeletedAt()))
                 .forEach(f -> {
                     f.setDeletedAt(null);
                     storedFileRepository.save(f);
                 });
-        // Restore sub-folder
-        folderRepository.findByOwnerIdAndDeletedAtIsNotNull(folder.getOwnerId()).stream()
-                .filter(f -> f.getParent() != null && f.getParent().getId().equals(folder.getId()))
-                .forEach(this::restoreFolderRecursive);
+        
+        // Chỉ phục hồi những sub-folder bên trong có cùng thời gian xóa (deletionTime) với folder cha
+        folderRepository.findByParentId(folder.getId()).stream()
+                .filter(sub -> deletionTime.equals(sub.getDeletedAt()))
+                .forEach(sub -> restoreFolderRecursive(sub, deletionTime));
     }
 
     // ──────────────────────────── PERMANENT DELETE ────────────────────────────
@@ -155,7 +160,7 @@ public class TrashService {
     public void permanentDeleteFile(UUID fileId) throws Exception {
         UUID userId = permissionHelper.getCurrentUserId();
         StoredFile file = getFileOrThrow(fileId);
-        permissionHelper.enforceOwner(file.getOwnerId(), userId);
+        permissionHelper.enforceFileOwnerOrFolderOwner(file, userId);
         if (file.getDeletedAt() == null) throw new AppException(DocumentErrorCode.INVALID_REQUEST);
         storageService.delete(file.getPath());
         storedFileRepository.delete(file);
@@ -165,7 +170,7 @@ public class TrashService {
     public void permanentDeleteFolder(UUID folderId) throws Exception {
         UUID userId = permissionHelper.getCurrentUserId();
         Folder folder = getFolderOrThrow(folderId);
-        permissionHelper.enforceOwner(folder.getOwnerId(), userId);
+        permissionHelper.enforceFolderOwnerOrParentOwner(folder, userId);
         if (folder.getDeletedAt() == null) throw new AppException(DocumentErrorCode.INVALID_REQUEST);
         permanentDeleteFolderRecursive(folder);
     }

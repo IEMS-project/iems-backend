@@ -21,6 +21,7 @@ public interface StoredFileRepository extends JpaRepository<StoredFile, UUID> {
     List<StoredFile> findByOwnerIdAndDeletedAtIsNull(UUID ownerId);
     List<StoredFile> findByPermissionAndDeletedAtIsNull(Permission permission);
     List<StoredFile> findByOwnerIdAndDeletedAtIsNotNull(UUID ownerId);
+    List<StoredFile> findByOwnerIdAndDeletedAtIsNullAndNameContainingIgnoreCase(UUID ownerId, String name);
 }
 
 

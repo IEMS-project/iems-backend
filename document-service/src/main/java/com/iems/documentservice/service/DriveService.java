@@ -267,9 +267,9 @@ public class DriveService {
         if (fileIds != null) {
             for (UUID fileId : fileIds) {
                 try {
-                    fileService.forceDelete(fileId, requesterId);
+                    trashService.softDeleteFile(fileId);
                     successFiles.add(fileId);
-                    activityService.log("FILE", fileId, "documents.activity.item.permanentlyDeleted");
+                    activityService.log("FILE", fileId, "documents.activity.item.movedToTrash");
                 } catch (Exception e) {
                     failed.add(BatchDeleteResponse.FailedItem.builder()
                             .id(fileId).type("file").reason(e.getMessage()).build());

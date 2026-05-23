@@ -1,5 +1,7 @@
 package com.iems.documentservice.service;
 
+import com.iems.documentservice.client.UserServiceFeignClient;
+import com.iems.documentservice.dto.request.AccountIdsDto;
 import com.iems.documentservice.dto.response.FileResponse;
 import com.iems.documentservice.dto.response.SearchResultItem;
 import com.iems.documentservice.dto.response.SimpleFileResponse;
@@ -20,12 +22,14 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.InputStream;
 import java.time.OffsetDateTime;
 import java.util.*;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Service
 public class FileService {
 
     private static final long MAX_UPLOAD_SIZE = 50L * 1024 * 1024; // 50 MB
+    private static final Pattern UNSAFE_FILE_NAME_CHARS = Pattern.compile("[^a-zA-Z0-9._-]");
 
     private final StoredFileRepository storedFileRepository;
     private final FolderRepository folderRepository;
@@ -33,19 +37,22 @@ public class FileService {
     private final FavoriteRepository favoriteRepository;
     private final ObjectStorageService storageService;
     private final PermissionHelper permissionHelper;
+    private final UserServiceFeignClient userServiceFeignClient;
 
     public FileService(StoredFileRepository storedFileRepository,
                        FolderRepository folderRepository,
                        ShareRepository shareRepository,
                        FavoriteRepository favoriteRepository,
                        ObjectStorageService storageService,
-                       PermissionHelper permissionHelper) {
+                       PermissionHelper permissionHelper,
+                       UserServiceFeignClient userServiceFeignClient) {
         this.storedFileRepository = storedFileRepository;
         this.folderRepository = folderRepository;
         this.shareRepository = shareRepository;
         this.favoriteRepository = favoriteRepository;
         this.storageService = storageService;
         this.permissionHelper = permissionHelper;
+        this.userServiceFeignClient = userServiceFeignClient;
     }
 
     // ──────────────────────────── UPLOAD ────────────────────────────
@@ -54,12 +61,11 @@ public class FileService {
     public FileResponse uploadFile(UUID folderId, MultipartFile file) throws Exception {
         UUID ownerId = permissionHelper.getCurrentUserId();
         permissionHelper.enforceWritePermission(folderId, ownerId);
+        validateFile(file);
         validateSize(file.getSize(), MAX_UPLOAD_SIZE);
         Folder folder = resolveFolder(folderId);
         String objectKey = buildObjectKey(folderId, ownerId, file.getOriginalFilename());
-        try (InputStream in = file.getInputStream()) {
-            storageService.upload(objectKey, in, file.getSize(), file.getContentType());
-        }
+        storageService.upload(objectKey, file);
         StoredFile saved = storedFileRepository.save(StoredFile.builder()
                 .name(file.getOriginalFilename())
                 .folder(folder)
@@ -78,10 +84,11 @@ public class FileService {
         List<SimpleFileResponse> results = new ArrayList<>();
         for (MultipartFile f : files) {
             FileResponse fr = uploadFile(folderId, f);
+            StoredFile savedFile = getOrThrow(fr.getId());
             results.add(SimpleFileResponse.builder()
                     .id(fr.getId().toString())
                     .fileName(fr.getName())
-                    .url(storageService.buildPublicUrl(fr.getPath()))
+                    .url(storageService.buildPublicUrl(savedFile.getPath()))
                     .type(fr.getType())
                     .build());
         }
@@ -93,15 +100,14 @@ public class FileService {
         UUID ownerId = permissionHelper.getCurrentUserId();
         List<SimpleFileResponse> results = new ArrayList<>();
         for (MultipartFile file : files) {
+            validateFile(file);
             validateSize(file.getSize(), MAX_UPLOAD_SIZE);
             double sizeMb = file.getSize() / (1024.0 * 1024.0);
             String mime = file.getContentType() == null ? "" : file.getContentType();
             if (mime.startsWith("image") && sizeMb > 5.0) throw new AppException(DocumentErrorCode.INVALID_REQUEST);
             if (!mime.startsWith("image") && sizeMb > 20.0) throw new AppException(DocumentErrorCode.INVALID_REQUEST);
             String objectKey = buildChatObjectKey(conversationId, file.getOriginalFilename());
-            try (InputStream in = file.getInputStream()) {
-                storageService.upload(objectKey, in, file.getSize(), file.getContentType());
-            }
+            storageService.upload(objectKey, file);
             StoredFile saved = storedFileRepository.save(StoredFile.builder()
                     .name(file.getOriginalFilename())
                     .folder(null)
@@ -127,11 +133,10 @@ public class FileService {
         UUID ownerId = permissionHelper.getCurrentUserId();
         List<SimpleFileResponse> results = new ArrayList<>();
         for (MultipartFile file : files) {
+            validateFile(file);
             validateSize(file.getSize(), MAX_UPLOAD_SIZE);
             String objectKey = buildPublicObjectKey(file.getOriginalFilename());
-            try (InputStream in = file.getInputStream()) {
-                storageService.upload(objectKey, in, file.getSize(), file.getContentType());
-            }
+            storageService.upload(objectKey, file);
             StoredFile saved = storedFileRepository.save(StoredFile.builder()
                     .name(file.getOriginalFilename())
                     .folder(null)
@@ -173,9 +178,15 @@ public class FileService {
 
     public List<FileResponse> listFiles() {
         UUID userId = permissionHelper.getCurrentUserId();
-        return storedFileRepository.findByOwnerIdAndDeletedAtIsNull(userId).stream()
+        List<StoredFile> ownedFiles = storedFileRepository.findByOwnerIdAndDeletedAtIsNull(userId).stream()
                 .filter(f -> !isAvatarFile(f))
-                .map(f -> toResponse(f, null, userId))
+                .toList();
+        Set<UUID> favoriteIds = loadFavoriteIds(userId, ownedFiles);
+        Set<UUID> ownerIds = ownedFiles.stream().map(StoredFile::getOwnerId).collect(Collectors.toSet());
+        Map<UUID, Map<String, Object>> owners = loadUsersByAccountId(ownerIds);
+
+        return ownedFiles.stream()
+                .map(f -> toResponse(f, null, userId, favoriteIds, owners.get(f.getOwnerId())))
                 .collect(Collectors.toList());
     }
 
@@ -189,20 +200,26 @@ public class FileService {
                 && !shareRepository.existsByTargetIdAndTargetTypeAndSharedWithUserId(folderId, "FOLDER", userId)) {
             throw new AppException(DocumentErrorCode.PERMISSION_DENIED);
         }
-        return storedFileRepository.findByFolderIdAndDeletedAtIsNull(folderId).stream()
+        List<StoredFile> visibleFiles = storedFileRepository.findByFolderIdAndDeletedAtIsNull(folderId).stream()
                 .filter(f -> !isAvatarFile(f))
                 .filter(f -> {
                     try { permissionHelper.enforceReadPermission(f, userId); return true; }
                     catch (Exception e) { return false; }
                 })
-                .map(f -> toResponse(f, null, userId))
+                .toList();
+        Set<UUID> favoriteIds = loadFavoriteIds(userId, visibleFiles);
+        Set<UUID> ownerIds = visibleFiles.stream().map(StoredFile::getOwnerId).collect(Collectors.toSet());
+        Map<UUID, Map<String, Object>> owners = loadUsersByAccountId(ownerIds);
+
+        return visibleFiles.stream()
+                .map(f -> toResponse(f, null, userId, favoriteIds, owners.get(f.getOwnerId())))
                 .collect(Collectors.toList());
     }
 
     public List<FileResponse> listAccessibleFiles() {
         UUID userId = permissionHelper.getCurrentUserId();
-        List<StoredFile> owned = storedFileRepository.findByOwnerId(userId);
-        List<StoredFile> publicFiles = storedFileRepository.findByPermission(Permission.PUBLIC).stream()
+        List<StoredFile> owned = storedFileRepository.findByOwnerIdAndDeletedAtIsNull(userId);
+        List<StoredFile> publicFiles = storedFileRepository.findByPermissionAndDeletedAtIsNull(Permission.PUBLIC).stream()
                 .filter(f -> !isAvatarFile(f))
                 .collect(Collectors.toList());
         Set<UUID> sharedFileIds = shareRepository.findBySharedWithUserId(userId).stream()
@@ -210,13 +227,21 @@ public class FileService {
                 .map(Share::getTargetId)
                 .collect(Collectors.toSet());
         List<StoredFile> sharedFiles = sharedFileIds.isEmpty() ? List.of()
-                : storedFileRepository.findByIdIn(sharedFileIds);
+                : storedFileRepository.findByIdIn(sharedFileIds).stream()
+                        .filter(f -> f.getDeletedAt() == null)
+                        .toList();
         Set<UUID> seen = new HashSet<>();
-        return List.of(owned, publicFiles, sharedFiles).stream()
+        List<StoredFile> accessibleFiles = List.of(owned, publicFiles, sharedFiles).stream()
                 .flatMap(List::stream)
                 .filter(f -> !isAvatarFile(f))
                 .filter(f -> seen.add(f.getId()))
-                .map(f -> toResponse(f, null, userId))
+                .toList();
+        Set<UUID> favoriteIds = loadFavoriteIds(userId, accessibleFiles);
+        Set<UUID> ownerIds = accessibleFiles.stream().map(StoredFile::getOwnerId).collect(Collectors.toSet());
+        Map<UUID, Map<String, Object>> owners = loadUsersByAccountId(ownerIds);
+
+        return accessibleFiles.stream()
+                .map(f -> toResponse(f, null, userId, favoriteIds, owners.get(f.getOwnerId())))
                 .collect(Collectors.toList());
     }
 
@@ -224,10 +249,9 @@ public class FileService {
 
     public List<SearchResultItem> searchFiles(String query) {
         UUID userId = permissionHelper.getCurrentUserId();
-        String q = query == null ? "" : query.toLowerCase();
-        return storedFileRepository.findByOwnerId(userId).stream()
+        String q = query == null ? "" : query.trim();
+        return storedFileRepository.findByOwnerIdAndDeletedAtIsNullAndNameContainingIgnoreCase(userId, q).stream()
                 .filter(f -> !isAvatarFile(f))
-                .filter(f -> f.getName() != null && f.getName().toLowerCase().contains(q))
                 .map(f -> SearchResultItem.builder()
                         .id(f.getId())
                         .name(f.getName())
@@ -246,7 +270,7 @@ public class FileService {
     public void rename(UUID fileId, String newName) {
         UUID userId = permissionHelper.getCurrentUserId();
         StoredFile file = getOrThrow(fileId);
-        permissionHelper.enforceOwner(file.getOwnerId(), userId);
+        permissionHelper.enforceFileOwnerOrFolderOwner(file, userId);
         file.setName(newName);
         storedFileRepository.save(file);
     }
@@ -255,7 +279,7 @@ public class FileService {
     public void move(UUID fileId, UUID newFolderId) {
         UUID userId = permissionHelper.getCurrentUserId();
         StoredFile file = getOrThrow(fileId);
-        permissionHelper.enforceOwner(file.getOwnerId(), userId);
+        permissionHelper.enforceFileOwnerOrFolderOwner(file, userId);
         permissionHelper.enforceWritePermission(newFolderId, userId);
         file.setFolder(newFolderId != null ? folderRepository.findById(newFolderId).orElse(null) : null);
         storedFileRepository.save(file);
@@ -265,7 +289,7 @@ public class FileService {
     public void updatePermission(UUID fileId, Permission permission) {
         UUID userId = permissionHelper.getCurrentUserId();
         StoredFile file = getOrThrow(fileId);
-        permissionHelper.enforceOwner(file.getOwnerId(), userId);
+        permissionHelper.enforceFileOwnerOrFolderOwner(file, userId);
         file.setPermission(permission);
         storedFileRepository.save(file);
     }
@@ -276,7 +300,7 @@ public class FileService {
     @Transactional
     public void forceDelete(UUID fileId, UUID requesterId) throws Exception {
         StoredFile file = getOrThrow(fileId);
-        permissionHelper.enforceOwner(file.getOwnerId(), requesterId);
+        permissionHelper.enforceFileOwnerOrFolderOwner(file, requesterId);
         storageService.delete(file.getPath());
         storedFileRepository.delete(file);
     }
@@ -291,19 +315,107 @@ public class FileService {
     }
 
     public FileResponse toResponse(StoredFile file, String presignedUrl, UUID userId) {
-        return FileResponse.builder()
+        Map<String, Object> owner = null;
+        if (file.getOwnerId() != null) {
+            Map<UUID, Map<String, Object>> owners = loadUsersByAccountId(List.of(file.getOwnerId()));
+            owner = owners.get(file.getOwnerId());
+        }
+        return toResponse(file, presignedUrl, userId, loadFavoriteIds(userId, List.of(file)), owner);
+    }
+
+    private FileResponse toResponse(StoredFile file, String presignedUrl, UUID userId, Set<UUID> favoriteIds, Map<String, Object> owner) {
+        var builder = FileResponse.builder()
                 .id(file.getId())
                 .name(file.getName())
                 .folderId(file.getFolder() != null ? file.getFolder().getId() : null)
                 .ownerId(file.getOwnerId())
-                .path(file.getPath())
                 .size(file.getSize())
                 .type(file.getType())
                 .permission(file.getPermission())
                 .createdAt(file.getCreatedAt())
                 .presignedUrl(presignedUrl)
-                .favorite(favoriteRepository.findByUserIdAndTargetId(userId, file.getId()).isPresent())
-                .build();
+                .favorite(favoriteIds.contains(file.getId()));
+
+        if (owner != null) {
+            if (owner.get("firstName") != null) {
+                builder.ownerName(owner.get("firstName").toString() + " " + (owner.get("lastName") != null ? owner.get("lastName").toString() : ""));
+            }
+            if (owner.get("email") != null) builder.ownerEmail(owner.get("email").toString());
+            if (owner.get("image") != null) builder.ownerAvatar(owner.get("image").toString());
+        }
+
+        // Add breadcrumbs
+        if (file.getFolder() != null) {
+            builder.breadcrumbs(buildFileBreadcrumbs(file.getFolder()));
+        } else {
+            builder.breadcrumbs(new ArrayList<>());
+        }
+
+        return builder.build();
+    }
+
+    private List<FileResponse.BreadcrumbResponse> buildFileBreadcrumbs(Folder folder) {
+        List<FileResponse.BreadcrumbResponse> crumbs = new ArrayList<>();
+        Folder cur = folder;
+        while (cur != null) {
+            crumbs.add(0, FileResponse.BreadcrumbResponse.builder()
+                    .id(cur.getId())
+                    .name(cur.getName())
+                    .build());
+            cur = cur.getParent();
+        }
+        return crumbs;
+    }
+
+    private Map<UUID, Map<String, Object>> loadUsersByAccountId(Collection<UUID> accountIds) {
+        if (accountIds == null || accountIds.isEmpty()) {
+            return Map.of();
+        }
+        try {
+            var resp = userServiceFeignClient.getUsersByAccountIds(new AccountIdsDto(new HashSet<>(accountIds)));
+            if (resp == null || !resp.getStatusCode().is2xxSuccessful() || !(resp.getBody() instanceof Map<?, ?> api)) {
+                return Map.of();
+            }
+            Object data = api.get("data");
+            if (!(data instanceof List<?> users)) {
+                return Map.of();
+            }
+            Map<UUID, Map<String, Object>> result = new HashMap<>();
+            for (Object item : users) {
+                if (item instanceof Map<?, ?> rawUser) {
+                    Object idValue = rawUser.get("id");
+                    if (idValue == null) {
+                        continue;
+                    }
+                    try {
+                        UUID id = UUID.fromString(idValue.toString());
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> user = (Map<String, Object>) rawUser;
+                        result.put(id, user);
+                    } catch (IllegalArgumentException ignored) {
+                    }
+                }
+            }
+            return result;
+        } catch (Exception ignored) {
+            return Map.of();
+        }
+    }
+
+    private Set<UUID> loadFavoriteIds(UUID userId, Collection<StoredFile> files) {
+        if (userId == null || files == null || files.isEmpty()) {
+            return Set.of();
+        }
+        Set<UUID> ids = files.stream()
+                .map(StoredFile::getId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        if (ids.isEmpty()) {
+            return Set.of();
+        }
+        return favoriteRepository.findByUserIdAndTargetIdIn(userId, ids).stream()
+                .map(f -> f.getTargetId())
+                .collect(Collectors.toSet());
     }
 
     private Folder resolveFolder(UUID folderId) {
@@ -316,6 +428,13 @@ public class FileService {
         if (size > max) throw new AppException(DocumentErrorCode.INVALID_REQUEST);
     }
 
+    private void validateFile(MultipartFile file) {
+        if (file == null || file.isEmpty() || file.getOriginalFilename() == null
+                || file.getOriginalFilename().isBlank()) {
+            throw new AppException(DocumentErrorCode.INVALID_REQUEST);
+        }
+    }
+
     /** Lọc bỏ file avatar khỏi danh sách document */
     private boolean isAvatarFile(StoredFile f) {
         String path = f.getPath();
@@ -324,14 +443,31 @@ public class FileService {
 
     private String buildObjectKey(UUID folderId, UUID ownerId, String fileName) {
         String folderPart = folderId != null ? String.valueOf(folderId) : "root";
-        return "document/owners/" + ownerId + "/" + folderPart + "/" + System.currentTimeMillis() + "-" + fileName;
+        return "document/owners/" + ownerId + "/" + folderPart + "/" + UUID.randomUUID() + "-" + safeFileName(fileName);
     }
 
     private String buildChatObjectKey(String conversationId, String fileName) {
-        return "chat/" + conversationId + "/" + System.currentTimeMillis() + "-" + fileName;
+        return "chat/" + safePathSegment(conversationId) + "/" + UUID.randomUUID() + "-" + safeFileName(fileName);
     }
 
     private String buildPublicObjectKey(String fileName) {
-        return "document/public/" + System.currentTimeMillis() + "-" + fileName;
+        return "document/public/" + UUID.randomUUID() + "-" + safeFileName(fileName);
+    }
+
+    private String safeFileName(String fileName) {
+        String normalized = fileName == null ? "file" : fileName.replace('\\', '/');
+        int slash = normalized.lastIndexOf('/');
+        if (slash >= 0) {
+            normalized = normalized.substring(slash + 1);
+        }
+        normalized = UNSAFE_FILE_NAME_CHARS.matcher(normalized).replaceAll("_");
+        return normalized.isBlank() ? "file" : normalized;
+    }
+
+    private String safePathSegment(String value) {
+        if (value == null || value.isBlank()) {
+            return "unknown";
+        }
+        return UNSAFE_FILE_NAME_CHARS.matcher(value).replaceAll("_");
     }
 }

@@ -3,9 +3,12 @@ package com.iems.documentservice.service;
 import com.cloudinary.Cloudinary;
 import com.cloudinary.utils.ObjectUtils;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.io.InputStream;
 import java.net.URI;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Map;
 
 @Service
@@ -23,13 +26,23 @@ public class ObjectStorageService {
      * public_id = objectKey (giữ nguyên cấu trúc thư mục và tên file).
      */
     public void upload(String objectKey, InputStream inputStream, long size, String contentType) throws Exception {
-        byte[] bytes = inputStream.readAllBytes();
-        cloudinary.uploader().upload(bytes, ObjectUtils.asMap(
-                "public_id", objectKey,
-                "resource_type", "raw",
-                "overwrite", true,
-                "invalidate", true
-        ));
+        Path tempFile = Files.createTempFile("iems-upload-", ".tmp");
+        try {
+            Files.copy(inputStream, tempFile, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            uploadFile(objectKey, tempFile);
+        } finally {
+            Files.deleteIfExists(tempFile);
+        }
+    }
+
+    public void upload(String objectKey, MultipartFile file) throws Exception {
+        Path tempFile = Files.createTempFile("iems-upload-", ".tmp");
+        try {
+            file.transferTo(tempFile);
+            uploadFile(objectKey, tempFile);
+        } finally {
+            Files.deleteIfExists(tempFile);
+        }
     }
 
     /**
@@ -76,9 +89,37 @@ public class ObjectStorageService {
      * Tiện lợi khi cần URL ngay lập tức không cần gọi buildPublicUrl riêng.
      */
     public String uploadAndGetUrl(String objectKey, InputStream inputStream, long size, String contentType) throws Exception {
-        byte[] bytes = inputStream.readAllBytes();
-        @SuppressWarnings("unchecked")
-        Map<String, Object> result = cloudinary.uploader().upload(bytes, ObjectUtils.asMap(
+        Path tempFile = Files.createTempFile("iems-upload-", ".tmp");
+        try {
+            Files.copy(inputStream, tempFile, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            return uploadFileAndGetUrl(objectKey, tempFile);
+        } finally {
+            Files.deleteIfExists(tempFile);
+        }
+    }
+
+    public String uploadAndGetUrl(String objectKey, MultipartFile file) throws Exception {
+        Path tempFile = Files.createTempFile("iems-upload-", ".tmp");
+        try {
+            file.transferTo(tempFile);
+            return uploadFileAndGetUrl(objectKey, tempFile);
+        } finally {
+            Files.deleteIfExists(tempFile);
+        }
+    }
+
+    private void uploadFile(String objectKey, Path file) throws Exception {
+        cloudinary.uploader().upload(file.toFile(), ObjectUtils.asMap(
+                "public_id", objectKey,
+                "resource_type", "raw",
+                "overwrite", true,
+                "invalidate", true
+        ));
+    }
+
+    @SuppressWarnings("unchecked")
+    private String uploadFileAndGetUrl(String objectKey, Path file) throws Exception {
+        Map<String, Object> result = cloudinary.uploader().upload(file.toFile(), ObjectUtils.asMap(
                 "public_id", objectKey,
                 "resource_type", "raw",
                 "overwrite", true,

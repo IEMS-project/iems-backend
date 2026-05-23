@@ -55,7 +55,7 @@ public class EmailService {
         // Kiểm tra preferences của user
         if (req.getRecipientId() != null) {
             try {
-                java.util.UUID recipientId = java.util.UUID.fromString(req.getRecipientId());
+                java.util.UUID recipientId = java.util.UUID.fromString(String.valueOf(req.getRecipientId()));
                 var response = userClient.getNotificationPreferences(recipientId);
                 if (response != null && response.getData() != null) {
                     java.util.Map<String, Object> prefs = response.getData();
