@@ -72,12 +72,31 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
     }
 
+    @ExceptionHandler(org.springframework.transaction.TransactionSystemException.class)
+    public ResponseEntity<ApiResponseDto<String>> handleTransactionSystemException(org.springframework.transaction.TransactionSystemException ex) {
+        System.err.println("=== JPA TRANSACTION COMMIT FAILURE DETECTED ===");
+        ex.printStackTrace();
+        Throwable rootCause = ex.getRootCause();
+        String detailMessage = rootCause != null ? rootCause.getMessage() : ex.getMessage();
+        System.err.println("Root Cause: " + detailMessage);
+        
+        ApiResponseDto<String> response = new ApiResponseDto<>(
+                HttpStatus.INTERNAL_SERVER_ERROR.value(),
+                "JPA Transaction failed: " + detailMessage,
+                null
+        );
+        return new ResponseEntity<>(response, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponseDto<String>> handleGlobalException(Exception ex, WebRequest request) throws Exception {
         String path = request.getDescription(false);
         if (path.contains("/api-docs") || path.contains("/swagger-ui")) {
             throw ex;
         }
+        System.err.println("=== UNCAUGHT EXCEPTION AT PATH " + path + " ===");
+        ex.printStackTrace();
+        
         ApiResponseDto<String> response = new ApiResponseDto<>(
                 DocumentErrorCode.INTERNAL_SERVER_ERROR.getHttpStatus().value(),
                 DocumentErrorCode.INTERNAL_SERVER_ERROR.getMessage(),

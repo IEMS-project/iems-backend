@@ -1,8 +1,6 @@
 package com.iems.documentservice.service;
 
-import com.iems.documentservice.client.AiServiceFeignClient;
 import com.iems.documentservice.client.ProjectServiceFeignClient;
-import com.iems.documentservice.dto.request.AiIndexCommandRequest;
 import com.iems.documentservice.dto.response.ProjectDocumentResponse;
 import com.iems.documentservice.entity.ProjectDocument;
 import com.iems.documentservice.exception.AppException;
@@ -33,7 +31,7 @@ public class ProjectDocumentService {
     private final ProjectServiceFeignClient projectServiceFeignClient;
     private final ObjectStorageService objectStorageService;
     private final PermissionHelper permissionHelper;
-    private final AiServiceFeignClient aiServiceFeignClient;
+    private final AiIndexingService aiIndexingService;
     private final ActivityService activityService;
 
     private void requireProjectMember(UUID projectId) {
@@ -256,40 +254,11 @@ public class ProjectDocumentService {
     }
 
     private void dispatchIndex(ProjectDocument doc) {
-        try {
-            String downloadUrl = objectStorageService.presignGetUrl(doc.getCloudinaryPath());
-            log.info("Dispatch INDEX docId={} projectId={} fileName={} fileType={} urlPresent={}",
-                    doc.getId(),
-                    doc.getProjectId(),
-                    doc.getFileName(),
-                    doc.getFileType(),
-                    downloadUrl != null && !downloadUrl.isBlank());
-            aiServiceFeignClient.dispatchIndexCommand(AiIndexCommandRequest.builder()
-                    .projectId(doc.getProjectId().toString())
-                    .documentId(doc.getId().toString())
-                    .operation("INDEX")
-                    .fileName(doc.getFileName())
-                    .fileType(doc.getFileType())
-                    .downloadUrl(downloadUrl)
-                    .build());
-            log.info("Dispatch INDEX completed for doc {}", doc.getId());
-        } catch (Exception e) {
-            log.warn("Failed to dispatch INDEX for doc {}: {}", doc.getId(), e.getMessage());
-        }
+        aiIndexingService.dispatchIndex(doc);
     }
 
     private void dispatchDeindex(ProjectDocument doc) {
-        try {
-            log.info("Dispatch DEINDEX docId={} projectId={}", doc.getId(), doc.getProjectId());
-            aiServiceFeignClient.dispatchIndexCommand(AiIndexCommandRequest.builder()
-                    .projectId(doc.getProjectId().toString())
-                    .documentId(doc.getId().toString())
-                    .operation("DEINDEX")
-                    .build());
-            log.info("Dispatch DEINDEX completed for doc {}", doc.getId());
-        } catch (Exception e) {
-            log.warn("Failed to dispatch DEINDEX for doc {}: {}", doc.getId(), e.getMessage());
-        }
+        aiIndexingService.dispatchDeindex(doc);
     }
 
     private ProjectDocumentResponse toResponse(ProjectDocument doc) {

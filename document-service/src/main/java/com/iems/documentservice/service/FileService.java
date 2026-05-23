@@ -2,6 +2,7 @@ package com.iems.documentservice.service;
 
 import com.iems.documentservice.client.UserServiceFeignClient;
 import com.iems.documentservice.dto.request.AccountIdsDto;
+import com.iems.documentservice.dto.request.RegisterFileMetadataRequest;
 import com.iems.documentservice.dto.response.FileResponse;
 import com.iems.documentservice.dto.response.SearchResultItem;
 import com.iems.documentservice.dto.response.SimpleFileResponse;
@@ -93,6 +94,37 @@ public class FileService {
                     .build());
         }
         return results;
+    }
+
+    public Map<String, Object> generateUploadSignature(String fileName, UUID folderId) {
+        UUID ownerId = permissionHelper.getCurrentUserId();
+        permissionHelper.enforceWritePermission(folderId, ownerId);
+        
+        long timestamp = System.currentTimeMillis() / 1000L;
+        String folderPart = folderId != null ? String.valueOf(folderId) : "root";
+        String objectKey = "document/owners/" + ownerId + "/" + folderPart + "/" + UUID.randomUUID() + "-" + safeFileName(fileName);
+        
+        return storageService.generateUploadSignature(objectKey, timestamp);
+    }
+    
+    @Transactional
+    public FileResponse registerMetadata(RegisterFileMetadataRequest request) {
+        UUID ownerId = permissionHelper.getCurrentUserId();
+        permissionHelper.enforceWritePermission(request.getFolderId(), ownerId);
+        Folder folder = resolveFolder(request.getFolderId());
+        
+        StoredFile saved = storedFileRepository.save(StoredFile.builder()
+                .name(request.getFileName())
+                .folder(folder)
+                .ownerId(ownerId)
+                .path(request.getObjectKey())
+                .size(request.getFileSize())
+                .type(request.getFileType())
+                .permission(Permission.PUBLIC)
+                .createdAt(OffsetDateTime.now())
+                .build());
+        
+        return toResponse(saved, null, ownerId);
     }
 
     @Transactional
