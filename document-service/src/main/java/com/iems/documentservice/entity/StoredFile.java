@@ -22,6 +22,9 @@ public class StoredFile {
     @UuidGenerator(style = UuidGenerator.Style.RANDOM)
     private UUID id;
 
+    @Version
+    private Long version;
+
     @Column(nullable = false)
     private String name;
 

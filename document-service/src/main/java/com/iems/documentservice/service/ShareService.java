@@ -1,6 +1,7 @@
 package com.iems.documentservice.service;
 
 import com.iems.documentservice.client.UserServiceFeignClient;
+import com.iems.documentservice.dto.request.AccountIdsDto;
 import com.iems.documentservice.dto.request.ShareRequest;
 import com.iems.documentservice.dto.response.SharedUserResponse;
 import com.iems.documentservice.entity.Share;
@@ -15,8 +16,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -82,28 +85,22 @@ public class ShareService {
         if (!permissionHelper.validateTargetExistsAndOwned(itemId, type, ownerId)) {
             throw new AppException(DocumentErrorCode.PERMISSION_DENIED);
         }
-        return shareRepository.findByTargetIdAndTargetType(itemId, type).stream()
+        List<Share> shares = shareRepository.findByTargetIdAndTargetType(itemId, type);
+        Map<UUID, Map<String, Object>> usersByAccountId = loadUsersByAccountId(shares);
+        return shares.stream()
                 .map(share -> {
                     var builder = SharedUserResponse.builder()
                             .shareId(share.getId())
                             .userId(share.getSharedWithUserId())
                             .permission(share.getPermission())
                             .sharedAt(share.getCreatedAt());
-                    try {
-                        var resp = userServiceFeignClient.getUserById(share.getSharedWithUserId());
-                        if (resp != null && resp.getStatusCode().is2xxSuccessful() && resp.getBody() instanceof Map) {
-                            @SuppressWarnings("unchecked")
-                            Map<String, Object> api = (Map<String, Object>) resp.getBody();
-                            if (api.get("data") instanceof Map) {
-                                @SuppressWarnings("unchecked")
-                                Map<String, Object> user = (Map<String, Object>) api.get("data");
-                                if (user.get("firstName") != null) builder.firstName(user.get("firstName").toString());
-                                if (user.get("lastName") != null) builder.lastName(user.get("lastName").toString());
-                                if (user.get("email") != null) builder.email(user.get("email").toString());
-                                if (user.get("image") != null) builder.image(user.get("image").toString());
-                            }
-                        }
-                    } catch (Exception ignored) { }
+                    Map<String, Object> user = usersByAccountId.get(share.getSharedWithUserId());
+                    if (user != null) {
+                        if (user.get("firstName") != null) builder.firstName(user.get("firstName").toString());
+                        if (user.get("lastName") != null) builder.lastName(user.get("lastName").toString());
+                        if (user.get("email") != null) builder.email(user.get("email").toString());
+                        if (user.get("image") != null) builder.image(user.get("image").toString());
+                    }
                     return builder.build();
                 })
                 .collect(Collectors.toList());
@@ -132,5 +129,43 @@ public class ShareService {
         }
         shareRepository.delete(share);
         return share;
+    }
+
+    private Map<UUID, Map<String, Object>> loadUsersByAccountId(List<Share> shares) {
+        if (shares == null || shares.isEmpty()) {
+            return Map.of();
+        }
+        Set<UUID> accountIds = shares.stream()
+                .map(Share::getSharedWithUserId)
+                .collect(Collectors.toSet());
+        try {
+            var resp = userServiceFeignClient.getUsersByAccountIds(new AccountIdsDto(accountIds));
+            if (resp == null || !resp.getStatusCode().is2xxSuccessful() || !(resp.getBody() instanceof Map<?, ?> api)) {
+                return Map.of();
+            }
+            Object data = api.get("data");
+            if (!(data instanceof List<?> users)) {
+                return Map.of();
+            }
+            Map<UUID, Map<String, Object>> result = new HashMap<>();
+            for (Object item : users) {
+                if (item instanceof Map<?, ?> rawUser) {
+                    Object idValue = rawUser.get("id");
+                    if (idValue == null) {
+                        continue;
+                    }
+                    try {
+                        UUID id = UUID.fromString(idValue.toString());
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> user = (Map<String, Object>) rawUser;
+                        result.put(id, user);
+                    } catch (IllegalArgumentException ignored) {
+                    }
+                }
+            }
+            return result;
+        } catch (Exception ignored) {
+            return Map.of();
+        }
     }
 }

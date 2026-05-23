@@ -14,21 +14,22 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.InputStream;
 import java.time.OffsetDateTime;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 @RestController
 @RequestMapping("/api/documents")
 @Tag(name = "Avatar API", description = "Employee avatar upload and retrieval")
 public class AvatarController {
+
+    private static final Pattern UNSAFE_PATH_CHARS = Pattern.compile("[^a-zA-Z0-9._-]");
 
     private final ObjectStorageService storageService;
     private final StoredFileRepository storedFileRepository;
@@ -45,6 +46,7 @@ public class AvatarController {
     @PostMapping(value = "/upload/avatar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "Upload employee avatar for current user")
     public ResponseEntity<ApiResponseDto<String>> uploadAvatar(@RequestPart("file") MultipartFile file) throws Exception {
+        validateUpload(file);
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         JwtUserDetails principal = (JwtUserDetails) authentication.getPrincipal();
         UUID userId = principal.getUserId();
@@ -58,9 +60,7 @@ public class AvatarController {
         String fileName = userId + "_avt" + ext;
         String objectKey = "avatar/employee/" + fileName;
 
-        try (InputStream in = file.getInputStream()) {
-            storageService.upload(objectKey, in, file.getSize(), file.getContentType());
-        }
+        storageService.upload(objectKey, file);
 
         StoredFile stored = StoredFile.builder()
                 .name(fileName)
@@ -86,6 +86,7 @@ public class AvatarController {
     @Operation(summary = "Upload group avatar for a specific group")
     public ResponseEntity<ApiResponseDto<String>> uploadGroupAvatar(@RequestPart("file") MultipartFile file,
                                                                     @RequestParam("groupId") String groupId) throws Exception {
+        validateUpload(file);
         // Auth required; only admin or group owner allowed; Chat-Service will re-check on update call
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         JwtUserDetails principal = (JwtUserDetails) authentication.getPrincipal();
@@ -96,12 +97,11 @@ public class AvatarController {
         if (dot > -1 && dot < original.length() - 1) {
             ext = original.substring(dot);
         }
-        String fileName = groupId + "_avt" + ext;
+        String safeGroupId = safePathSegment(groupId);
+        String fileName = safeGroupId + "_avt" + ext;
         String objectKey = "avatar/group/" + fileName;
 
-        try (InputStream in = file.getInputStream()) {
-            storageService.upload(objectKey, in, file.getSize(), file.getContentType());
-        }
+        storageService.upload(objectKey, file);
 
         StoredFile stored = StoredFile.builder()
                 .name(fileName)
@@ -127,8 +127,9 @@ public class AvatarController {
     @Operation(summary = "Get group avatar URL or stream if necessary")
     public ResponseEntity<ApiResponseDto<String>> getGroupAvatarUrl(@PathVariable("groupId") String groupId) throws Exception {
         // Find latest file that matches naming scheme
+        String safeGroupId = safePathSegment(groupId);
         Optional<StoredFile> latest = storedFileRepository
-                .findFirstByPathStartingWithOrderByCreatedAtDesc("avatar/group/" + groupId + "_avt");
+                .findFirstByPathStartingWithOrderByCreatedAtDesc("avatar/group/" + safeGroupId + "_avt");
 
         if (latest.isEmpty()) {
             return ResponseEntity.ok(new ApiResponseDto<>(200, "No group avatar", null));
@@ -150,6 +151,19 @@ public class AvatarController {
 
         String presignedUrl = storageService.buildPublicUrl(latest.get().getPath());
         return ResponseEntity.ok(new ApiResponseDto<>(200, "OK", presignedUrl));
+    }
+
+    private void validateUpload(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new IllegalArgumentException("Uploaded file is required");
+        }
+    }
+
+    private String safePathSegment(String value) {
+        if (value == null || value.isBlank()) {
+            return "unknown";
+        }
+        return UNSAFE_PATH_CHARS.matcher(value).replaceAll("_");
     }
 }
 

@@ -4,8 +4,11 @@ import com.iems.documentservice.dto.response.ApiResponseDto;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.context.request.WebRequest;
 
 import java.util.Map;
@@ -45,6 +48,26 @@ public class GlobalExceptionHandler {
                 HttpStatus.BAD_REQUEST.value(),
                 "Validation failed",
                 errors
+        );
+        return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiResponseDto<String>> handleMaxUploadSizeExceeded(MaxUploadSizeExceededException ex) {
+        ApiResponseDto<String> response = new ApiResponseDto<>(
+                HttpStatus.PAYLOAD_TOO_LARGE.value(),
+                "Uploaded file exceeds the maximum allowed size",
+                null
+        );
+        return new ResponseEntity<>(response, HttpStatus.PAYLOAD_TOO_LARGE);
+    }
+
+    @ExceptionHandler({MissingServletRequestPartException.class, MissingServletRequestParameterException.class})
+    public ResponseEntity<ApiResponseDto<String>> handleMissingMultipartInput(Exception ex) {
+        ApiResponseDto<String> response = new ApiResponseDto<>(
+                HttpStatus.BAD_REQUEST.value(),
+                ex.getMessage(),
+                null
         );
         return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
     }

@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -36,8 +37,19 @@ public class FavoriteService {
     @Transactional
     public boolean toggle(UUID targetId, String type) {
         UUID userId = permissionHelper.getCurrentUserId();
-        if (!permissionHelper.validateTargetExists(targetId, type)) {
-            throw new AppException(DocumentErrorCode.FOLDER_NOT_FOUND);
+        String normalizedType = type == null ? "" : type.trim().toUpperCase(Locale.ROOT);
+        if ("FILE".equals(normalizedType)) {
+            var file = storedFileRepository.findById(targetId)
+                    .filter(f -> f.getDeletedAt() == null)
+                    .orElseThrow(() -> new AppException(DocumentErrorCode.FILE_NOT_FOUND));
+            permissionHelper.enforceReadPermission(file, userId);
+        } else if ("FOLDER".equals(normalizedType)) {
+            folderRepository.findById(targetId)
+                    .filter(f -> f.getDeletedAt() == null)
+                    .orElseThrow(() -> new AppException(DocumentErrorCode.FOLDER_NOT_FOUND));
+            permissionHelper.enforceFolderReadPermission(targetId, userId);
+        } else {
+            throw new AppException(DocumentErrorCode.INVALID_REQUEST);
         }
         var existing = favoriteRepository.findByUserIdAndTargetId(userId, targetId);
         if (existing.isPresent()) {
@@ -69,6 +81,9 @@ public class FavoriteService {
         var file = storedFileRepository.findById(fav.getTargetId());
         if (file.isPresent()) {
             var f = file.get();
+            if (f.getDeletedAt() != null) {
+                return unknownFavorite(fav);
+            }
             return FavoriteItemResponse.builder()
                     .id(fav.getId())
                     .targetId(fav.getTargetId())
@@ -86,6 +101,9 @@ public class FavoriteService {
         var folder = folderRepository.findById(fav.getTargetId());
         if (folder.isPresent()) {
             var fo = folder.get();
+            if (fo.getDeletedAt() != null) {
+                return unknownFavorite(fav);
+            }
             return FavoriteItemResponse.builder()
                     .id(fav.getId())
                     .targetId(fav.getTargetId())
@@ -97,6 +115,10 @@ public class FavoriteService {
                     .parentId(fo.getParent() != null ? fo.getParent().getId() : null)
                     .build();
         }
+        return unknownFavorite(fav);
+    }
+
+    private FavoriteItemResponse unknownFavorite(Favorite fav) {
         return FavoriteItemResponse.builder()
                 .id(fav.getId())
                 .targetId(fav.getTargetId())

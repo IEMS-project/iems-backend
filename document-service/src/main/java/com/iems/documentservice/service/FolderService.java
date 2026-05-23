@@ -1,5 +1,7 @@
 package com.iems.documentservice.service;
 
+import com.iems.documentservice.client.UserServiceFeignClient;
+import com.iems.documentservice.dto.request.AccountIdsDto;
 import com.iems.documentservice.dto.request.CreateFolderRequest;
 import com.iems.documentservice.dto.response.FolderResponse;
 import com.iems.documentservice.entity.Folder;
@@ -25,15 +27,18 @@ public class FolderService {
     private final ShareRepository shareRepository;
     private final FavoriteRepository favoriteRepository;
     private final PermissionHelper permissionHelper;
+    private final UserServiceFeignClient userServiceFeignClient;
 
     public FolderService(FolderRepository folderRepository,
                          ShareRepository shareRepository,
                          FavoriteRepository favoriteRepository,
-                         PermissionHelper permissionHelper) {
+                         PermissionHelper permissionHelper,
+                         UserServiceFeignClient userServiceFeignClient) {
         this.folderRepository = folderRepository;
         this.shareRepository = shareRepository;
         this.favoriteRepository = favoriteRepository;
         this.permissionHelper = permissionHelper;
+        this.userServiceFeignClient = userServiceFeignClient;
     }
 
     @Transactional
@@ -67,9 +72,15 @@ public class FolderService {
                         .collect(Collectors.toList());
         List<Folder> publicFolders = folderRepository.findByPermissionAndDeletedAtIsNull(Permission.PUBLIC);
         Set<UUID> seen = new HashSet<>();
-        return Stream.concat(Stream.concat(owned.stream(), shared.stream()), publicFolders.stream())
+        List<Folder> visibleFolders = Stream.concat(Stream.concat(owned.stream(), shared.stream()), publicFolders.stream())
                 .filter(f -> seen.add(f.getId()))
-                .map(f -> toResponse(f, userId))
+                .toList();
+        Set<UUID> favoriteIds = loadFavoriteIds(userId, visibleFolders);
+        Set<UUID> ownerIds = visibleFolders.stream().map(Folder::getOwnerId).collect(Collectors.toSet());
+        Map<UUID, Map<String, Object>> owners = loadUsersByAccountId(ownerIds);
+
+        return visibleFolders.stream()
+                .map(f -> toResponse(f, userId, favoriteIds, owners.get(f.getOwnerId())))
                 .collect(Collectors.toList());
     }
 
@@ -92,9 +103,15 @@ public class FolderService {
         folderRepository.findByParentIdAndDeletedAtIsNull(parentId).stream()
                 .filter(f -> f.getPermission() == Permission.PUBLIC)
                 .map(Folder::getId).forEach(accessible::add);
-        return folderRepository.findByIdIn(new ArrayList<>(accessible)).stream()
+        List<Folder> visibleFolders = folderRepository.findByIdIn(new ArrayList<>(accessible)).stream()
                 .filter(f -> f.getDeletedAt() == null)
-                .map(f -> toResponse(f, userId))
+                .toList();
+        Set<UUID> favoriteIds = loadFavoriteIds(userId, visibleFolders);
+        Set<UUID> ownerIds = visibleFolders.stream().map(Folder::getOwnerId).collect(Collectors.toSet());
+        Map<UUID, Map<String, Object>> owners = loadUsersByAccountId(ownerIds);
+
+        return visibleFolders.stream()
+                .map(f -> toResponse(f, userId, favoriteIds, owners.get(f.getOwnerId())))
                 .collect(Collectors.toList());
     }
 
@@ -102,7 +119,7 @@ public class FolderService {
     public void rename(UUID folderId, String newName) {
         UUID userId = permissionHelper.getCurrentUserId();
         Folder folder = getOrThrow(folderId);
-        permissionHelper.enforceOwner(folder.getOwnerId(), userId);
+        permissionHelper.enforceFolderOwnerOrParentOwner(folder, userId);
         folder.setName(newName);
         folderRepository.save(folder);
     }
@@ -111,7 +128,7 @@ public class FolderService {
     public void move(UUID folderId, UUID newParentId) {
         UUID userId = permissionHelper.getCurrentUserId();
         Folder folder = getOrThrow(folderId);
-        permissionHelper.enforceOwner(folder.getOwnerId(), userId);
+        permissionHelper.enforceFolderOwnerOrParentOwner(folder, userId);
         permissionHelper.enforceWritePermission(newParentId, userId);
         if (newParentId != null) {
             Folder newParent = folderRepository.findById(newParentId)
@@ -131,7 +148,7 @@ public class FolderService {
     public void updatePermission(UUID folderId, Permission permission) {
         UUID userId = permissionHelper.getCurrentUserId();
         Folder folder = getOrThrow(folderId);
-        permissionHelper.enforceOwner(folder.getOwnerId(), userId);
+        permissionHelper.enforceFolderOwnerOrParentOwner(folder, userId);
         folder.setPermission(permission);
         folderRepository.save(folder);
     }
@@ -141,7 +158,7 @@ public class FolderService {
     public void softDelete(UUID folderId) {
         UUID userId = permissionHelper.getCurrentUserId();
         Folder folder = getOrThrow(folderId);
-        permissionHelper.enforceOwner(folder.getOwnerId(), userId);
+        permissionHelper.enforceFolderOwnerOrParentOwner(folder, userId);
         softDeleteRecursive(folder);
     }
 
@@ -156,9 +173,8 @@ public class FolderService {
 
     public List<com.iems.documentservice.dto.response.SearchResultItem> searchFolders(String query) {
         UUID userId = permissionHelper.getCurrentUserId();
-        String q = query == null ? "" : query.toLowerCase();
-        return folderRepository.findByOwnerId(userId).stream()
-                .filter(f -> f.getName() != null && f.getName().toLowerCase().contains(q))
+        String q = query == null ? "" : query.trim();
+        return folderRepository.findByOwnerIdAndDeletedAtIsNullAndNameContainingIgnoreCase(userId, q).stream()
                 .map(f -> com.iems.documentservice.dto.response.SearchResultItem.builder()
                         .id(f.getId())
                         .name(f.getName())
@@ -179,14 +195,99 @@ public class FolderService {
     }
 
     public FolderResponse toResponse(Folder folder, UUID userId) {
-        return FolderResponse.builder()
+        Map<String, Object> owner = null;
+        if (folder.getOwnerId() != null) {
+            Map<UUID, Map<String, Object>> owners = loadUsersByAccountId(List.of(folder.getOwnerId()));
+            owner = owners.get(folder.getOwnerId());
+        }
+        return toResponse(folder, userId, loadFavoriteIds(userId, List.of(folder)), owner);
+    }
+
+    private FolderResponse toResponse(Folder folder, UUID userId, Set<UUID> favoriteIds, Map<String, Object> owner) {
+        var builder = FolderResponse.builder()
                 .id(folder.getId())
                 .name(folder.getName())
                 .parentId(folder.getParent() != null ? folder.getParent().getId() : null)
                 .ownerId(folder.getOwnerId())
                 .permission(folder.getPermission())
                 .createdAt(folder.getCreatedAt())
-                .favorite(favoriteRepository.findByUserIdAndTargetId(userId, folder.getId()).isPresent())
-                .build();
+                .favorite(favoriteIds.contains(folder.getId()));
+
+        if (owner != null) {
+            if (owner.get("firstName") != null) {
+                builder.ownerName(owner.get("firstName").toString() + " " + (owner.get("lastName") != null ? owner.get("lastName").toString() : ""));
+            }
+            if (owner.get("email") != null) builder.ownerEmail(owner.get("email").toString());
+            if (owner.get("image") != null) builder.ownerAvatar(owner.get("image").toString());
+        }
+
+        // Add breadcrumbs
+        builder.breadcrumbs(buildFolderBreadcrumbs(folder));
+
+        return builder.build();
+    }
+
+    private List<FolderResponse.BreadcrumbResponse> buildFolderBreadcrumbs(Folder folder) {
+        List<FolderResponse.BreadcrumbResponse> crumbs = new ArrayList<>();
+        Folder cur = folder;
+        while (cur != null) {
+            crumbs.add(0, FolderResponse.BreadcrumbResponse.builder()
+                    .id(cur.getId())
+                    .name(cur.getName())
+                    .build());
+            cur = cur.getParent();
+        }
+        return crumbs;
+    }
+
+    private Map<UUID, Map<String, Object>> loadUsersByAccountId(Collection<UUID> accountIds) {
+        if (accountIds == null || accountIds.isEmpty()) {
+            return Map.of();
+        }
+        try {
+            var resp = userServiceFeignClient.getUsersByAccountIds(new AccountIdsDto(new HashSet<>(accountIds)));
+            if (resp == null || !resp.getStatusCode().is2xxSuccessful() || !(resp.getBody() instanceof Map<?, ?> api)) {
+                return Map.of();
+            }
+            Object data = api.get("data");
+            if (!(data instanceof List<?> users)) {
+                return Map.of();
+            }
+            Map<UUID, Map<String, Object>> result = new HashMap<>();
+            for (Object item : users) {
+                if (item instanceof Map<?, ?> rawUser) {
+                    Object idValue = rawUser.get("id");
+                    if (idValue == null) {
+                        continue;
+                    }
+                    try {
+                        UUID id = UUID.fromString(idValue.toString());
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> user = (Map<String, Object>) rawUser;
+                        result.put(id, user);
+                    } catch (IllegalArgumentException ignored) {
+                    }
+                }
+            }
+            return result;
+        } catch (Exception ignored) {
+            return Map.of();
+        }
+    }
+
+    private Set<UUID> loadFavoriteIds(UUID userId, Collection<Folder> folders) {
+        if (userId == null || folders == null || folders.isEmpty()) {
+            return Set.of();
+        }
+        Set<UUID> ids = folders.stream()
+                .map(Folder::getId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        if (ids.isEmpty()) {
+            return Set.of();
+        }
+        return favoriteRepository.findByUserIdAndTargetIdIn(userId, ids).stream()
+                .map(f -> f.getTargetId())
+                .collect(Collectors.toSet());
     }
 }
