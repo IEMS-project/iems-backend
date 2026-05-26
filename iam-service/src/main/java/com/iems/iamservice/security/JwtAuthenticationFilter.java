@@ -1,5 +1,6 @@
 package com.iems.iamservice.security;
 
+import com.iems.iamservice.service.AccountStatusCacheService;
 import com.iems.iamservice.service.JwtService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -32,6 +33,7 @@ import java.util.UUID;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
+    private final AccountStatusCacheService accountStatusCacheService;
 
     @Override
     protected void doFilterInternal(
@@ -63,6 +65,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
             // Check if user is already authenticated
             if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+                if (!accountStatusCacheService.isEnabled(userId)) {
+                    SecurityContextHolder.clearContext();
+                    response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                    response.setContentType("application/json");
+                    response.getWriter().write("{\"status\":\"error\",\"message\":\"Account is locked\"}");
+                    return;
+                }
+
                 // Get user information
                 List<GrantedAuthority> authorities = new ArrayList<>();
 

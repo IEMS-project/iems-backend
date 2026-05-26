@@ -68,6 +68,7 @@ public class IssueService {
     private final ActivityLogService activityLogService;
     private final UserServiceFeignClient userServiceFeignClient;
     private final ObjectMapper objectMapper;
+    private final ProjectSubscriptionSyncService projectSubscriptionSyncService;
     private final SubscriptionLimitService subscriptionLimitService;
     private final NotificationPublisher notificationPublisher;
     private final ActorNameResolver actorNameResolver;
@@ -104,7 +105,9 @@ public class IssueService {
         return new UserInfoDto(u.getId(), name.trim(), u.getEmail(), u.getImage());
     }
 
-    private IssueResponseDto toDto(Issue issue, Map<UUID, UserDetailDto> userMap) {
+    private IssueResponseDto toDto(Issue issue, Map<UUID, UserDetailDto> userMap, Map<UUID, WorkflowStatus> statusMap) {
+        WorkflowStatus status = issue.getStatusId() != null ? statusMap.get(issue.getStatusId()) : null;
+
         return IssueResponseDto.builder()
                 .id(issue.getId())
                 .projectId(issue.getProjectId())
@@ -128,10 +131,8 @@ public class IssueService {
                 .labels(issue.getLabels().stream()
                         .map(l -> new com.iems.projectservice.dto.response.LabelDto(l.getId(), l.getName(), l.getColor()))
                         .collect(Collectors.toSet()))
-                .statusName(issue.getStatusId() != null ? 
-                    workflowStatusRepository.findById(issue.getStatusId()).map(WorkflowStatus::getName).orElse(null) : null)
-                .statusCategory(issue.getStatusId() != null ? 
-                    workflowStatusRepository.findById(issue.getStatusId()).map(s -> s.getCategory().name()).orElse(null) : null)
+                .statusName(status != null ? status.getName() : null)
+                .statusCategory(status != null && status.getCategory() != null ? status.getCategory().name() : null)
                 .build();
     }
 
@@ -141,19 +142,31 @@ public class IssueService {
             ids.add(issue.getAssigneeId());
         if (issue.getReporterId() != null)
             ids.add(issue.getReporterId());
-        return toDto(issue, fetchUsers(ids));
+        Map<UUID, WorkflowStatus> statusMap = issue.getStatusId() != null
+                ? workflowStatusRepository.findById(issue.getStatusId())
+                        .map(status -> Map.of(status.getId(), status))
+                        .orElse(Collections.emptyMap())
+                : Collections.emptyMap();
+        return toDto(issue, fetchUsers(ids), statusMap);
     }
 
     private List<IssueResponseDto> enrichList(List<Issue> issues) {
         Set<UUID> ids = new HashSet<>();
+        Set<UUID> statusIds = new HashSet<>();
         for (Issue i : issues) {
             if (i.getAssigneeId() != null)
                 ids.add(i.getAssigneeId());
             if (i.getReporterId() != null)
                 ids.add(i.getReporterId());
+            if (i.getStatusId() != null)
+                statusIds.add(i.getStatusId());
         }
         Map<UUID, UserDetailDto> userMap = fetchUsers(ids);
-        return issues.stream().map(i -> toDto(i, userMap)).collect(Collectors.toList());
+        Map<UUID, WorkflowStatus> statusMap = statusIds.isEmpty()
+                ? Collections.emptyMap()
+                : workflowStatusRepository.findAllById(statusIds).stream()
+                        .collect(Collectors.toMap(WorkflowStatus::getId, status -> status));
+        return issues.stream().map(i -> toDto(i, userMap, statusMap)).collect(Collectors.toList());
     }
 
     // ── Issue CRUD ───────────────────────────────────────────────────────────
@@ -163,16 +176,15 @@ public class IssueService {
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new AppException(ProjectErrorCode.PROJECT_NOT_FOUND));
 
-        // Check project lock
+        // Check project lock after refreshing a stale owner subscription cache.
+        project = projectSubscriptionSyncService.refreshProjectSubscription(project);
         if (project.isLocked()) {
             throw new AppException(ProjectErrorCode.PROJECT_LOCKED);
         }
 
         // Check issue limit based on project owner's subscription
-        long currentIssueCount = issueRepository.countByProjectId(projectId);
-        subscriptionLimitService.checkCanCreateIssue(currentIssueCount, project.getOwnerSubscription());
-
         long count = issueRepository.countByProjectId(projectId);
+        subscriptionLimitService.checkCanCreateIssue(count, project.getOwnerSubscription());
         String issueKey = project.getProjectKey() + "-" + (count + 1);
 
         UUID defaultStatusId = resolveDefaultStatusId(projectId);

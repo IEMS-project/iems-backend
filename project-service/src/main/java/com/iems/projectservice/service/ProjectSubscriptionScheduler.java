@@ -1,6 +1,7 @@
 package com.iems.projectservice.service;
 
 import com.iems.projectservice.entity.Project;
+import com.iems.projectservice.entity.enums.MemberStatus;
 import com.iems.projectservice.repository.IssueRepository;
 import com.iems.projectservice.repository.ProjectMemberRepository;
 import com.iems.projectservice.repository.ProjectRepository;
@@ -92,7 +93,7 @@ public class ProjectSubscriptionScheduler {
      * Check if a project violates FREE-tier limits.
      */
     private boolean isViolatingFreeLimits(Project project) {
-        long memberCount = projectMemberRepository.countByProjectId(project.getId());
+        long memberCount = projectMemberRepository.countByProjectIdAndStatus(project.getId(), MemberStatus.ACTIVE);
         var freeSettings = subscriptionLimitService.settingsFor(false);
         if (memberCount > freeSettings.getMaxMembersPerProject()) return true;
 

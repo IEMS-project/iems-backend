@@ -26,6 +26,9 @@ public interface UserServiceFeignClient {
     @GetMapping("/users/by-account/{accountId}")
     ResponseEntity<Map<String, Object>> getUserByAccountId(@PathVariable("accountId") UUID accountId);
 
+    @GetMapping("/users/by-account/{accountId}/subscription")
+    ResponseEntity<Map<String, Object>> getAccountSubscription(@PathVariable("accountId") UUID accountId);
+
     @PostMapping("/users/by-ids")
     ResponseEntity<Map<String, Object>> getUsersByID(
             @RequestBody UserIdsDto request

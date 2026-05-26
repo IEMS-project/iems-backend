@@ -7,6 +7,7 @@ import com.iems.projectservice.dto.response.ApiResponseDto;
 import com.iems.projectservice.dto.response.BatchOperationResultDto;
 import com.iems.projectservice.dto.response.ProjectMemberResponseDto;
 import com.iems.projectservice.entity.ProjectMember;
+import com.iems.projectservice.entity.enums.MemberStatus;
 import com.iems.projectservice.entity.enums.ProjectPermission;
 import com.iems.projectservice.exception.AppException;
 import com.iems.projectservice.service.ProjectMemberService;
@@ -85,6 +86,17 @@ public class ProjectMemberController {
             @RequestParam UUID roleId) throws AppException {
         ProjectMember member = projectMemberService.updateMemberRole(projectId, accountId, roleId);
         return ResponseEntity.ok(new ApiResponseDto<>("success", "Member role updated successfully", member));
+    }
+
+    @PatchMapping("/{accountId}/status")
+    @Operation(summary = "Change member status")
+    @RequireProjectPermission(ProjectPermission.MEMBER_ROLE_ASSIGN)
+    public ResponseEntity<ApiResponseDto<ProjectMember>> updateMemberStatus(
+            @PathVariable UUID projectId,
+            @PathVariable UUID accountId,
+            @RequestParam MemberStatus status) throws AppException {
+        ProjectMember member = projectMemberService.updateMemberStatus(projectId, accountId, status);
+        return ResponseEntity.ok(new ApiResponseDto<>("success", "Member status updated successfully", member));
     }
 
     @GetMapping

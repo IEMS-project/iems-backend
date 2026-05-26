@@ -2,6 +2,7 @@ package com.iems.iamservice.controller;
 
 import com.iems.iamservice.dto.ApiResponseDto;
 import com.iems.iamservice.dto.request.*;
+import com.iems.iamservice.dto.response.AdminAccountResponseDto;
 import com.iems.iamservice.dto.response.AccountResponseDto;
 import com.iems.iamservice.entity.Account;
 import com.iems.iamservice.service.AccountService;
@@ -12,6 +13,9 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
@@ -39,7 +43,7 @@ public class AccountController {
         var created = accountService.createUser(dto);
         var response = accountService.toUserResponse(created);
         
-        return ResponseEntity.created(URI.create("/api/users/" + created.getId()))
+        return ResponseEntity.created(URI.create("/api/accounts/" + created.getId()))
                 .body(ApiResponseDto.<AccountResponseDto>builder()
                         .status("success")
                         .message("User created successfully")
@@ -59,6 +63,25 @@ public class AccountController {
         return ResponseEntity.ok(ApiResponseDto.<List<AccountResponseDto>>builder()
                 .status("success")
                 .message("Users list retrieved successfully")
+                .data(data)
+                .build());
+    }
+
+    @GetMapping("/_admin")
+    @Operation(summary = "List admin accounts", description = "Get paginated accounts with profile/avatar fields for admin UI")
+    public ResponseEntity<ApiResponseDto<Page<AdminAccountResponseDto>>> listAdminAccounts(
+            @RequestParam(defaultValue = "") String q,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        int safePage = Math.max(page, 0);
+        int safeSize = Math.min(Math.max(size, 1), 100);
+        var pageable = PageRequest.of(safePage, safeSize, Sort.by(Sort.Direction.DESC, "createdAt"));
+        var data = accountService.searchAdminAccounts(q, pageable);
+
+        return ResponseEntity.ok(ApiResponseDto.<Page<AdminAccountResponseDto>>builder()
+                .status("success")
+                .message("Admin accounts retrieved successfully")
                 .data(data)
                 .build());
     }
@@ -93,20 +116,6 @@ public class AccountController {
                 .build());
     }
 
-    @PutMapping("/{id}/password")
-    @Operation(summary = "Reset user password", description = "Reset password for a user account")
-    public ResponseEntity<ApiResponseDto<Void>> resetPassword(@PathVariable UUID id,
-                                                              @Valid @RequestBody ResetPasswordRequestDto dto) {
-        log.info("Resetting password for user ID: {}", id);
-
-        accountService.resetPassword(id, dto.getNewPassword());
-
-        return ResponseEntity.ok(ApiResponseDto.<Void>builder()
-                .status("success")
-                .message("Password reset successfully")
-                .build());
-    }
-
     @PutMapping("/{id}/lock")
     @Operation(summary = "Lock/Unlock user", description = "Lock or unlock user account")
     public ResponseEntity<ApiResponseDto<AccountResponseDto>> lockUser(@PathVariable UUID id, @Valid @RequestBody LockUserRequestDto dto) {
@@ -133,19 +142,6 @@ public class AccountController {
         return ResponseEntity.ok(ApiResponseDto.<Void>builder()
                 .status("success")
                 .message("Role assigned to user successfully")
-                .build());
-    }
-
-    @PutMapping("/{id}/roles")
-    @Operation(summary = "Replace user role", description = "Replace user role (user can only have 1 role)")
-    public ResponseEntity<ApiResponseDto<Void>> replaceRoles(@PathVariable UUID id, @Valid @RequestBody AssignRoleRequestDto dto) {
-        log.info("Replacing roles {} for user ID: {}", dto.getRoleCodes(), id);
-        
-        userRolePermissionService.replaceUserRoles(id, dto.getRoleCodes());
-        
-        return ResponseEntity.ok(ApiResponseDto.<Void>builder()
-                .status("success")
-                .message("User roles replaced successfully")
                 .build());
     }
 

@@ -3,6 +3,7 @@ package com.iems.iamservice.service;
 import com.iems.iamservice.dto.request.CreateUserDto;
 import com.iems.iamservice.dto.request.UpdateUserDto;
 import com.iems.iamservice.dto.request.UserIdsDto;
+import com.iems.iamservice.dto.response.AccountSubscriptionResponseDto;
 import com.iems.iamservice.dto.response.UserBasicInfoDto;
 import com.iems.iamservice.dto.response.UserResponseDto;
 import com.iems.iamservice.entity.User;
@@ -105,17 +106,6 @@ public class UserService {
         }
     }
 
-    public List<UserResponseDto> getAllUsers() {
-        try {
-            return repository.findAll()
-                    .stream()
-                    .map(this::convertToUserResponse)
-                    .toList();
-        } catch (Exception ex) {
-            throw new AppException(ErrorCode.INTERNAL_SERVER_ERROR);
-        }
-    }
-
     public List<UserBasicInfoDto> getAllUserBasicInfos() {
         try {
             return repository.findAll()
@@ -205,6 +195,15 @@ public class UserService {
         }
     }
 
+    public AccountSubscriptionResponseDto getAccountSubscription(UUID accountId) {
+        Account account = accountRepository.findById(accountId)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXIST));
+        return new AccountSubscriptionResponseDto(
+                account.getId(),
+                account.getSubscriptionType(),
+                account.getPremiumUntil());
+    }
+
     public List<UserResponseDto> getUsersByID(UserIdsDto request) {
         try {
             if (request == null || request.getIds() == null || request.getIds().isEmpty()) {
@@ -228,19 +227,6 @@ public class UserService {
                     .stream()
                     .map(this::convertToUserResponse)
                     .toList();
-        } catch (Exception ex) {
-            throw new AppException(ErrorCode.INTERNAL_SERVER_ERROR);
-        }
-    }
-
-    public void deleteUser(UUID id) {
-        try {
-            if (!repository.existsById(id)) {
-                throw new AppException(ErrorCode.USER_NOT_EXIST);
-            }
-            repository.deleteById(id);
-        } catch (AppException e) {
-            throw e;
         } catch (Exception ex) {
             throw new AppException(ErrorCode.INTERNAL_SERVER_ERROR);
         }
@@ -305,9 +291,9 @@ public class UserService {
             user.setImage(userRequest.getImage());
     }
 
-    public Optional<UserResponseDto> updateAvatar(UUID id, String imageUrl) {
+    public Optional<UserResponseDto> updateAvatarByAccountId(UUID accountId, String imageUrl) {
         try {
-            return repository.findById(id)
+            return repository.findByAccountId(accountId)
                     .map(existing -> {
                         existing.setImage(imageUrl);
                         return convertToUserResponse(repository.save(existing));

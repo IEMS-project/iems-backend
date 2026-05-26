@@ -4,7 +4,6 @@ import com.iems.projectservice.client.DocumentServiceFeignClient;
 import com.iems.projectservice.client.UserServiceFeignClient;
 import com.iems.projectservice.dto.request.AccountIdsDto;
 import com.iems.projectservice.dto.request.CreateProjectDto;
-import com.iems.projectservice.dto.request.ProjectIdsDto;
 import com.iems.projectservice.dto.request.UpdateProjectDto;
 import com.iems.projectservice.dto.response.*;
 import com.iems.projectservice.entity.Project;
@@ -68,6 +67,7 @@ public class ProjectService {
     private final UserServiceFeignClient userServiceFeignClient;
     private final ObjectMapper objectMapper;
     private final SubscriptionLimitService subscriptionLimitService;
+    private final ProjectSubscriptionSyncService projectSubscriptionSyncService;
 
     public UUID getUserIdFromRequest() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
@@ -251,14 +251,11 @@ public class ProjectService {
     public Project getProjectById(UUID projectId) {
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new AppException(ProjectErrorCode.PROJECT_NOT_FOUND));
+        project = projectSubscriptionSyncService.refreshProjectSubscription(project);
         if (project.isLocked()) {
             throw new AppException(ProjectErrorCode.PROJECT_LOCKED);
         }
         return project;
-    }
-
-    public List<Project> getAllProjects() {
-        return projectRepository.findAll();
     }
 
     public List<ProjectTableDto> getProjectsTable() {
@@ -309,15 +306,16 @@ public class ProjectService {
         }).collect(Collectors.toList());
     }
 
-    public PagedResponseDto<Project> getMyProjects(int page, int size) {
+    public PagedResponseDto<MyProjectResponseDto> getMyProjects(int page, int size) {
         UUID accountId = getUserIdFromRequest();
         int safePage = Math.max(page, 0);
         int safeSize = Math.max(1, Math.min(size, 200));
         PageRequest pageable = PageRequest.of(safePage, safeSize, Sort.by(Sort.Direction.DESC, "createdAt"));
         Page<Project> result = projectRepository.findByOwnerOrMember(accountId, pageable);
+        List<MyProjectResponseDto> content = enrichMyProjects(result.getContent());
 
         return new PagedResponseDto<>(
-                result.getContent(),
+                content,
                 result.getNumber(),
                 result.getSize(),
                 result.getTotalElements(),
@@ -325,20 +323,61 @@ public class ProjectService {
                 result.isLast());
     }
 
-    public List<ProjectInfoResponse> getProjectsByID(ProjectIdsDto projectIds) {
-        List<ProjectInfoResponse> list = new ArrayList<>();
-        for (UUID projectId : projectIds.getIds()) {
-            projectRepository.findById(projectId).ifPresent(project -> {
-                ProjectInfoResponse response = new ProjectInfoResponse();
-                response.setId(project.getId());
-                response.setName(project.getName());
-                response.setDescription(project.getDescription());
-                response.setStartDate(project.getStartDate());
-                response.setEndDate(project.getEndDate());
-                list.add(response);
-            });
+    private List<MyProjectResponseDto> enrichMyProjects(List<Project> projects) {
+        if (projects == null || projects.isEmpty()) {
+            return List.of();
         }
-        return list;
+
+        Set<UUID> managerIds = projects.stream()
+                .map(Project::getManagerAccountId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        Map<UUID, UserDetailDto> userMap = new HashMap<>();
+        if (!managerIds.isEmpty()) {
+            try {
+                ResponseEntity<Map<String, Object>> response = userServiceFeignClient
+                        .getUsersByAccountIds(new AccountIdsDto(managerIds));
+                if (response.getBody() != null && response.getBody().get("data") != null) {
+                    List<UserDetailDto> users = objectMapper.convertValue(
+                            response.getBody().get("data"),
+                            objectMapper.getTypeFactory().constructCollectionType(List.class, UserDetailDto.class));
+                    userMap = users.stream()
+                            .filter(u -> u.getId() != null)
+                            .collect(Collectors.toMap(UserDetailDto::getId, u -> u));
+                }
+            } catch (Exception e) {
+                log.warn("Failed to fetch manager details for my projects from IAM service: {}", e.getMessage());
+            }
+        }
+
+        Map<UUID, UserDetailDto> finalUserMap = userMap;
+        return projects.stream()
+                .map(project -> toMyProjectResponse(project, finalUserMap.get(project.getManagerAccountId())))
+                .collect(Collectors.toList());
+    }
+
+    private MyProjectResponseDto toMyProjectResponse(Project project, UserDetailDto manager) {
+        String managerName = manager != null
+                ? (Optional.ofNullable(manager.getFirstName()).orElse("").trim() + " "
+                        + Optional.ofNullable(manager.getLastName()).orElse("").trim()).trim()
+                : null;
+
+        MyProjectResponseDto dto = new MyProjectResponseDto();
+        dto.setId(project.getId());
+        dto.setName(project.getName());
+        dto.setDescription(project.getDescription());
+        dto.setStartDate(project.getStartDate());
+        dto.setEndDate(project.getEndDate());
+        dto.setStatus(project.getStatus());
+        dto.setCreatedBy(project.getCreatedByAccountId());
+        dto.setManagerId(project.getManagerAccountId());
+        dto.setManagerName(managerName);
+        dto.setManagerEmail(manager != null ? manager.getEmail() : null);
+        dto.setManagerImage(manager != null ? manager.getImage() : null);
+        dto.setCreatedAt(project.getCreatedAt());
+        dto.setUpdatedAt(project.getUpdatedAt());
+        return dto;
     }
 
     private boolean hasPermissionToUpdateProject(Project project, UUID accountId) {

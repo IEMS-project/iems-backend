@@ -1,6 +1,5 @@
 package com.iems.iamservice.dto.request;
 
-import com.iems.iamservice.entity.enums.ContractType;
 import com.iems.iamservice.entity.enums.Gender;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -22,7 +21,6 @@ public class UpdateUserDto {
     private Date dob;
     private Gender gender;
     private String image;
-    private String role;
 }
 
 

@@ -2,11 +2,10 @@ package com.iems.projectservice.controller;
 
 import com.iems.projectservice.annotation.RequireProjectPermission;
 import com.iems.projectservice.dto.request.CreateProjectDto;
-import com.iems.projectservice.dto.request.ProjectIdsDto;
 import com.iems.projectservice.dto.request.UpdateProjectDto;
 import com.iems.projectservice.dto.response.ApiResponseDto;
+import com.iems.projectservice.dto.response.MyProjectResponseDto;
 import com.iems.projectservice.dto.response.PagedResponseDto;
-import com.iems.projectservice.dto.response.ProjectInfoResponse;
 import com.iems.projectservice.dto.response.ProjectTableDto;
 import com.iems.projectservice.entity.Project;
 import com.iems.projectservice.entity.enums.ProjectPermission;
@@ -67,13 +66,6 @@ public class ProjectController {
         return ResponseEntity.ok(new ApiResponseDto<>("success", "Project retrieved successfully", project));
     }
 
-    @GetMapping("/all")
-    @Operation(summary = "Get all projects")
-    public ResponseEntity<ApiResponseDto<List<Project>>> getAllProjects() throws AppException {
-        List<Project> projects = projectService.getAllProjects();
-        return ResponseEntity.ok(new ApiResponseDto<>("success", "All projects retrieved successfully", projects));
-    }
-
     @GetMapping("/table")
     @Operation(summary = "Get projects table with manager info")
     public ResponseEntity<ApiResponseDto<List<ProjectTableDto>>> getProjectsTable() throws AppException {
@@ -83,18 +75,11 @@ public class ProjectController {
 
     @GetMapping("/my-projects")
     @Operation(summary = "Get my projects")
-    public ResponseEntity<ApiResponseDto<PagedResponseDto<Project>>> getMyProjects(
+    public ResponseEntity<ApiResponseDto<PagedResponseDto<MyProjectResponseDto>>> getMyProjects(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) throws AppException {
-        PagedResponseDto<Project> projects = projectService.getMyProjects(page, size);
+        PagedResponseDto<MyProjectResponseDto> projects = projectService.getMyProjects(page, size);
         return ResponseEntity.ok(new ApiResponseDto<>("success", "User projects retrieved successfully", projects));
     }
 
-    @PostMapping("/by-ids")
-    @Operation(summary = "Get projects by IDs")
-    public ResponseEntity<ApiResponseDto<List<ProjectInfoResponse>>> getProjectsByID(
-            @RequestBody ProjectIdsDto request) throws AppException {
-        List<ProjectInfoResponse> data = projectService.getProjectsByID(request);
-        return ResponseEntity.ok(new ApiResponseDto<>("success", "Projects retrieved successfully", data));
-    }
 }

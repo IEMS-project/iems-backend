@@ -7,6 +7,7 @@ import com.iems.projectservice.dto.response.ProjectMemberResponseDto;
 import com.iems.projectservice.dto.response.UserDetailDto;
 import com.iems.projectservice.entity.ProjectMember;
 import com.iems.projectservice.entity.Role;
+import com.iems.projectservice.entity.enums.MemberStatus;
 import com.iems.projectservice.exception.AppException;
 import com.iems.projectservice.exception.ProjectErrorCode;
 import com.iems.projectservice.repository.ProjectMemberRepository;
@@ -46,7 +47,7 @@ public class ProjectMemberService {
         // Check member limit based on project owner's subscription
         String ownerSub = projectRepository.findById(projectId)
                 .map(p -> p.getOwnerSubscription()).orElse("FREE");
-        long memberCount = projectMemberRepository.countByProjectId(projectId);
+        long memberCount = projectMemberRepository.countByProjectIdAndStatus(projectId, MemberStatus.ACTIVE);
         subscriptionLimitService.checkCanAddMember(memberCount, ownerSub);
 
         ProjectMember member = new ProjectMember();
@@ -67,7 +68,7 @@ public class ProjectMemberService {
         if (!accountId.equals(assignedBy)) {
             String ownerSub = projectRepository.findById(projectId)
                     .map(p -> p.getOwnerSubscription()).orElse("FREE");
-            long memberCount = projectMemberRepository.countByProjectId(projectId);
+            long memberCount = projectMemberRepository.countByProjectIdAndStatus(projectId, MemberStatus.ACTIVE);
             subscriptionLimitService.checkCanAddMember(memberCount, ownerSub);
         }
         ProjectMember member = new ProjectMember();
@@ -96,7 +97,7 @@ public class ProjectMemberService {
             UUID assignedBy) {
         String ownerSub = projectRepository.findById(projectId)
                 .map(p -> p.getOwnerSubscription()).orElse("FREE");
-        long memberCount = projectMemberRepository.countByProjectId(projectId);
+        long memberCount = projectMemberRepository.countByProjectIdAndStatus(projectId, MemberStatus.ACTIVE);
 
         List<ProjectMember> created = new ArrayList<>();
         for (UUID accountId : accountIds) {
@@ -122,7 +123,7 @@ public class ProjectMemberService {
             UUID assignedBy) {
         String ownerSub = projectRepository.findById(projectId)
                 .map(p -> p.getOwnerSubscription()).orElse("FREE");
-        long memberCount = projectMemberRepository.countByProjectId(projectId);
+        long memberCount = projectMemberRepository.countByProjectIdAndStatus(projectId, MemberStatus.ACTIVE);
 
         List<ProjectMember> created = new ArrayList<>();
         for (com.iems.projectservice.dto.request.ProjectMemberDto memberDto : members) {
@@ -158,12 +159,20 @@ public class ProjectMemberService {
         return projectMemberRepository.save(member);
     }
 
+    @Transactional
+    public ProjectMember updateMemberStatus(UUID projectId, UUID accountId, MemberStatus status) {
+        ProjectMember member = projectMemberRepository.findByProjectIdAndAccountId(projectId, accountId)
+                .orElseThrow(() -> new AppException(ProjectErrorCode.MEMBER_NOT_FOUND));
+        member.setStatus(status);
+        return projectMemberRepository.save(member);
+    }
+
     public List<ProjectMember> getProjectMembers(UUID projectId) {
         return projectMemberRepository.findByProjectId(projectId);
     }
 
     public boolean isProjectMember(UUID projectId, UUID accountId) {
-        return projectMemberRepository.existsByProjectIdAndAccountId(projectId, accountId);
+        return projectMemberRepository.existsByProjectIdAndAccountIdAndStatus(projectId, accountId, MemberStatus.ACTIVE);
     }
 
     public ProjectMember getMember(UUID projectId, UUID accountId) {

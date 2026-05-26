@@ -5,6 +5,7 @@ import com.iems.iamservice.dto.request.UpdateAvatarDto;
 import com.iems.iamservice.dto.request.UpdateUserDto;
 import com.iems.iamservice.dto.request.UserIdsDto;
 import com.iems.iamservice.dto.ApiResponseDto;
+import com.iems.iamservice.dto.response.AccountSubscriptionResponseDto;
 import com.iems.iamservice.dto.response.UserBasicInfoDto;
 import com.iems.iamservice.dto.response.UserResponseDto;
 import com.iems.iamservice.security.JwtUserDetails;
@@ -39,9 +40,9 @@ public class UserController {
         @Operation(summary = "Update avatar URL", description = "Update only the image field of current user")
         @PutMapping("/me/avatar")
         public ResponseEntity<ApiResponseDto<UserResponseDto>> updateMyAvatar(@RequestBody UpdateAvatarDto payload) {
-                UUID userId = getCurrentAccountId();
+                UUID accountId = getCurrentAccountId();
 
-                return service.updateAvatar(userId, payload.getImageUrl())
+                return service.updateAvatarByAccountId(accountId, payload.getImageUrl())
                                 .map(updated -> ResponseEntity.ok(ApiResponseDto.<UserResponseDto>builder()
                                                 .status("success")
                                                 .message("Avatar updated")
@@ -59,18 +60,6 @@ public class UserController {
                                 .status("success")
                                 .message("User saved successfully")
                                 .data(savedUser)
-                                .build());
-        }
-
-        @Operation(summary = "Get all users", description = "Retrieve a list of all users")
-        @GetMapping
-        public ResponseEntity<ApiResponseDto<List<UserResponseDto>>> getAllUsers() {
-                log.info("Getting all users");
-                List<UserResponseDto> users = service.getAllUsers();
-                return ResponseEntity.ok(ApiResponseDto.<List<UserResponseDto>>builder()
-                                .status("success")
-                                .message("Users retrieved successfully")
-                                .data(users)
                                 .build());
         }
 
@@ -101,7 +90,7 @@ public class UserController {
                                 .build());
         }
 
-        @Operation(summary = "Get project manager candidates", description = "Retrieve users who can be project managers (ADMIN or PROJECT_MANAGER roles)")
+        @Operation(summary = "Get project manager candidates", description = "Retrieve users who can be project managers")
         @GetMapping("/project-manager-candidates")
         public ResponseEntity<ApiResponseDto<List<UserBasicInfoDto>>> getProjectManagerCandidates() {
                 log.info("Getting project manager candidates");
@@ -142,6 +131,18 @@ public class UserController {
                 }
         }
 
+        @Operation(summary = "Get account subscription by Account ID", description = "Retrieve account subscription status by account ID")
+        @GetMapping("/by-account/{accountId}/subscription")
+        public ResponseEntity<ApiResponseDto<AccountSubscriptionResponseDto>> getAccountSubscription(
+                        @PathVariable UUID accountId) {
+                AccountSubscriptionResponseDto subscription = service.getAccountSubscription(accountId);
+                return ResponseEntity.ok(ApiResponseDto.<AccountSubscriptionResponseDto>builder()
+                                .status("success")
+                                .message("Account subscription retrieved successfully")
+                                .data(subscription)
+                                .build());
+        }
+
         @Operation(summary = "Get user by ID", description = "Retrieve user details by unique ID")
         @GetMapping("/{id}")
         public ResponseEntity<ApiResponseDto<UserResponseDto>> getUserById(@PathVariable UUID id) {
@@ -154,17 +155,6 @@ public class UserController {
                                                                 .data(userResponse)
                                                                 .build()))
                                 .orElseGet(() -> ResponseEntity.notFound().build());
-        }
-
-        @Operation(summary = "Delete user", description = "Delete a user by unique ID")
-        @DeleteMapping("/{id}")
-        public ResponseEntity<ApiResponseDto<Void>> deleteUser(@PathVariable UUID id) {
-                log.info("Deleting user with ID: {}", id);
-                service.deleteUser(id);
-                return ResponseEntity.ok(ApiResponseDto.<Void>builder()
-                                .status("success")
-                                .message("User deleted successfully")
-                                .build());
         }
 
         @Operation(summary = "Update user by ID", description = "Update a user's information by ID")

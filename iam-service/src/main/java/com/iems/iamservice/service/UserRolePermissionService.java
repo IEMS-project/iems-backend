@@ -60,43 +60,6 @@ public class UserRolePermissionService {
     }
 
     /**
-     * Replace role for user (single role only)
-     */
-    @Transactional
-    public void replaceUserRoles(UUID userId, Set<String> roleCodes) {
-        log.info("Replacing role {} for userId={}", roleCodes, userId);
-
-        Account account = accountRepository.findById(userId)
-                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND_BY_ID));
-
-        if (roleCodes == null || roleCodes.isEmpty()) {
-            account.setRole(null);
-            accountRepository.save(account);
-            log.info("Role removed for userId={}", userId);
-            return;
-        }
-        
-        // Validate: only 1 role allowed per user
-        if (roleCodes.size() > 1) {
-            throw new AppException(ErrorCode.MULTIPLE_ROLES_NOT_ALLOWED);
-        }
-
-        // Parse role from string
-        String roleCode = roleCodes.iterator().next();
-        UserRole role;
-        try {
-            role = UserRole.valueOf(roleCode.toUpperCase());
-        } catch (IllegalArgumentException e) {
-            throw new AppException(ErrorCode.ROLE_NOT_FOUND_BY_CODE);
-        }
-
-        account.setRole(role);
-        accountRepository.save(account);
-
-        log.info("Role {} replaced successfully for userId={}", roleCode, userId);
-    }
-
-    /**
      * Get role assigned to user (returns Set for backward compatibility)
      */
     public Set<String> getUserRoles(UUID userId) {

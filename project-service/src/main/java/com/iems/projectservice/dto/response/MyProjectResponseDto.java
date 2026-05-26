@@ -19,6 +19,10 @@ public class MyProjectResponseDto {
     private LocalDateTime endDate;
     private ProjectStatus status;
     private UUID createdBy;
+    private UUID managerId;
+    private String managerName;
+    private String managerEmail;
+    private String managerImage;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private Double progress;

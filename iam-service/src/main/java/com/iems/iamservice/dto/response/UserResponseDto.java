@@ -1,6 +1,5 @@
 package com.iems.iamservice.dto.response;
 
-import com.iems.iamservice.entity.enums.ContractType;
 import com.iems.iamservice.entity.enums.Gender;
 import lombok.AllArgsConstructor;
 import lombok.Data;
