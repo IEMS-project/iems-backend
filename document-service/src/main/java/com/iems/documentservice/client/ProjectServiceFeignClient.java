@@ -1,10 +1,13 @@
 package com.iems.documentservice.client;
 
 import com.iems.documentservice.config.FeignClientConfig;
+import com.iems.documentservice.dto.request.UpdateProjectAvatarRequest;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 
 import java.util.UUID;
 
@@ -27,5 +30,9 @@ public interface ProjectServiceFeignClient {
      */
     @GetMapping("/projects/{projectId}/members/check")
     ResponseEntity<Void> checkMembership(@PathVariable("projectId") UUID projectId);
+
+    @PutMapping("/projects/{projectId}/avatar")
+    ResponseEntity<Object> updateProjectAvatar(@PathVariable("projectId") UUID projectId,
+                                               @RequestBody UpdateProjectAvatarRequest body);
 
 }

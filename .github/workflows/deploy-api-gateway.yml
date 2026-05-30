@@ -6,7 +6,10 @@ on:
       - main
     paths:
       - 'api-gateway/**'
+      - 'pom.xml'
+      - 'compose.yml'
       - '.github/workflows/deploy-api-gateway.yml'
+  workflow_dispatch:
 
 jobs:
   build:
@@ -51,7 +54,6 @@ jobs:
 
       - name: Copy compose.yml to server
         uses: appleboy/scp-action@v0.1.7
-        continue-on-error: true
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
@@ -67,17 +69,21 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             mkdir -p ~/iems/api-gateway
-            
+
             cat > ~/iems/api-gateway/.env << EOF
-            # No specific secrets for api-gateway required
+            SERVICE_NAME=api-gateway
+            IMAGE_NAME=${{ vars.DOCKER_USERNAME }}/api-gateway:latest
+            HOST_PORT=8080
+            CONTAINER_PORT=8080
+            EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
             EOF
-            
+
             chmod 600 ~/iems/api-gateway/.env
             cd ~/iems/api-gateway
-            
+
             docker network create iems-network || true
-            docker compose pull || true
-            docker compose up -d --remove-orphans || true
-            
+            docker compose pull
+            docker compose up -d --remove-orphans
+
             docker image prune -f
-            echo "Deployment completed!"
+            echo "API gateway deployment completed!"

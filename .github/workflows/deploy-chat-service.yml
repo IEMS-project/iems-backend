@@ -6,7 +6,10 @@ on:
       - main
     paths:
       - 'chat-service/**'
+      - 'pom.xml'
+      - 'compose.yml'
       - '.github/workflows/deploy-chat-service.yml'
+  workflow_dispatch:
 
 jobs:
   build:
@@ -51,7 +54,6 @@ jobs:
 
       - name: Copy compose.yml to server
         uses: appleboy/scp-action@v0.1.7
-        continue-on-error: true
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
@@ -67,20 +69,24 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             mkdir -p ~/iems/chat-service
-            
+
             cat > ~/iems/chat-service/.env << EOF
+            SERVICE_NAME=chat-service
+            IMAGE_NAME=${{ vars.DOCKER_USERNAME }}/chat-service:latest
+            HOST_PORT=8091
+            CONTAINER_PORT=8091
             MONGODB_URI=${{ secrets.CHAT_MONGODB_URI }}
             JWT_SECRET=${{ secrets.JWT_SECRET }}
             JWT_EXPIRATION=${{ secrets.JWT_EXPIRATION }}
             JWT_REFRESH_EXPIRATION=${{ secrets.JWT_REFRESH_EXPIRATION }}
             EOF
-            
+
             chmod 600 ~/iems/chat-service/.env
             cd ~/iems/chat-service
-            
+
             docker network create iems-network || true
-            docker compose pull || true
-            docker compose up -d --remove-orphans || true
-            
+            docker compose pull
+            docker compose up -d --remove-orphans
+
             docker image prune -f
-            echo "Deployment completed!"
+            echo "Chat service deployment completed!"

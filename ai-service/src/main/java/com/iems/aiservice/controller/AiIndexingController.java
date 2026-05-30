@@ -14,8 +14,10 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Locale;
 import java.util.Map;
+import java.util.Base64;
 
 import static org.springframework.http.HttpStatus.BAD_REQUEST;
+import static org.springframework.http.HttpStatus.BAD_GATEWAY;
 
 @RestController
 @RequestMapping("/api/ai/indexing")
@@ -39,15 +41,33 @@ public class AiIndexingController {
 
         return switch (operation) {
             case "INDEX" -> {
-                if (request.downloadUrl() == null || request.downloadUrl().isBlank()) {
-                    throw new ResponseStatusException(BAD_REQUEST, "downloadUrl is required for INDEX operation");
+                if ((request.downloadUrl() == null || request.downloadUrl().isBlank())
+                        && (request.contentBase64() == null || request.contentBase64().isBlank())) {
+                    throw new ResponseStatusException(BAD_REQUEST,
+                            "downloadUrl or contentBase64 is required for INDEX operation");
                 }
-                documentContextService.indexDocument(
-                        request.projectId(),
-                        request.documentId(),
-                        request.fileName(),
-                        request.fileType(),
-                        request.downloadUrl());
+                try {
+                    if (request.contentBase64() != null && !request.contentBase64().isBlank()) {
+                        documentContextService.indexUploadedDocument(
+                                request.projectId(),
+                                request.documentId(),
+                                request.fileName(),
+                                request.fileType(),
+                                Base64.getDecoder().decode(request.contentBase64()));
+                    } else {
+                        documentContextService.indexDocument(
+                                request.projectId(),
+                                request.documentId(),
+                                request.fileName(),
+                                request.fileType(),
+                                request.downloadUrl());
+                    }
+                } catch (IllegalArgumentException ex) {
+                    throw new ResponseStatusException(BAD_REQUEST, ex.getMessage(), ex);
+                } catch (Exception ex) {
+                    throw new ResponseStatusException(BAD_GATEWAY,
+                            "Unable to index document: " + ex.getMessage(), ex);
+                }
                 log.info("Indexing command completed operation={} projectId={} documentId={}",
                         operation, request.projectId(), request.documentId());
                 yield ResponseEntity.ok(Map.of("success", true, "operation", operation));

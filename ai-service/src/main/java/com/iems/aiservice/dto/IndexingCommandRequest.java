@@ -8,5 +8,6 @@ public record IndexingCommandRequest(
         @NotBlank(message = "operation is required") String operation,
         String fileName,
         String fileType,
-        String downloadUrl) {
+        String downloadUrl,
+        String contentBase64) {
 }

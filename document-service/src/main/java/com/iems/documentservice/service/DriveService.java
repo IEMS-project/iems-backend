@@ -97,15 +97,14 @@ public class DriveService {
 
     // ══════════════════════════ FILE ══════════════════════════
 
-    @Transactional
     public FileResponse uploadFile(UUID folderId, MultipartFile file) throws Exception {
         FileResponse response = fileService.uploadFile(folderId, file);
         activityService.log("FILE", response.getId(), "documents.activity.item.created", payload("itemName", response.getName()));
         return response;
     }
 
-    public Map<String, Object> generateUploadSignature(String fileName, UUID folderId) {
-        return fileService.generateUploadSignature(fileName, folderId);
+    public Map<String, Object> generateUploadSignature(String fileName, String contentType, UUID folderId) {
+        return fileService.generateUploadSignature(fileName, contentType, folderId);
     }
 
     @Transactional
@@ -115,17 +114,14 @@ public class DriveService {
         return response;
     }
 
-    @Transactional
     public List<SimpleFileResponse> uploadFilesAndBuildPublicUrls(UUID folderId, MultipartFile[] files) throws Exception {
         return fileService.uploadBatch(folderId, files);
     }
 
-    @Transactional
     public List<SimpleFileResponse> uploadChatFiles(String conversationId, MultipartFile[] files) throws Exception {
         return fileService.uploadChatFiles(conversationId, files);
     }
 
-    @Transactional
     public List<SimpleFileResponse> uploadFilesToPublicFolder(MultipartFile[] files) throws Exception {
         return fileService.uploadPublicFiles(files);
     }

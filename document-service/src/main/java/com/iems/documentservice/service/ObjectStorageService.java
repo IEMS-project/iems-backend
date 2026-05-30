@@ -1,191 +1,212 @@
 package com.iems.documentservice.service;
 
-import com.cloudinary.Cloudinary;
-import com.cloudinary.utils.ObjectUtils;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+import software.amazon.awssdk.core.ResponseInputStream;
+import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
+import software.amazon.awssdk.services.s3.model.GetObjectRequest;
+import software.amazon.awssdk.services.s3.model.GetObjectResponse;
+import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import software.amazon.awssdk.services.s3.presigner.S3Presigner;
+import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
+import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignRequest;
 
 import java.io.InputStream;
-import java.net.URI;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
+import java.util.HashMap;
 import java.util.Map;
 
 @Service
 public class ObjectStorageService {
 
-    private final Cloudinary cloudinary;
+    private final S3Client s3Client;
+    private final S3Presigner s3Presigner;
+    private final String bucket;
+    private final String region;
+    private final String publicBaseUrl;
+    private final Duration presignedUrlExpiration;
 
-    public ObjectStorageService(Cloudinary cloudinary) {
-        this.cloudinary = cloudinary;
+    public ObjectStorageService(S3Client s3Client,
+                                S3Presigner s3Presigner,
+                                @Value("${storage.s3.bucket}") String bucket,
+                                @Value("${storage.s3.region}") String region,
+                                @Value("${storage.s3.public-base-url:}") String publicBaseUrl,
+                                @Value("${storage.s3.presigned-url-expiration-minutes:15}") long expirationMinutes) {
+        this.s3Client = s3Client;
+        this.s3Presigner = s3Presigner;
+        this.bucket = bucket;
+        this.region = region;
+        this.publicBaseUrl = publicBaseUrl;
+        this.presignedUrlExpiration = Duration.ofMinutes(expirationMinutes);
     }
 
-    /**
-     * Tạo chữ ký số (presigned upload signature) cho phép client upload trực tiếp lên Cloudinary.
-     */
     public Map<String, Object> generateUploadSignature(String objectKey, long timestamp) {
-        Map<String, Object> params = new java.util.HashMap<>();
-        params.put("public_id", objectKey);
-        params.put("timestamp", timestamp);
-        
-        try {
-            String signature = cloudinary.apiSignRequest(params, cloudinary.config.apiSecret);
-            Map<String, Object> response = new java.util.HashMap<>();
-            response.put("signature", signature);
-            response.put("apiKey", cloudinary.config.apiKey);
-            response.put("cloudName", cloudinary.config.cloudName);
-            response.put("timestamp", timestamp);
-            response.put("publicId", objectKey);
-            response.put("uploadUrl", "https://api.cloudinary.com/v1_1/" + cloudinary.config.cloudName + "/raw/upload");
-            return response;
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to generate Cloudinary upload signature", e);
-        }
+        return generateUploadSignature(objectKey, timestamp, null);
     }
 
-    /**
-     * Upload một file lên Cloudinary.
-     * Tất cả file đều dùng resource_type = "raw" để hỗ trợ mọi loại file.
-     * public_id = objectKey (giữ nguyên cấu trúc thư mục và tên file).
-     */
-    public void upload(String objectKey, InputStream inputStream, long size, String contentType) throws Exception {
-        Path tempFile = Files.createTempFile("iems-upload-", ".tmp");
-        try {
-            Files.copy(inputStream, tempFile, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-            uploadFile(objectKey, tempFile);
-        } finally {
-            Files.deleteIfExists(tempFile);
+    public Map<String, Object> generateUploadSignature(String objectKey, long timestamp, String contentType) {
+        ensureBucketConfigured();
+        PutObjectRequest.Builder putObjectRequestBuilder = PutObjectRequest.builder()
+                .bucket(bucket)
+                .key(objectKey);
+        if (contentType != null && !contentType.isBlank()) {
+            putObjectRequestBuilder.contentType(contentType);
         }
+        PutObjectRequest putObjectRequest = putObjectRequestBuilder.build();
+        PutObjectPresignRequest presignRequest = PutObjectPresignRequest.builder()
+                .signatureDuration(presignedUrlExpiration)
+                .putObjectRequest(putObjectRequest)
+                .build();
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("uploadUrl", s3Presigner.presignPutObject(presignRequest).url().toString());
+        response.put("method", "PUT");
+        response.put("bucket", bucket);
+        response.put("objectKey", objectKey);
+        response.put("publicId", objectKey);
+        response.put("timestamp", timestamp);
+        response.put("expiresInSeconds", presignedUrlExpiration.toSeconds());
+        response.put("contentType", contentType);
+        return response;
+    }
+
+    public void upload(String objectKey, InputStream inputStream, long size, String contentType) {
+        ensureBucketConfigured();
+        PutObjectRequest request = putObjectRequest(objectKey, contentType, size);
+        s3Client.putObject(request, RequestBody.fromInputStream(inputStream, size));
     }
 
     public void upload(String objectKey, MultipartFile file) throws Exception {
-        Path tempFile = Files.createTempFile("iems-upload-", ".tmp");
+        ensureBucketConfigured();
+        Path tempFile = Files.createTempFile("iems-s3-upload-", ".tmp");
         try {
             file.transferTo(tempFile);
-            uploadFile(objectKey, tempFile);
+            PutObjectRequest request = putObjectRequest(objectKey, file.getContentType(), file.getSize());
+            s3Client.putObject(request, RequestBody.fromFile(tempFile));
         } finally {
             Files.deleteIfExists(tempFile);
         }
     }
 
-    /**
-     * Tải xuống file từ Cloudinary bằng cách lấy URL công khai rồi mở stream HTTP.
-     */
-    public InputStream download(String objectKey) throws Exception {
-        String url = buildPublicUrl(objectKey);
-        return URI.create(url).toURL().openStream();
+    public InputStream download(String objectKey) {
+        ensureBucketConfigured();
+        GetObjectRequest request = GetObjectRequest.builder()
+                .bucket(bucket)
+                .key(objectKey)
+                .build();
+        ResponseInputStream<GetObjectResponse> objectStream = s3Client.getObject(request);
+        return objectStream;
     }
 
-    /**
-     * Xóa file khỏi Cloudinary.
-     * invalidate = true để xóa cache CDN.
-     */
-    public void delete(String objectKey) throws Exception {
+    public void delete(String objectKey) {
+        ensureBucketConfigured();
+        DeleteObjectRequest request = DeleteObjectRequest.builder()
+                .bucket(bucket)
+                .key(objectKey)
+                .build();
         executeWithRetry(() -> {
-            cloudinary.uploader().destroy(objectKey, ObjectUtils.asMap(
-                    "resource_type", "raw",
-                    "invalidate", true
-            ));
+            s3Client.deleteObject(request);
             return null;
         });
     }
 
-    /**
-     * Trả về URL download của file.
-     * Vì file được upload với type "upload" (public) nên URL CDN đã có thể truy cập trực tiếp.
-     * Nếu cần kiểm soát truy cập, đổi upload type sang "authenticated" và dùng privateDownload.
-     */
-    public String presignGetUrl(String objectKey) throws Exception {
+    public String presignGetUrl(String objectKey) {
+        ensureBucketConfigured();
+        GetObjectRequest getObjectRequest = GetObjectRequest.builder()
+                .bucket(bucket)
+                .key(objectKey)
+                .build();
+        GetObjectPresignRequest presignRequest = GetObjectPresignRequest.builder()
+                .signatureDuration(presignedUrlExpiration)
+                .getObjectRequest(getObjectRequest)
+                .build();
+        return s3Presigner.presignGetObject(presignRequest).url().toString();
+    }
+
+    public String buildPublicUrl(String objectKey) {
+        ensureBucketConfigured();
+        if (!publicBaseUrl.isBlank()) {
+            return trimTrailingSlash(publicBaseUrl) + "/" + encodeKey(objectKey);
+        }
+
+        return "https://" + bucket + ".s3." + region + ".amazonaws.com/" + encodeKey(objectKey);
+    }
+
+    public String uploadAndGetUrl(String objectKey, InputStream inputStream, long size, String contentType) {
+        upload(objectKey, inputStream, size, contentType);
         return buildPublicUrl(objectKey);
     }
 
-    /**
-     * Trả về URL công khai trên CDN Cloudinary.
-     * Dạng: https://res.cloudinary.com/{cloud_name}/raw/upload/{objectKey}
-     */
-    public String buildPublicUrl(String objectKey) {
-        return cloudinary.url()
-                .resourceType("raw")
-                .type("upload")
-                .generate(objectKey);
-    }
-
-    /**
-     * Upload file và trả về URL công khai ngay sau khi upload.
-     * Tiện lợi khi cần URL ngay lập tức không cần gọi buildPublicUrl riêng.
-     */
-    public String uploadAndGetUrl(String objectKey, InputStream inputStream, long size, String contentType) throws Exception {
-        Path tempFile = Files.createTempFile("iems-upload-", ".tmp");
-        try {
-            Files.copy(inputStream, tempFile, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-            return uploadFileAndGetUrl(objectKey, tempFile);
-        } finally {
-            Files.deleteIfExists(tempFile);
-        }
-    }
-
     public String uploadAndGetUrl(String objectKey, MultipartFile file) throws Exception {
-        Path tempFile = Files.createTempFile("iems-upload-", ".tmp");
-        try {
-            file.transferTo(tempFile);
-            return uploadFileAndGetUrl(objectKey, tempFile);
-        } finally {
-            Files.deleteIfExists(tempFile);
+        upload(objectKey, file);
+        return buildPublicUrl(objectKey);
+    }
+
+    private PutObjectRequest putObjectRequest(String objectKey, String contentType, long size) {
+        PutObjectRequest.Builder builder = PutObjectRequest.builder()
+                .bucket(bucket)
+                .key(objectKey)
+                .contentLength(size);
+
+        if (contentType != null && !contentType.isBlank()) {
+            builder.contentType(contentType);
+        }
+
+        return builder.build();
+    }
+
+    private void ensureBucketConfigured() {
+        if (bucket == null || bucket.isBlank()) {
+            throw new IllegalStateException("S3 bucket is not configured. Set AWS_S3_BUCKET or storage.s3.bucket.");
         }
     }
 
-    private void uploadFile(String objectKey, Path file) throws Exception {
-        executeWithRetry(() -> {
-            cloudinary.uploader().upload(file.toFile(), ObjectUtils.asMap(
-                    "public_id", objectKey,
-                    "resource_type", "raw",
-                    "overwrite", true,
-                    "invalidate", true
-            ));
-            return null;
-        });
-    }
-
-    @SuppressWarnings("unchecked")
-    private String uploadFileAndGetUrl(String objectKey, Path file) throws Exception {
-        return executeWithRetry(() -> {
-            Map<String, Object> result = cloudinary.uploader().upload(file.toFile(), ObjectUtils.asMap(
-                    "public_id", objectKey,
-                    "resource_type", "raw",
-                    "overwrite", true,
-                    "invalidate", true
-            ));
-            return (String) result.get("secure_url");
-        });
-    }
-
-    private <T> T executeWithRetry(RetryableAction<T> action) throws Exception {
+    private <T> T executeWithRetry(RetryableAction<T> action) {
         int maxAttempts = 3;
         long backoffMs = 500;
-        Exception lastException = null;
+        RuntimeException lastException = null;
         for (int attempt = 1; attempt <= maxAttempts; attempt++) {
             try {
                 return action.execute();
-            } catch (Exception e) {
+            } catch (RuntimeException e) {
                 lastException = e;
                 if (attempt == maxAttempts) {
                     break;
                 }
-                System.err.println("Cloudinary client transient error (attempt " + attempt + "): " + e.getMessage() + ". Retrying in " + backoffMs + "ms...");
+                System.err.println("S3 client transient error (attempt " + attempt + "): " + e.getMessage() + ". Retrying in " + backoffMs + "ms...");
                 try {
                     Thread.sleep(backoffMs);
                 } catch (InterruptedException ie) {
                     Thread.currentThread().interrupt();
                     throw e;
                 }
-                backoffMs *= 2; // Exponential backoff
+                backoffMs *= 2;
             }
         }
         throw lastException;
     }
 
+    private String trimTrailingSlash(String value) {
+        return value.endsWith("/") ? value.substring(0, value.length() - 1) : value;
+    }
+
+    private String encodeKey(String objectKey) {
+        String[] parts = objectKey.split("/");
+        for (int i = 0; i < parts.length; i++) {
+            parts[i] = URLEncoder.encode(parts[i], StandardCharsets.UTF_8).replace("+", "%20");
+        }
+        return String.join("/", parts);
+    }
+
     @FunctionalInterface
     private interface RetryableAction<T> {
-        T execute() throws Exception;
+        T execute();
     }
 }

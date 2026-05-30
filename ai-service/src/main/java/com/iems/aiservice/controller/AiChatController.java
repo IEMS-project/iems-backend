@@ -5,6 +5,7 @@ import com.iems.aiservice.dto.AgentChatRequest;
 import com.iems.aiservice.dto.AgentChatResponse;
 import com.iems.aiservice.dto.ChatRequest;
 import com.iems.aiservice.dto.ChatResponse;
+import com.iems.aiservice.dto.DocumentContextResult;
 import com.iems.aiservice.dto.HealthResponse;
 import com.iems.aiservice.entity.ChatMessage;
 import com.iems.aiservice.entity.Conversation;
@@ -13,7 +14,7 @@ import com.iems.aiservice.model.agent.AgentIntent;
 import com.iems.aiservice.service.ChatHistoryService;
 import com.iems.aiservice.service.DocumentContextService;
 import com.iems.aiservice.service.JwtService;
-import com.iems.aiservice.service.OllamaChatService;
+import com.iems.aiservice.service.OpenRouterChatService;
 import com.iems.aiservice.service.agent.AgentIntentRouterService;
 import com.iems.aiservice.service.agent.AgentOrchestratorService;
 import jakarta.validation.Valid;
@@ -32,38 +33,47 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 import static org.springframework.http.HttpStatus.UNAUTHORIZED;
+import static org.springframework.http.HttpStatus.BAD_REQUEST;
+import static org.springframework.http.HttpStatus.BAD_GATEWAY;
 
 @RestController
 @RequestMapping("/api/ai")
 @Slf4j
 public class AiChatController {
 
-    private final OllamaChatService ollamaChatService;
+    private final OpenRouterChatService openRouterChatService;
     private final AiProperties aiProperties;
     private final JwtService jwtService;
     private final ChatHistoryService chatHistoryService;
     private final DocumentContextService documentContextService;
     private final AgentOrchestratorService agentOrchestratorService;
     private final AgentIntentRouterService agentIntentRouterService;
+    private final MongoTemplate mongoTemplate;
 
-    public AiChatController(OllamaChatService ollamaChatService, AiProperties aiProperties, JwtService jwtService,
+    public AiChatController(OpenRouterChatService openRouterChatService, AiProperties aiProperties, JwtService jwtService,
             ChatHistoryService chatHistoryService, DocumentContextService documentContextService,
             AgentOrchestratorService agentOrchestratorService,
-            AgentIntentRouterService agentIntentRouterService) {
-        this.ollamaChatService = ollamaChatService;
+            AgentIntentRouterService agentIntentRouterService,
+            MongoTemplate mongoTemplate) {
+        this.openRouterChatService = openRouterChatService;
         this.aiProperties = aiProperties;
         this.jwtService = jwtService;
         this.chatHistoryService = chatHistoryService;
         this.documentContextService = documentContextService;
         this.agentOrchestratorService = agentOrchestratorService;
         this.agentIntentRouterService = agentIntentRouterService;
+        this.mongoTemplate = mongoTemplate;
     }
 
     @PostMapping("/chat/agent")
@@ -76,8 +86,9 @@ public class AiChatController {
                 request.conversationId(), userId, request.question(), request.projectId());
         chatHistoryService.saveMessage(conversationId, "user", request.question());
 
-        String documentContext = documentContextService.buildDocumentContext(
+        DocumentContextResult documentContextResult = documentContextService.buildDocumentContextResult(
                 request.projectId(), request.selectedDocumentIds(), request.question());
+        String documentContext = documentContextResult.context();
         String conversationContext = chatHistoryService.buildRecentConversationContext(conversationId);
 
         AgentChatResponse response = agentOrchestratorService.handle(
@@ -106,8 +117,9 @@ public class AiChatController {
                 request.conversationId(), userId, request.question(), request.projectId());
         chatHistoryService.saveMessage(conversationId, "user", request.question());
 
-        String documentContext = documentContextService.buildDocumentContext(
+        DocumentContextResult documentContextResult = documentContextService.buildDocumentContextResult(
                 request.projectId(), request.selectedDocumentIds(), request.question());
+        String documentContext = documentContextResult.context();
         String conversationContext = chatHistoryService.buildRecentConversationContext(conversationId);
         log.info("Chat request projectId={} selectedCount={} contextChars={} conversationId={}",
                 request.projectId(),
@@ -116,22 +128,42 @@ public class AiChatController {
                 conversationId);
         log.info("Chat memory conversationId={} memoryChars={}", conversationId, conversationContext.length());
 
-        AgentChatRequest agentRequest = new AgentChatRequest(
-                request.question(),
-                conversationId,
-                request.projectId(),
-                request.selectedDocumentIds());
+        AgentChatResponse agentResponse;
+        String answer;
+        if (!documentContextResult.sources().isEmpty()) {
+            answer = openRouterChatService.ask(
+                    request.question(),
+                    request.selectedDocumentIds(),
+                    documentContext,
+                    conversationContext);
+            agentResponse = new AgentChatResponse(
+                    answer,
+                    aiProperties.getModel(),
+                    conversationId,
+                    Instant.now(),
+                    "DOCUMENT_CHAT",
+                    0.95,
+                    List.of(),
+                    documentContextResult.sources().stream()
+                            .map(source -> source.fileName() + " #" + source.chunkIndex())
+                            .toList());
+        } else {
+            AgentChatRequest agentRequest = new AgentChatRequest(
+                    request.question(),
+                    conversationId,
+                    request.projectId(),
+                    request.selectedDocumentIds());
 
-        AgentChatResponse agentResponse = agentOrchestratorService.handle(
-                userId,
-                conversationId,
-                agentRequest,
-                authorization,
-                documentContext,
-                conversationContext,
-                aiProperties.getModel());
-
-        String answer = agentResponse.answer();
+            agentResponse = agentOrchestratorService.handle(
+                    userId,
+                    conversationId,
+                    agentRequest,
+                    authorization,
+                    documentContext,
+                    conversationContext,
+                    aiProperties.getModel());
+            answer = agentResponse.answer();
+        }
         chatHistoryService.saveMessage(conversationId, "assistant", answer);
         chatHistoryService.updateTimestamp(conversationId);
 
@@ -139,7 +171,10 @@ public class AiChatController {
                 answer,
                 aiProperties.getModel(),
                 conversationId,
-                Instant.now());
+                Instant.now(),
+                agentResponse.intent(),
+                agentResponse.confidence(),
+                documentContextResult.sources());
 
         return ResponseEntity.ok(response);
     }
@@ -155,8 +190,9 @@ public class AiChatController {
                 request.conversationId(), userId, request.question(), request.projectId());
         chatHistoryService.saveMessage(conversationId, "user", request.question());
 
-        String documentContext = documentContextService.buildDocumentContext(
+        DocumentContextResult documentContextResult = documentContextService.buildDocumentContextResult(
                 request.projectId(), request.selectedDocumentIds(), request.question());
+        String documentContext = documentContextResult.context();
         String conversationContext = chatHistoryService.buildRecentConversationContext(conversationId);
         log.info("Stream chat request projectId={} selectedCount={} contextChars={} conversationId={}",
                 request.projectId(),
@@ -170,6 +206,32 @@ public class AiChatController {
 
         CompletableFuture.runAsync(() -> {
             try {
+                if (!documentContextResult.sources().isEmpty()) {
+                    openRouterChatService.streamAsk(request.question(), request.selectedDocumentIds(), documentContext,
+                            conversationContext,
+                            chunk -> {
+                                try {
+                                    fullAnswer.append(chunk);
+                                    emitter.send(SseEmitter.event().data(Map.of(
+                                            "type", "chunk",
+                                            "content", chunk)));
+                                } catch (Exception sendException) {
+                                    throw new RuntimeException(sendException);
+                                }
+                            });
+
+                    chatHistoryService.saveMessage(conversationId, "assistant", fullAnswer.toString());
+                    chatHistoryService.updateTimestamp(conversationId);
+
+                    emitter.send(SseEmitter.event().data(Map.of(
+                            "type", "end",
+                            "conversationId", conversationId,
+                            "intent", "DOCUMENT_CHAT",
+                            "sources", documentContextResult.sources())));
+                    emitter.complete();
+                    return;
+                }
+
                 AgentDecision decision = agentIntentRouterService.route(request.question());
                 if (decision.intent() == AgentIntent.ISSUE_QUERY
                         || decision.intent() == AgentIntent.ISSUE_ACTION
@@ -195,12 +257,15 @@ public class AiChatController {
                             "content", answer)));
                     chatHistoryService.saveMessage(conversationId, "assistant", fullAnswer.toString());
                     chatHistoryService.updateTimestamp(conversationId);
-                    emitter.send(SseEmitter.event().data(Map.of("type", "end")));
+                    emitter.send(SseEmitter.event().data(Map.of(
+                            "type", "end",
+                            "conversationId", conversationId,
+                            "sources", documentContextResult.sources())));
                     emitter.complete();
                     return;
                 }
 
-                ollamaChatService.streamAsk(request.question(), request.selectedDocumentIds(), documentContext,
+                openRouterChatService.streamAsk(request.question(), request.selectedDocumentIds(), documentContext,
                         conversationContext,
                         chunk -> {
                             try {
@@ -217,7 +282,10 @@ public class AiChatController {
                 chatHistoryService.saveMessage(conversationId, "assistant", fullAnswer.toString());
                 chatHistoryService.updateTimestamp(conversationId);
 
-                emitter.send(SseEmitter.event().data(Map.of("type", "end")));
+                emitter.send(SseEmitter.event().data(Map.of(
+                        "type", "end",
+                        "conversationId", conversationId,
+                        "sources", documentContextResult.sources())));
                 emitter.complete();
             } catch (Exception e) {
                 try {
@@ -307,6 +375,80 @@ public class AiChatController {
         return ResponseEntity.ok(new HealthResponse("ai-service", "UP", aiProperties.getModel()));
     }
 
+    @GetMapping("/storage")
+    public ResponseEntity<?> storage(@RequestHeader("Authorization") String authorization) {
+        extractUserIdFromAuthorization(authorization);
+        return ResponseEntity.ok(Map.of(
+                "success", true,
+                "database", mongoTemplate.getDb().getName(),
+                "collections", Map.of(
+                        "conversations", mongoTemplate.getCollection("conversations").countDocuments(),
+                        "chat_messages", mongoTemplate.getCollection("chat_messages").countDocuments(),
+                        "document_vector_chunks", mongoTemplate.getCollection("document_vector_chunks").countDocuments())));
+    }
+
+    @PostMapping(path = "/documents/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> uploadDocumentForChat(
+            @RequestHeader("Authorization") String authorization,
+            @RequestParam("projectId") String projectId,
+            @RequestParam("file") MultipartFile file) throws IOException {
+        extractUserIdFromAuthorization(authorization);
+        if (projectId == null || projectId.isBlank()) {
+            throw new ResponseStatusException(BAD_REQUEST, "projectId is required to attach a document to chat");
+        }
+        if (file == null || file.isEmpty()) {
+            throw new ResponseStatusException(BAD_REQUEST, "Uploaded file is empty");
+        }
+
+        String docId = "chat-upload-" + UUID.randomUUID();
+        String fileName = file.getOriginalFilename() == null || file.getOriginalFilename().isBlank()
+                ? docId
+                : file.getOriginalFilename();
+        String fileType = file.getContentType() == null ? "application/octet-stream" : file.getContentType();
+
+        try {
+            byte[] fileBytes = file.getBytes();
+            if (isImage(fileName, fileType)) {
+                String description = openRouterChatService.describeImage(fileName, fileType, fileBytes);
+                documentContextService.indexTextDocument(
+                        projectId,
+                        docId,
+                        fileName,
+                        "Image file: " + fileName + "\n\nExtracted visual content:\n" + description);
+            } else {
+                documentContextService.indexUploadedDocument(
+                        projectId,
+                        docId,
+                        fileName,
+                        fileType,
+                        fileBytes);
+            }
+        } catch (IllegalArgumentException ex) {
+            throw new ResponseStatusException(BAD_REQUEST, ex.getMessage(), ex);
+        } catch (Exception ex) {
+            throw new ResponseStatusException(BAD_GATEWAY, "Unable to read uploaded file with AI: " + ex.getMessage(),
+                    ex);
+        }
+
+        return ResponseEntity.ok(Map.of(
+                "success", true,
+                "id", docId,
+                "fileName", fileName,
+                "fileType", fileType,
+                "projectId", projectId,
+                "allowEmbedded", true));
+    }
+
+    private boolean isImage(String fileName, String fileType) {
+        String lowerFileName = fileName == null ? "" : fileName.toLowerCase();
+        String lowerFileType = fileType == null ? "" : fileType.toLowerCase();
+        return lowerFileType.startsWith("image/")
+                || lowerFileName.endsWith(".png")
+                || lowerFileName.endsWith(".jpg")
+                || lowerFileName.endsWith(".jpeg")
+                || lowerFileName.endsWith(".webp");
+    }
+
     @GetMapping("/options")
     public ResponseEntity<?> getQuickOptions(
             @RequestHeader("Authorization") String authorization,
@@ -315,21 +457,21 @@ public class AiChatController {
 
         List<Map<String, String>> options = List.of(
                 Map.of(
-                        "id", "important_my_tasks",
-                        "label", "Cong viec quan trong cua toi",
-                        "prompt", "Lay cac cong viec quan trong cua toi hom nay"),
+                        "id", "daily_plan",
+                        "label", "Lập kế hoạch hôm nay",
+                        "prompt", "Đọc các issue/task trong dự án này và lập kế hoạch làm việc hôm nay cho tôi. Ưu tiên việc quan trọng, việc gần deadline, blocker, và đưa ra thứ tự nên làm kèm lý do."),
                 Map.of(
-                        "id", "analysis",
-                        "label", "Phan tich cong viec",
-                        "prompt", "Phan tich cong viec hien tai va de xuat uu tien"),
+                        "id", "project_risk_review",
+                        "label", "Phân tích rủi ro",
+                        "prompt", "Phân tích tình hình công việc hiện tại trong dự án: task nào đang rủi ro, task nào có khả năng trễ, blocker nằm ở đâu, và đề xuất hành động tiếp theo."),
                 Map.of(
-                        "id", "move_to_in_progress",
-                        "label", "Chuyen issue sang In Progress",
-                        "prompt", "Chuyen issue IEMS-1 sang In Progress"),
+                        "id", "progress_summary",
+                        "label", "Tóm tắt tiến độ",
+                        "prompt", "Tóm tắt tiến độ dự án hiện tại theo nhóm: việc đã xong, việc đang làm, việc bị kẹt, việc cần ưu tiên. Trả lời ngắn gọn nhưng đủ để báo cáo standup."),
                 Map.of(
-                        "id", "move_to_done",
-                        "label", "Chuyen issue sang Done",
-                        "prompt", "Chuyen issue IEMS-1 sang Done"));
+                        "id", "next_actions",
+                        "label", "Đề xuất bước tiếp theo",
+                        "prompt", "Dựa trên dữ liệu issue/task hiện tại, hãy đề xuất 5 hành động tiếp theo tôi nên làm để đẩy dự án tiến lên. Nếu có issue cụ thể, nêu issue key và lý do."));
 
         return ResponseEntity.ok(Map.of(
                 "success", true,

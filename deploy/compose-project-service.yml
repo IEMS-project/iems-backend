@@ -1,0 +1,27 @@
+services:
+  project-service:
+    image: pthngws/project-service:latest
+    container_name: project-service
+    restart: unless-stopped
+    ports:
+      - "8087:8087"
+    environment:
+      SERVER_PORT: 8087
+      SPRING_APPLICATION_NAME: project-service
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+
+      DB_URL: jdbc:postgresql://iems-cluster-iems-db.k.aivencloud.com:11991/project-db?sslmode=require
+      DB_USERNAME: avnadmin
+      DB_PASSWORD: AVNS_QbyQKU_5k7YLAwfZGMK
+
+      JWT_SECRET: 404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
+      JWT_EXPIRATION: 86400000
+      JWT_REFRESH_EXPIRATION: 604800000
+
+      NOTIFICATION_SERVICE_URL: http://notification-service:8090
+    networks:
+      - iems-network
+
+networks:
+  iems-network:
+    external: true

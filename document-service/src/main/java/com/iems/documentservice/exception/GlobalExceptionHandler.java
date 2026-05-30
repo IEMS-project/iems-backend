@@ -7,6 +7,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.multipart.MultipartException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.context.request.WebRequest;
@@ -56,10 +57,20 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponseDto<String>> handleMaxUploadSizeExceeded(MaxUploadSizeExceededException ex) {
         ApiResponseDto<String> response = new ApiResponseDto<>(
                 HttpStatus.PAYLOAD_TOO_LARGE.value(),
-                "Uploaded file exceeds the maximum allowed size",
+                "Uploaded file exceeds the configured maximum allowed size",
                 null
         );
         return new ResponseEntity<>(response, HttpStatus.PAYLOAD_TOO_LARGE);
+    }
+
+    @ExceptionHandler(MultipartException.class)
+    public ResponseEntity<ApiResponseDto<String>> handleMultipartException(MultipartException ex) {
+        ApiResponseDto<String> response = new ApiResponseDto<>(
+                HttpStatus.BAD_REQUEST.value(),
+                "Upload was interrupted or the multipart request is invalid",
+                null
+        );
+        return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
     }
 
     @ExceptionHandler({MissingServletRequestPartException.class, MissingServletRequestParameterException.class})

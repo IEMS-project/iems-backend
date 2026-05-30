@@ -4,7 +4,9 @@ import com.iems.documentservice.dto.response.ApiResponseDto;
 import com.iems.documentservice.client.UserServiceFeignClient;
 import com.iems.documentservice.dto.request.UpdateAvatarRequest;
 import com.iems.documentservice.client.ChatServiceFeignClient;
+import com.iems.documentservice.client.ProjectServiceFeignClient;
 import com.iems.documentservice.dto.request.UpdateGroupAvatarRequest;
+import com.iems.documentservice.dto.request.UpdateProjectAvatarRequest;
 import com.iems.documentservice.entity.StoredFile;
 import com.iems.documentservice.entity.enums.Permission;
 import com.iems.documentservice.repository.StoredFileRepository;
@@ -35,12 +37,14 @@ public class AvatarController {
     private final StoredFileRepository storedFileRepository;
     private final UserServiceFeignClient userServiceFeignClient;
     private final ChatServiceFeignClient chatServiceFeignClient;
+    private final ProjectServiceFeignClient projectServiceFeignClient;
 
-    public AvatarController(ObjectStorageService storageService, StoredFileRepository storedFileRepository, UserServiceFeignClient userServiceFeignClient, ChatServiceFeignClient chatServiceFeignClient) {
+    public AvatarController(ObjectStorageService storageService, StoredFileRepository storedFileRepository, UserServiceFeignClient userServiceFeignClient, ChatServiceFeignClient chatServiceFeignClient, ProjectServiceFeignClient projectServiceFeignClient) {
         this.storageService = storageService;
         this.storedFileRepository = storedFileRepository;
         this.userServiceFeignClient = userServiceFeignClient;
         this.chatServiceFeignClient = chatServiceFeignClient;
+        this.projectServiceFeignClient = projectServiceFeignClient;
     }
 
     @PostMapping(value = "/upload/avatar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -121,6 +125,57 @@ public class AvatarController {
         chatServiceFeignClient.updateGroupAvatar(groupId, new UpdateGroupAvatarRequest(presignedUrl));
 
         return ResponseEntity.ok(new ApiResponseDto<>(200, "Group avatar uploaded", presignedUrl));
+    }
+
+    @PostMapping(value = "/upload/project-avatar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Upload project avatar for a specific project")
+    public ResponseEntity<ApiResponseDto<String>> uploadProjectAvatar(@RequestPart("file") MultipartFile file,
+                                                                      @RequestParam("projectId") UUID projectId) throws Exception {
+        validateUpload(file);
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        JwtUserDetails principal = (JwtUserDetails) authentication.getPrincipal();
+
+        String original = file.getOriginalFilename() != null ? file.getOriginalFilename() : "avatar";
+        String ext = "";
+        int dot = original.lastIndexOf('.');
+        if (dot > -1 && dot < original.length() - 1) {
+            ext = original.substring(dot);
+        }
+        String fileName = projectId + "_avt" + ext;
+        String objectKey = "avatar/project/" + fileName;
+
+        storageService.upload(objectKey, file);
+
+        StoredFile stored = StoredFile.builder()
+                .name(fileName)
+                .folder(null)
+                .ownerId(principal.getUserId())
+                .path(objectKey)
+                .size(file.getSize())
+                .type(file.getContentType())
+                .permission(Permission.PRIVATE)
+                .createdAt(OffsetDateTime.now())
+                .build();
+        storedFileRepository.save(stored);
+
+        String publicUrl = storageService.buildPublicUrl(objectKey);
+        projectServiceFeignClient.updateProjectAvatar(projectId, new UpdateProjectAvatarRequest(publicUrl));
+
+        return ResponseEntity.ok(new ApiResponseDto<>(200, "Project avatar uploaded", publicUrl));
+    }
+
+    @GetMapping("/project-avatar/{projectId}")
+    @Operation(summary = "Get project avatar URL")
+    public ResponseEntity<ApiResponseDto<String>> getProjectAvatarUrl(@PathVariable("projectId") UUID projectId) throws Exception {
+        Optional<StoredFile> latest = storedFileRepository
+                .findFirstByPathStartingWithOrderByCreatedAtDesc("avatar/project/" + projectId + "_avt");
+
+        if (latest.isEmpty()) {
+            return ResponseEntity.ok(new ApiResponseDto<>(200, "No project avatar", null));
+        }
+
+        String presignedUrl = storageService.presignGetUrl(latest.get().getPath());
+        return ResponseEntity.ok(new ApiResponseDto<>(200, "OK", presignedUrl));
     }
 
     @GetMapping("/group-avatar/{groupId}")

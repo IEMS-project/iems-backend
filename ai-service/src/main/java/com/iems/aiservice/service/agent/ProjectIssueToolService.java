@@ -11,10 +11,12 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -41,7 +43,7 @@ public class ProjectIssueToolService {
         String normalized = normalize(question);
         boolean myOnly = hasAnyPhrase(normalized, "my", "cua toi", "cua minh", "viec cua toi");
         boolean includeAll = hasAnyPhrase(normalized, "tat ca", "all", "het");
-        List<Map<String, Object>> issues = getIssues(projectId, authorization, myOnly);
+        List<Map<String, Object>> issues = getScopedIssues(projectId, authorization, myOnly);
         Map<String, String> priorityById = getIssuePriorities(projectId, authorization);
         Map<String, String> typeById = getIssueTypes(projectId, authorization);
         Map<String, String> statusById = getWorkflowStatuses(projectId, authorization);
@@ -102,7 +104,7 @@ public class ProjectIssueToolService {
         int limit = includeAll ? filtered.size() : Math.min(filtered.size(), 30);
         StringBuilder response = new StringBuilder();
         if (needImportanceReason) {
-            response.append("Danh sach cong viec quan trong (badge):\n");
+            response.append("Danh sach cong viec quan trong:\n");
         } else if (myAllAsBadge) {
             response.append("Tat ca cong viec cua toi (badge):\n");
         } else {
@@ -117,21 +119,16 @@ public class ProjectIssueToolService {
             String statusName = statusById.getOrDefault(stringValue(issue.get("statusId")), "unknown");
             String priorityName = priorityById.getOrDefault(stringValue(issue.get("priorityId")), "unknown");
             String dueDate = stringValue(issue.get("dueDate"));
-            response.append(i + 1).append(". ").append(key == null ? "(no-key)" : key);
 
             if (needImportanceReason) {
                 String reason = buildImportantReason(issue, priorityById, statusById, today);
-                response.append(" | reason=").append(reason);
+                response.append(i + 1).append(". ")
+                        .append(formatIssueCardLine(issue, statusName, priorityName, dueDate, reason));
             } else if (!myAllAsBadge) {
-                response.append(" | ")
-                        .append(title == null ? "(no-title)" : title)
-                        .append(" | status=")
-                        .append(statusName)
-                        .append(" | priority=")
-                        .append(priorityName);
-                if (dueDate != null && !dueDate.isBlank()) {
-                    response.append(" | due=").append(dueDate);
-                }
+                response.append(i + 1).append(". ")
+                        .append(formatIssueCardLine(issue, statusName, priorityName, dueDate, null));
+            } else {
+                response.append(i + 1).append(". ").append(key == null ? "(no-key)" : key);
             }
             response.append("\n");
         }
@@ -144,7 +141,7 @@ public class ProjectIssueToolService {
             return "Can projectId de thuc thi thay doi status issue.";
         }
 
-        List<Map<String, Object>> issues = getIssues(projectId, authorization, false);
+        List<Map<String, Object>> issues = getScopedIssues(projectId, authorization, false);
         if (issues.isEmpty()) {
             return "Khong co issue nao trong project de cap nhat.";
         }
@@ -210,7 +207,7 @@ public class ProjectIssueToolService {
 
         String normalized = normalize(question);
         boolean myOnly = hasAnyPhrase(normalized, "my", "cua toi", "cua minh", "viec cua toi");
-        List<Map<String, Object>> issues = getIssues(projectId, authorization, myOnly);
+        List<Map<String, Object>> issues = getScopedIssues(projectId, authorization, myOnly);
         if (issues.isEmpty()) {
             return "Khong co issue nao de phan tich.";
         }
@@ -247,6 +244,20 @@ public class ProjectIssueToolService {
             return "Khong tim thay task phu hop de phan tich.";
         }
 
+        if (hasAnyPhrase(normalized, "standup", "bao cao standup", "tom tat tien do", "tinh hinh cong viec",
+                "bao cao tien do")) {
+            return buildStandupBrief(issues, openIssues, priorityById, statusById, today);
+        }
+
+        if (hasAnyPhrase(normalized, "rui ro", "risk", "blocker", "stuck", "ket", "tre deadline", "qua han")) {
+            return buildProjectRiskReview(openIssues, priorityById, statusById, today);
+        }
+
+        if (hasAnyPhrase(normalized, "grooming", "lam ro", "thieu mo ta", "acceptance", "test case",
+                "task mo ho", "issue mo ho", "chat luong task")) {
+            return buildIssueQualityAudit(openIssues, priorityById, statusById, today);
+        }
+
         boolean concisePriorityMode = hasAnyPhrase(normalized,
                 "de xuat uu tien",
                 "uu tien truoc",
@@ -266,6 +277,19 @@ public class ProjectIssueToolService {
         int limit = Math.min(taskTargets.size(), 4);
         for (int i = 0; i < limit; i++) {
             Map<String, Object> issue = taskTargets.get(i);
+            String priorityName = priorityById.getOrDefault(stringValue(issue.get("priorityId")), "unknown");
+            String statusName = statusById.getOrDefault(stringValue(issue.get("statusId")), "unknown");
+            String dueDate = stringValue(issue.get("dueDate"));
+            Integer storyPoints = parseIntValue(issue.get("storyPoints"));
+            String reason = buildShortPriorityReason(issue, priorityName, storyPoints, statusById, today);
+            result.append(i + 1).append(". ")
+                    .append(formatIssueCardLine(issue, statusName, priorityName, dueDate, reason))
+                    .append("\n");
+        }
+        result.append("\n---\n\n## Phan tich chi tiet\n\n");
+
+        for (int i = 0; i < limit; i++) {
+            Map<String, Object> issue = taskTargets.get(i);
             String key = stringValue(issue.get("issueKey"));
             String title = stringValue(issue.get("title"));
             String typeName = typeById.getOrDefault(stringValue(issue.get("issueTypeId")), "unknown");
@@ -278,8 +302,9 @@ public class ProjectIssueToolService {
                 result.append("\n---\n\n");
             }
 
-            result.append((key == null ? "(no-key)" : key))
-                    .append(" | ")
+            result.append("### ")
+                    .append(key == null ? "(no-key)" : key)
+                    .append(" - ")
                     .append(title == null ? "(no-title)" : title)
                     .append("\n\n")
                     .append(buildIssueTemplate(
@@ -426,6 +451,91 @@ public class ProjectIssueToolService {
             keys.add(m.group(1));
         }
         return keys;
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> getScopedIssues(String projectId, String authorization, boolean myIssues) {
+        List<Map<String, Object>> projectIssues = filterIssuesToProject(
+                getIssues(projectId, authorization, false),
+                projectId);
+
+        if (!myIssues) {
+            return projectIssues;
+        }
+
+        List<Map<String, Object>> myIssueCandidates = filterIssuesToProject(
+                getIssues(projectId, authorization, true),
+                projectId);
+
+        if (projectIssues.isEmpty()) {
+            return myIssueCandidates;
+        }
+
+        Set<String> projectIssueIds = new HashSet<>();
+        Set<String> projectIssueKeys = new HashSet<>();
+        for (Map<String, Object> issue : projectIssues) {
+            String id = stringValue(issue.get("id"));
+            String key = stringValue(issue.get("issueKey"));
+            if (id != null && !id.isBlank()) {
+                projectIssueIds.add(id);
+            }
+            if (key != null && !key.isBlank()) {
+                projectIssueKeys.add(normalize(key));
+            }
+        }
+
+        return myIssueCandidates.stream()
+                .filter(issue -> {
+                    String id = stringValue(issue.get("id"));
+                    String key = stringValue(issue.get("issueKey"));
+                    return (id != null && projectIssueIds.contains(id))
+                            || (key != null && projectIssueKeys.contains(normalize(key)));
+                })
+                .collect(Collectors.toList());
+    }
+
+    private List<Map<String, Object>> filterIssuesToProject(List<Map<String, Object>> issues, String projectId) {
+        if (projectId == null || projectId.isBlank() || issues.isEmpty()) {
+            return issues;
+        }
+
+        boolean hasProjectMarker = issues.stream().anyMatch(issue -> extractIssueProjectId(issue) != null);
+        if (!hasProjectMarker) {
+            return issues;
+        }
+
+        return issues.stream()
+                .filter(issue -> projectId.equals(extractIssueProjectId(issue)))
+                .collect(Collectors.toList());
+    }
+
+    @SuppressWarnings("unchecked")
+    private String extractIssueProjectId(Map<String, Object> issue) {
+        String direct = firstNonBlank(
+                stringValue(issue.get("projectId")),
+                stringValue(issue.get("project_id")),
+                stringValue(issue.get("projectID")));
+        if (direct != null) {
+            return direct;
+        }
+
+        Object project = issue.get("project");
+        if (project instanceof Map<?, ?> projectMap) {
+            return firstNonBlank(
+                    stringValue(((Map<String, Object>) projectMap).get("id")),
+                    stringValue(((Map<String, Object>) projectMap).get("projectId")));
+        }
+
+        return null;
+    }
+
+    private String firstNonBlank(String... values) {
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+        return null;
     }
 
     @SuppressWarnings("unchecked")
@@ -678,6 +788,133 @@ public class ProjectIssueToolService {
         return "tiep tuc theo sprint plan va cap nhat tien do deu";
     }
 
+    private String buildStandupBrief(List<Map<String, Object>> issues,
+            List<Map<String, Object>> openIssues,
+            Map<String, String> priorityById,
+            Map<String, String> statusById,
+            LocalDate today) {
+        List<Map<String, Object>> focus = openIssues.stream()
+                .sorted(Comparator.comparingInt(issue -> -issueImportanceScore(issue, priorityById, statusById, today)))
+                .limit(5)
+                .collect(Collectors.toList());
+
+        long doneCount = issues.stream()
+                .filter(issue -> isDoneStatus(normalize(statusById.getOrDefault(stringValue(issue.get("statusId")), ""))))
+                .count();
+        long blockedCount = openIssues.stream().filter(issue -> isBlockedIssue(issue, statusById)).count();
+        long overdueCount = openIssues.stream().filter(issue -> isOverdue(issue, today)).count();
+        long inProgressCount = openIssues.stream().filter(issue -> isInProgressIssue(issue, statusById)).count();
+
+        StringBuilder out = new StringBuilder();
+        out.append("Bao cao standup nhanh:\n");
+        for (int i = 0; i < focus.size(); i++) {
+            Map<String, Object> issue = focus.get(i);
+            String statusName = statusById.getOrDefault(stringValue(issue.get("statusId")), "unknown");
+            String priorityName = priorityById.getOrDefault(stringValue(issue.get("priorityId")), "unknown");
+            String dueDate = stringValue(issue.get("dueDate"));
+            String reason = buildStandupReason(issue, priorityById, statusById, today);
+            out.append(i + 1).append(". ")
+                    .append(formatIssueCardLine(issue, statusName, priorityName, dueDate, reason))
+                    .append("\n");
+        }
+
+        out.append("\n---\n\n")
+                .append("## Standup notes\n\n")
+                .append("- Tong issue: ").append(issues.size()).append("\n")
+                .append("- Da done: ").append(doneCount).append("\n")
+                .append("- Dang mo: ").append(openIssues.size()).append("\n")
+                .append("- Dang lam: ").append(inProgressCount).append("\n")
+                .append("- Blocker/stuck: ").append(blockedCount).append("\n")
+                .append("- Qua han: ").append(overdueCount).append("\n\n")
+                .append("## Nen noi trong standup\n\n")
+                .append("- Hom qua/hien tai: tap trung vao cac card uu tien o tren.\n")
+                .append("- Hom nay: xu ly task qua han/blocker truoc, sau do den task priority cao.\n")
+                .append("- Can ho tro: hoi ro owner/requirement cho task thieu mo ta hoac dang stuck.\n");
+
+        return out.toString().trim();
+    }
+
+    private String buildProjectRiskReview(List<Map<String, Object>> openIssues,
+            Map<String, String> priorityById,
+            Map<String, String> statusById,
+            LocalDate today) {
+        List<Map<String, Object>> riskIssues = openIssues.stream()
+                .filter(issue -> isBlockedIssue(issue, statusById)
+                        || isOverdue(issue, today)
+                        || isDueSoon(issue, today)
+                        || priorityWeight(priorityById.getOrDefault(stringValue(issue.get("priorityId")), "")) >= 3)
+                .sorted(Comparator.comparingInt(issue -> -issueImportanceScore(issue, priorityById, statusById, today)))
+                .limit(6)
+                .collect(Collectors.toList());
+
+        if (riskIssues.isEmpty()) {
+            return "Chua thay rui ro lon trong cac issue dang mo. Van nen kiem tra cac task thieu due date/mo ta truoc sprint review.";
+        }
+
+        StringBuilder out = new StringBuilder();
+        out.append("Rui ro can xu ly truoc:\n");
+        for (int i = 0; i < riskIssues.size(); i++) {
+            Map<String, Object> issue = riskIssues.get(i);
+            String statusName = statusById.getOrDefault(stringValue(issue.get("statusId")), "unknown");
+            String priorityName = priorityById.getOrDefault(stringValue(issue.get("priorityId")), "unknown");
+            String dueDate = stringValue(issue.get("dueDate"));
+            String reason = buildRiskReason(issue, priorityById, statusById, today);
+            out.append(i + 1).append(". ")
+                    .append(formatIssueCardLine(issue, statusName, priorityName, dueDate, reason))
+                    .append("\n");
+        }
+
+        out.append("\n---\n\n")
+                .append("## Cach xu ly\n\n")
+                .append("- Blocker/stuck: can owner go blocker va deadline clear trong ngay.\n")
+                .append("- Qua han: cap nhat ETA moi, cat scope neu can, va thong bao stakeholder.\n")
+                .append("- Priority cao: tach viec nho hon, chot acceptance criteria, tranh lam lan man.\n")
+                .append("- Task thieu context: hoi lai requirement truoc khi code de tranh rework.\n");
+
+        return out.toString().trim();
+    }
+
+    private String buildIssueQualityAudit(List<Map<String, Object>> openIssues,
+            Map<String, String> priorityById,
+            Map<String, String> statusById,
+            LocalDate today) {
+        List<Map<String, Object>> weakIssues = openIssues.stream()
+                .filter(issue -> !hasUsefulDescription(issue)
+                        || !hasAssignee(issue)
+                        || stringValue(issue.get("dueDate")) == null
+                        || parseIntValue(issue.get("storyPoints")) == null)
+                .sorted(Comparator.comparingInt(issue -> -issueImportanceScore(issue, priorityById, statusById, today)))
+                .limit(8)
+                .collect(Collectors.toList());
+
+        if (weakIssues.isEmpty()) {
+            return "Cac task dang mo nhin kha day du: co mo ta/assignee/due/story point co ban. Nen chuyen sang risk review hoac daily plan.";
+        }
+
+        StringBuilder out = new StringBuilder();
+        out.append("Nhung task can grooming/lam ro:\n");
+        for (int i = 0; i < weakIssues.size(); i++) {
+            Map<String, Object> issue = weakIssues.get(i);
+            String statusName = statusById.getOrDefault(stringValue(issue.get("statusId")), "unknown");
+            String priorityName = priorityById.getOrDefault(stringValue(issue.get("priorityId")), "unknown");
+            String dueDate = stringValue(issue.get("dueDate"));
+            String reason = buildQualityReason(issue);
+            out.append(i + 1).append(". ")
+                    .append(formatIssueCardLine(issue, statusName, priorityName, dueDate, reason))
+                    .append("\n");
+        }
+
+        out.append("\n---\n\n")
+                .append("## Checklist grooming nen bo sung\n\n")
+                .append("- Muc tieu: task nay giai quyet van de gi?\n")
+                .append("- Acceptance criteria: dieu kien nao thi duoc xem la done?\n")
+                .append("- Scope/khong scope: lam gi va khong lam gi?\n")
+                .append("- Test case: happy path, invalid input, permission, regression.\n")
+                .append("- Owner/deadline: ai chiu trach nhiem va khi nao can xong?\n");
+
+        return out.toString().trim();
+    }
+
     private List<Map<String, Object>> selectTaskTargets(String question,
             List<Map<String, Object>> allIssues,
             List<Map<String, Object>> openIssues,
@@ -709,6 +946,107 @@ public class ProjectIssueToolService {
                         issue -> -issueImportanceScore(issue, priorityById, statusById, today)))
                 .limit(7)
                 .collect(Collectors.toList());
+    }
+
+    private boolean isBlockedIssue(Map<String, Object> issue, Map<String, String> statusById) {
+        String status = normalize(statusById.getOrDefault(stringValue(issue.get("statusId")), ""));
+        return status.contains("block") || status.contains("stuck") || status.contains("hold") || status.contains("ket");
+    }
+
+    private boolean isInProgressIssue(Map<String, Object> issue, Map<String, String> statusById) {
+        String status = normalize(statusById.getOrDefault(stringValue(issue.get("statusId")), ""));
+        return status.contains("progress") || status.contains("doing") || status.contains("dang lam");
+    }
+
+    private boolean isOverdue(Map<String, Object> issue, LocalDate today) {
+        LocalDate due = parseDate(stringValue(issue.get("dueDate")));
+        return due != null && due.isBefore(today);
+    }
+
+    private boolean isDueSoon(Map<String, Object> issue, LocalDate today) {
+        LocalDate due = parseDate(stringValue(issue.get("dueDate")));
+        return due != null && !due.isBefore(today) && !due.isAfter(today.plusDays(3));
+    }
+
+    private boolean hasUsefulDescription(Map<String, Object> issue) {
+        String description = stripHtml(stringValue(issue.get("description")));
+        return description != null && description.length() >= 40;
+    }
+
+    private boolean hasAssignee(Map<String, Object> issue) {
+        return firstNonBlank(
+                stringValue(issue.get("assigneeId")),
+                stringValue(issue.get("assignee_id")),
+                stringValue(issue.get("assigneeUserId")),
+                stringValue(issue.get("assigneeName")),
+                stringValue(issue.get("assignee"))) != null;
+    }
+
+    private String buildStandupReason(Map<String, Object> issue,
+            Map<String, String> priorityById,
+            Map<String, String> statusById,
+            LocalDate today) {
+        if (isBlockedIssue(issue, statusById)) {
+            return "dang blocker/stuck, can noi trong standup de xin ho tro";
+        }
+        if (isOverdue(issue, today)) {
+            return "da qua han, can cap nhat ETA va cach xu ly";
+        }
+        if (isDueSoon(issue, today)) {
+            return "gan deadline, nen day len focus hom nay";
+        }
+        String priorityName = priorityById.getOrDefault(stringValue(issue.get("priorityId")), "unknown");
+        if (priorityWeight(priorityName) >= 3) {
+            return "priority cao, anh huong tien do neu tre";
+        }
+        return "nam trong nhom viec nen tiep tuc theo sprint plan";
+    }
+
+    private String buildRiskReason(Map<String, Object> issue,
+            Map<String, String> priorityById,
+            Map<String, String> statusById,
+            LocalDate today) {
+        List<String> reasons = new ArrayList<>();
+        if (isBlockedIssue(issue, statusById)) {
+            reasons.add("blocker/stuck");
+        }
+        if (isOverdue(issue, today)) {
+            reasons.add("qua han");
+        } else if (isDueSoon(issue, today)) {
+            reasons.add("gan deadline");
+        }
+        String priorityName = priorityById.getOrDefault(stringValue(issue.get("priorityId")), "unknown");
+        if (priorityWeight(priorityName) >= 3) {
+            reasons.add("priority cao");
+        }
+        if (!hasUsefulDescription(issue)) {
+            reasons.add("mo ta thieu, de rework");
+        }
+        return reasons.isEmpty() ? "can theo doi vi co anh huong den tien do" : String.join(", ", reasons);
+    }
+
+    private String buildQualityReason(Map<String, Object> issue) {
+        List<String> reasons = new ArrayList<>();
+        if (!hasUsefulDescription(issue)) {
+            reasons.add("thieu mo ta/acceptance criteria");
+        }
+        if (!hasAssignee(issue)) {
+            reasons.add("chua ro owner");
+        }
+        if (stringValue(issue.get("dueDate")) == null) {
+            reasons.add("chua co deadline");
+        }
+        if (parseIntValue(issue.get("storyPoints")) == null) {
+            reasons.add("chua estimate story point");
+        }
+        return reasons.isEmpty() ? "can grooming them" : String.join(", ", reasons);
+    }
+
+    private String stripHtml(String value) {
+        if (value == null) {
+            return null;
+        }
+        return value.replaceAll("<[^>]*>", " ").replaceAll("\\s+", " ").trim();
     }
 
     private String buildComplexityInsight(Integer storyPoints, String descriptionNormalized, String typeName) {
@@ -966,6 +1304,8 @@ public class ProjectIssueToolService {
             String title = stringValue(issue.get("title"));
             String typeName = typeById.getOrDefault(stringValue(issue.get("issueTypeId")), "Task");
             String priorityName = priorityById.getOrDefault(stringValue(issue.get("priorityId")), "Unknown");
+            String statusName = statusById.getOrDefault(stringValue(issue.get("statusId")), "unknown");
+            String dueDate = stringValue(issue.get("dueDate"));
             Integer storyPoints = parseIntValue(issue.get("storyPoints"));
 
             String whatToDo = buildShortWhatToDo(typeName, title);
@@ -973,9 +1313,7 @@ public class ProjectIssueToolService {
 
             out.append(i + 1)
                     .append(". ")
-                    .append(key == null ? "(no-key)" : key)
-                    .append(" | ")
-                    .append(title == null ? "(no-title)" : title)
+                    .append(formatIssueCardLine(issue, statusName, priorityName, dueDate, reason))
                     .append("\n")
                     .append("   - Làm gì: ").append(whatToDo).append("\n")
                     .append("   - Vì sao ưu tiên: ").append(reason).append("\n");
@@ -1383,6 +1721,42 @@ public class ProjectIssueToolService {
 
     private String stringValue(Object value) {
         return value == null ? null : String.valueOf(value);
+    }
+
+    private String formatIssueCardLine(Map<String, Object> issue,
+            String statusName,
+            String priorityName,
+            String dueDate,
+            String reason) {
+        StringBuilder out = new StringBuilder();
+        out.append(cardValue(stringValue(issue.get("issueKey")), "(no-key)"))
+                .append(" | ")
+                .append(cardValue(stringValue(issue.get("title")), "(no-title)"))
+                .append(" | status=")
+                .append(cardValue(statusName, "unknown"))
+                .append(" | priority=")
+                .append(cardValue(priorityName, "unknown"));
+
+        String issueId = stringValue(issue.get("id"));
+        if (issueId != null && !issueId.isBlank()) {
+            out.append(" | id=").append(cardValue(issueId, ""));
+        }
+        String projectId = stringValue(issue.get("projectId"));
+        if (projectId != null && !projectId.isBlank()) {
+            out.append(" | projectId=").append(cardValue(projectId, ""));
+        }
+        if (dueDate != null && !dueDate.isBlank()) {
+            out.append(" | due=").append(cardValue(dueDate, ""));
+        }
+        if (reason != null && !reason.isBlank()) {
+            out.append(" | reason=").append(cardValue(reason, ""));
+        }
+        return out.toString();
+    }
+
+    private String cardValue(String value, String fallback) {
+        String text = value == null || value.isBlank() ? fallback : value;
+        return text.replace('|', '/').replaceAll("\\s+", " ").trim();
     }
 
     private String normalize(String value) {

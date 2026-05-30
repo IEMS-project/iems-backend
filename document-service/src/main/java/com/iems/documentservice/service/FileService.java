@@ -29,7 +29,6 @@ import java.util.stream.Collectors;
 @Service
 public class FileService {
 
-    private static final long MAX_UPLOAD_SIZE = 50L * 1024 * 1024; // 50 MB
     private static final Pattern UNSAFE_FILE_NAME_CHARS = Pattern.compile("[^a-zA-Z0-9._-]");
 
     private final StoredFileRepository storedFileRepository;
@@ -58,12 +57,10 @@ public class FileService {
 
     // ──────────────────────────── UPLOAD ────────────────────────────
 
-    @Transactional
     public FileResponse uploadFile(UUID folderId, MultipartFile file) throws Exception {
         UUID ownerId = permissionHelper.getCurrentUserId();
         permissionHelper.enforceWritePermission(folderId, ownerId);
         validateFile(file);
-        validateSize(file.getSize(), MAX_UPLOAD_SIZE);
         Folder folder = resolveFolder(folderId);
         String objectKey = buildObjectKey(folderId, ownerId, file.getOriginalFilename());
         storageService.upload(objectKey, file);
@@ -80,7 +77,6 @@ public class FileService {
         return toResponse(saved, null, ownerId);
     }
 
-    @Transactional
     public List<SimpleFileResponse> uploadBatch(UUID folderId, MultipartFile[] files) throws Exception {
         List<SimpleFileResponse> results = new ArrayList<>();
         for (MultipartFile f : files) {
@@ -96,7 +92,7 @@ public class FileService {
         return results;
     }
 
-    public Map<String, Object> generateUploadSignature(String fileName, UUID folderId) {
+    public Map<String, Object> generateUploadSignature(String fileName, String contentType, UUID folderId) {
         UUID ownerId = permissionHelper.getCurrentUserId();
         permissionHelper.enforceWritePermission(folderId, ownerId);
         
@@ -104,7 +100,7 @@ public class FileService {
         String folderPart = folderId != null ? String.valueOf(folderId) : "root";
         String objectKey = "document/owners/" + ownerId + "/" + folderPart + "/" + UUID.randomUUID() + "-" + safeFileName(fileName);
         
-        return storageService.generateUploadSignature(objectKey, timestamp);
+        return storageService.generateUploadSignature(objectKey, timestamp, contentType);
     }
     
     @Transactional
@@ -127,13 +123,11 @@ public class FileService {
         return toResponse(saved, null, ownerId);
     }
 
-    @Transactional
     public List<SimpleFileResponse> uploadChatFiles(String conversationId, MultipartFile[] files) throws Exception {
         UUID ownerId = permissionHelper.getCurrentUserId();
         List<SimpleFileResponse> results = new ArrayList<>();
         for (MultipartFile file : files) {
             validateFile(file);
-            validateSize(file.getSize(), MAX_UPLOAD_SIZE);
             double sizeMb = file.getSize() / (1024.0 * 1024.0);
             String mime = file.getContentType() == null ? "" : file.getContentType();
             if (mime.startsWith("image") && sizeMb > 5.0) throw new AppException(DocumentErrorCode.INVALID_REQUEST);
@@ -160,13 +154,11 @@ public class FileService {
         return results;
     }
 
-    @Transactional
     public List<SimpleFileResponse> uploadPublicFiles(MultipartFile[] files) throws Exception {
         UUID ownerId = permissionHelper.getCurrentUserId();
         List<SimpleFileResponse> results = new ArrayList<>();
         for (MultipartFile file : files) {
             validateFile(file);
-            validateSize(file.getSize(), MAX_UPLOAD_SIZE);
             String objectKey = buildPublicObjectKey(file.getOriginalFilename());
             storageService.upload(objectKey, file);
             StoredFile saved = storedFileRepository.save(StoredFile.builder()
@@ -454,10 +446,6 @@ public class FileService {
         if (folderId == null) return null;
         return folderRepository.findById(folderId)
                 .orElseThrow(() -> new AppException(DocumentErrorCode.FOLDER_NOT_FOUND));
-    }
-
-    private void validateSize(long size, long max) {
-        if (size > max) throw new AppException(DocumentErrorCode.INVALID_REQUEST);
     }
 
     private void validateFile(MultipartFile file) {

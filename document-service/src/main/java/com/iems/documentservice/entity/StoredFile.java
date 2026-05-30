@@ -35,7 +35,7 @@ public class StoredFile {
     @Column(name = "owner_id", nullable = false)
     private UUID ownerId;
 
-    // public_id / path key in Cloudinary
+    // Object storage key
     @Column(nullable = false)
     private String path;
 

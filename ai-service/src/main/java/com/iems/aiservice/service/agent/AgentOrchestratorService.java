@@ -5,7 +5,7 @@ import com.iems.aiservice.dto.AgentChatResponse;
 import com.iems.aiservice.model.agent.AgentDecision;
 import com.iems.aiservice.model.agent.AgentIntent;
 import com.iems.aiservice.model.agent.AgentProposedAction;
-import com.iems.aiservice.service.OllamaChatService;
+import com.iems.aiservice.service.OpenRouterChatService;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -17,14 +17,14 @@ import java.util.Map;
 public class AgentOrchestratorService {
 
     private final AgentIntentRouterService intentRouterService;
-    private final OllamaChatService ollamaChatService;
+    private final OpenRouterChatService openRouterChatService;
     private final ProjectIssueToolService projectIssueToolService;
 
     public AgentOrchestratorService(AgentIntentRouterService intentRouterService,
-            OllamaChatService ollamaChatService,
+            OpenRouterChatService openRouterChatService,
             ProjectIssueToolService projectIssueToolService) {
         this.intentRouterService = intentRouterService;
-        this.ollamaChatService = ollamaChatService;
+        this.openRouterChatService = openRouterChatService;
         this.projectIssueToolService = projectIssueToolService;
     }
 
@@ -47,7 +47,7 @@ public class AgentOrchestratorService {
         }
 
         String enhancedQuestion = buildPromptForIntent(decision, request.question());
-        String answer = ollamaChatService.ask(enhancedQuestion,
+        String answer = openRouterChatService.ask(enhancedQuestion,
                 request.selectedDocumentIds(),
                 documentContext,
                 conversationContext);

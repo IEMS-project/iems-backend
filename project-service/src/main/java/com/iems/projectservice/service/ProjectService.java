@@ -199,6 +199,20 @@ public class ProjectService {
     }
 
     @Transactional
+    public Project updateProjectAvatar(UUID projectId, String avatarUrl) {
+        UUID currentUserId = getUserIdFromRequest();
+        Project project = projectRepository.findById(projectId)
+                .orElseThrow(() -> new AppException(ProjectErrorCode.PROJECT_NOT_FOUND));
+
+        if (!hasPermissionToUpdateProject(project, currentUserId)) {
+            throw new AppException(ProjectErrorCode.PERMISSION_DENIED);
+        }
+
+        project.setAvatarUrl(avatarUrl);
+        return projectRepository.save(project);
+    }
+
+    @Transactional
     public void deleteProject(UUID projectId) {
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new AppException(ProjectErrorCode.PROJECT_NOT_FOUND));
@@ -296,6 +310,7 @@ public class ProjectService {
                     p.getId(),
                     p.getName(),
                     p.getDescription(),
+                    p.getAvatarUrl(),
                     p.getStatus(),
                     p.getManagerAccountId(),
                     managerName != null ? managerName.trim() : null,
@@ -367,6 +382,7 @@ public class ProjectService {
         dto.setId(project.getId());
         dto.setName(project.getName());
         dto.setDescription(project.getDescription());
+        dto.setAvatarUrl(project.getAvatarUrl());
         dto.setStartDate(project.getStartDate());
         dto.setEndDate(project.getEndDate());
         dto.setStatus(project.getStatus());

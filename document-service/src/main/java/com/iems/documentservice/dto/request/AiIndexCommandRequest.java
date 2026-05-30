@@ -12,4 +12,5 @@ public class AiIndexCommandRequest {
     private String fileName;
     private String fileType;
     private String downloadUrl;
+    private String contentBase64;
 }

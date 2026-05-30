@@ -6,7 +6,10 @@ on:
       - main
     paths:
       - 'iam-service/**'
+      - 'pom.xml'
+      - 'compose.yml'
       - '.github/workflows/deploy-iam-service.yml'
+  workflow_dispatch:
 
 jobs:
   build:
@@ -51,7 +54,6 @@ jobs:
 
       - name: Copy compose.yml to server
         uses: appleboy/scp-action@v0.1.7
-        continue-on-error: true
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
@@ -67,8 +69,13 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             mkdir -p ~/iems/iam-service
-            
+
             cat > ~/iems/iam-service/.env << EOF
+            SERVICE_NAME=iam-service
+            IMAGE_NAME=${{ vars.DOCKER_USERNAME }}/iam-service:latest
+            HOST_PORT=8086
+            CONTAINER_PORT=8086
+            EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
             DB_URL=${{ secrets.IAM_DB_URL }}
             DB_USERNAME=${{ secrets.IAM_DB_USERNAME }}
             DB_PASSWORD=${{ secrets.IAM_DB_PASSWORD }}
@@ -81,14 +88,22 @@ jobs:
             GITHUB_CLIENT_ID=${{ secrets.GITHUB_CLIENT_ID }}
             GITHUB_CLIENT_SECRET=${{ secrets.GITHUB_CLIENT_SECRET }}
             GITHUB_REDIRECT_URI=${{ secrets.GITHUB_REDIRECT_URI }}
+            PAYOS_CLIENT_ID=${{ secrets.PAYOS_CLIENT_ID }}
+            PAYOS_API_KEY=${{ secrets.PAYOS_API_KEY }}
+            PAYOS_CHECKSUM_KEY=${{ secrets.PAYOS_CHECKSUM_KEY }}
+            PAYOS_BANK_NAME=${{ secrets.PAYOS_BANK_NAME }}
+            PAYOS_ACCOUNT_NAME=${{ secrets.PAYOS_ACCOUNT_NAME }}
+            PAYOS_ACCOUNT_NUMBER=${{ secrets.PAYOS_ACCOUNT_NUMBER }}
+            APP_FRONTEND_URL=${{ vars.APP_FRONTEND_URL }}
+            APP_BACKEND_URL=${{ vars.APP_BACKEND_URL }}
             EOF
-            
+
             chmod 600 ~/iems/iam-service/.env
             cd ~/iems/iam-service
-            
+
             docker network create iems-network || true
-            docker compose pull || true
-            docker compose up -d --remove-orphans || true
-            
+            docker compose pull
+            docker compose up -d --remove-orphans
+
             docker image prune -f
-            echo "Deployment completed!"
+            echo "IAM service deployment completed!"

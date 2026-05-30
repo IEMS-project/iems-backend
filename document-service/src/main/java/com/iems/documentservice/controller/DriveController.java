@@ -80,11 +80,12 @@ public class DriveController {
     }
 
     @PostMapping("/files/upload-signature")
-    @Operation(summary = "Generate direct upload signature for Cloudinary")
+    @Operation(summary = "Generate direct upload presigned URL for S3")
     public ResponseEntity<ApiResponseDto<Map<String, Object>>> generateUploadSignature(
             @RequestParam("fileName") String fileName,
+            @RequestParam(required = false) String contentType,
             @RequestParam(required = false) UUID folderId) {
-        Map<String, Object> data = driveService.generateUploadSignature(fileName, folderId);
+        Map<String, Object> data = driveService.generateUploadSignature(fileName, contentType, folderId);
         return ResponseEntity.ok(new ApiResponseDto<>(200, "Signature generated", data));
     }
 

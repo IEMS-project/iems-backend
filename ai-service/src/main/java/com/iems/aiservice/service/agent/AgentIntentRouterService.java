@@ -17,14 +17,19 @@ public class AgentIntentRouterService {
 
     private static final Set<String> ISSUE_ANALYSIS_TERMS = Set.of(
             "phan tich", "root cause", "nguyen nhan", "rui ro", "risk", "duplicate", "trung lap", "blocker",
-            "stuck", "uu tien", "priority", "phan tich cong viec", "phan tich task", "workload", "tong quan cong viec");
+            "stuck", "uu tien", "priority", "phan tich cong viec", "phan tich task", "workload", "tong quan cong viec",
+            "lap ke hoach", "ke hoach hom nay", "de xuat", "buoc tiep theo", "hanh dong tiep theo",
+            "day du an", "risk review", "standup", "bao cao standup", "tom tat tien do", "tinh hinh cong viec",
+            "grooming", "lam ro", "thieu mo ta", "acceptance criteria", "test case", "task mo ho",
+            "issue mo ho", "chat luong task");
 
     private static final Set<String> SPRINT_TERMS = Set.of(
-            "sprint", "burndown", "worklog", "tien do", "velocity", "backlog", "qua han", "deadline");
+            "sprint", "burndown", "worklog", "tien do", "velocity", "backlog", "qua han", "deadline",
+            "bao cao tien do", "progress summary");
 
     private static final Set<String> ISSUE_QUERY_TERMS = Set.of(
             "issue", "task", "cong viec", "my issues", "danh sach", "status", "assignee", "reporter",
-            "hom nay", "quan trong", "uu tien", "important", "today");
+            "hom nay", "quan trong", "uu tien", "important", "today", "viec nao", "can lam gi");
 
     public AgentDecision route(String question) {
         if (question == null || question.isBlank()) {

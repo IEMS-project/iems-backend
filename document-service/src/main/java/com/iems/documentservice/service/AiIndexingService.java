@@ -8,6 +8,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
+import java.io.InputStream;
+import java.util.Base64;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -19,20 +22,23 @@ public class AiIndexingService {
     @Async
     public void dispatchIndex(ProjectDocument doc) {
         try {
-            String downloadUrl = objectStorageService.presignGetUrl(doc.getCloudinaryPath());
-            log.info("Async Dispatch INDEX docId={} projectId={} fileName={} fileType={} urlPresent={}",
+            byte[] contentBytes;
+            try (InputStream inputStream = objectStorageService.download(doc.getStorageKey())) {
+                contentBytes = inputStream.readAllBytes();
+            }
+            log.info("Async Dispatch INDEX docId={} projectId={} fileName={} fileType={} bytes={}",
                     doc.getId(),
                     doc.getProjectId(),
                     doc.getFileName(),
                     doc.getFileType(),
-                    downloadUrl != null && !downloadUrl.isBlank());
+                    contentBytes.length);
             aiServiceFeignClient.dispatchIndexCommand(AiIndexCommandRequest.builder()
                     .projectId(doc.getProjectId().toString())
                     .documentId(doc.getId().toString())
                     .operation("INDEX")
                     .fileName(doc.getFileName())
                     .fileType(doc.getFileType())
-                    .downloadUrl(downloadUrl)
+                    .contentBase64(Base64.getEncoder().encodeToString(contentBytes))
                     .build());
             log.info("Async Dispatch INDEX completed for doc {}", doc.getId());
         } catch (Exception e) {

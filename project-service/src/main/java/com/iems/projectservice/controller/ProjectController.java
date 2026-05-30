@@ -2,6 +2,7 @@ package com.iems.projectservice.controller;
 
 import com.iems.projectservice.annotation.RequireProjectPermission;
 import com.iems.projectservice.dto.request.CreateProjectDto;
+import com.iems.projectservice.dto.request.UpdateProjectAvatarDto;
 import com.iems.projectservice.dto.request.UpdateProjectDto;
 import com.iems.projectservice.dto.response.ApiResponseDto;
 import com.iems.projectservice.dto.response.MyProjectResponseDto;
@@ -48,6 +49,16 @@ public class ProjectController {
             @Valid @RequestBody UpdateProjectDto dto) throws AppException {
         Project project = projectService.updateProject(projectId, dto);
         return ResponseEntity.ok(new ApiResponseDto<>("success", "Project updated successfully", project));
+    }
+
+    @RequestMapping(value = "/{projectId}/avatar", method = { RequestMethod.PATCH, RequestMethod.PUT })
+    @Operation(summary = "Update project avatar")
+    @RequireProjectPermission(ProjectPermission.PROJECT_UPDATE)
+    public ResponseEntity<ApiResponseDto<Project>> updateProjectAvatar(
+            @PathVariable UUID projectId,
+            @Valid @RequestBody UpdateProjectAvatarDto dto) throws AppException {
+        Project project = projectService.updateProjectAvatar(projectId, dto.getAvatarUrl());
+        return ResponseEntity.ok(new ApiResponseDto<>("success", "Project avatar updated successfully", project));
     }
 
     @DeleteMapping("/{projectId}")

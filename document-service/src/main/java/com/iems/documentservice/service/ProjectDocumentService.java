@@ -23,7 +23,6 @@ import java.util.regex.Pattern;
 @Slf4j
 public class ProjectDocumentService {
 
-    private static final long MAX_UPLOAD_SIZE = 50L * 1024 * 1024;
     private static final String DEFAULT_DOCS_FOLDER_NAME = "docs";
     private static final Pattern UNSAFE_FILE_NAME_CHARS = Pattern.compile("[^a-zA-Z0-9._-]");
 
@@ -153,7 +152,6 @@ public class ProjectDocumentService {
         return toResponse(saved);
     }
 
-    @Transactional
     public ProjectDocumentResponse uploadDocument(UUID projectId,
             UUID folderId,
             MultipartFile file,
@@ -161,9 +159,6 @@ public class ProjectDocumentService {
         requireProjectMember(projectId);
         UUID userId = permissionHelper.getCurrentUserId();
 
-        if (file.getSize() > MAX_UPLOAD_SIZE) {
-            throw new AppException(DocumentErrorCode.INVALID_REQUEST);
-        }
         if (file.isEmpty() || file.getOriginalFilename() == null || file.getOriginalFilename().isBlank()) {
             throw new AppException(DocumentErrorCode.INVALID_REQUEST);
         }
@@ -180,7 +175,7 @@ public class ProjectDocumentService {
                 .fileSize(file.getSize())
                 .fileType(file.getContentType())
                 .uploadedBy(userId)
-                .cloudinaryPath(objectKey)
+                .storageKey(objectKey)
                 .createdAt(OffsetDateTime.now())
                 .allowEmbedded(allowEmbedded)
                 .aiIndexed(allowEmbedded && ragSupported)
@@ -231,7 +226,7 @@ public class ProjectDocumentService {
         ProjectDocument doc = projectDocumentRepository.findByProjectIdAndId(projectId, docId)
                 .orElseThrow(() -> new AppException(DocumentErrorCode.FILE_NOT_FOUND));
 
-        String presignedUrl = objectStorageService.presignGetUrl(doc.getCloudinaryPath());
+        String presignedUrl = objectStorageService.presignGetUrl(doc.getStorageKey());
         return toResponse(doc, presignedUrl);
     }
 
@@ -246,8 +241,8 @@ public class ProjectDocumentService {
             if (Boolean.TRUE.equals(doc.getAiIndexed())) {
                 dispatchDeindex(doc);
             }
-            if (doc.getCloudinaryPath() != null) {
-                objectStorageService.delete(doc.getCloudinaryPath());
+            if (doc.getStorageKey() != null) {
+                objectStorageService.delete(doc.getStorageKey());
             }
         }
         projectDocumentRepository.delete(doc);

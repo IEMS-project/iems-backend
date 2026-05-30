@@ -15,6 +15,7 @@ public class MyProjectResponseDto {
     private UUID id;
     private String name;
     private String description;
+    private String avatarUrl;
     private LocalDateTime startDate;
     private LocalDateTime endDate;
     private ProjectStatus status;

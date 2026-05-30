@@ -15,6 +15,7 @@ public class ProjectTableDto {
     private UUID id;
     private String name;
     private String description;
+    private String avatarUrl;
     private ProjectStatus status;
     private UUID managerId;
     private String managerName;

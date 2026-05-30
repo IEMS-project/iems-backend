@@ -38,8 +38,8 @@ public class ProjectDocument {
     @Column(name = "uploaded_by", nullable = false)
     private UUID uploadedBy;
 
-    @Column(name = "cloudinary_path")
-    private String cloudinaryPath;
+    @Column(name = "storage_key")
+    private String storageKey;
 
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
