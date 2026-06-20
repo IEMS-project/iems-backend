@@ -30,4 +30,5 @@ public class UpdateIssueDto {
     }
 
     private java.util.List<UUID> labelIds;
+    private java.util.List<AttachmentRequestDto> attachments;
 }

@@ -46,14 +46,16 @@ public class CommentService {
         comment.setParentCommentId(parentCommentId);
         Comment saved = commentRepository.save(comment);
 
-        // Notify mentioned users
+        // Notify mentioned users and parent comment author
         try {
-            List<UUID> mentionedIds = extractMentionedUserIds(content);
-            if (!mentionedIds.isEmpty()) {
-                Issue issue = issueRepository.findById(issueId).orElse(null);
-                if (issue != null) {
-                    Project project = projectRepository.findById(issue.getProjectId()).orElse(null);
-                    String actorName = actorNameResolver.resolve(authorId);
+            Issue issue = issueRepository.findById(issueId).orElse(null);
+            if (issue != null) {
+                Project project = projectRepository.findById(issue.getProjectId()).orElse(null);
+                String actorName = actorNameResolver.resolve(authorId);
+                String projectName = project != null ? project.getName() : "Unknown";
+
+                List<UUID> mentionedIds = extractMentionedUserIds(content);
+                if (!mentionedIds.isEmpty()) {
                     notificationPublisher.notifyMentioned(
                             mentionedIds,
                             authorId,
@@ -63,12 +65,29 @@ public class CommentService {
                             issueId,
                             saved.getId(),
                             issue.getProjectId(),
-                            project != null ? project.getName() : "Unknown"
+                            projectName
                     );
+                }
+
+                if (parentCommentId != null) {
+                    Comment parentComment = commentRepository.findById(parentCommentId).orElse(null);
+                    if (parentComment != null) {
+                        UUID recipientId = parentComment.getAuthorId();
+                        notificationPublisher.notifyCommentReplied(
+                                recipientId,
+                                authorId,
+                                actorName,
+                                issue.getIssueKey(),
+                                issueId,
+                                saved.getId(),
+                                issue.getProjectId(),
+                                projectName
+                        );
+                    }
                 }
             }
         } catch (Exception e) {
-            log.warn("Failed to send mention notifications: {}", e.getMessage());
+            log.warn("Failed to send comment notifications: {}", e.getMessage());
         }
 
         return saved;

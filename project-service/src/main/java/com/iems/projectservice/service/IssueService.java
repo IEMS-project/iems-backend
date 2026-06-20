@@ -4,12 +4,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.iems.projectservice.client.UserServiceFeignClient;
 import com.iems.projectservice.dto.request.AccountIdsDto;
 import com.iems.projectservice.dto.request.CreateIssueDto;
+import com.iems.projectservice.dto.request.AttachmentRequestDto;
 import com.iems.projectservice.dto.request.IssuePrioritySyncItemDto;
 import com.iems.projectservice.dto.request.IssueTypeSyncItemDto;
 import com.iems.projectservice.dto.request.UpdateIssueDto;
 import com.iems.projectservice.dto.response.IssueImportResultDto;
 import com.iems.projectservice.dto.response.PagedResponseDto;
 import com.iems.projectservice.dto.response.IssueResponseDto;
+import com.iems.projectservice.dto.response.AttachmentResponseDto;
 import com.iems.projectservice.dto.response.UserDetailDto;
 import com.iems.projectservice.dto.response.UserInfoDto;
 import com.iems.projectservice.entity.*;
@@ -73,6 +75,8 @@ public class IssueService {
     private final NotificationPublisher notificationPublisher;
     private final ActorNameResolver actorNameResolver;
     private final LabelRepository labelRepository;
+    private final AttachmentRepository attachmentRepository;
+    private final AttachmentService attachmentService;
 
     // ── User enrichment helpers ──────────────────────────────────────────────
 
@@ -105,7 +109,22 @@ public class IssueService {
         return new UserInfoDto(u.getId(), name.trim(), u.getEmail(), u.getImage());
     }
 
-    private IssueResponseDto toDto(Issue issue, Map<UUID, UserDetailDto> userMap, Map<UUID, WorkflowStatus> statusMap) {
+    private AttachmentResponseDto toAttachmentDto(Attachment att) {
+        if (att == null) return null;
+        return AttachmentResponseDto.builder()
+                .id(att.getId())
+                .issueId(att.getIssueId())
+                .fileId(att.getFileId())
+                .fileName(att.getFileName())
+                .fileUrl(att.getFileUrl())
+                .fileType(att.getFileType())
+                .fileSize(att.getFileSize())
+                .uploadedBy(att.getUploadedBy())
+                .uploadedAt(att.getUploadedAt())
+                .build();
+    }
+
+    private IssueResponseDto toDto(Issue issue, Map<UUID, UserDetailDto> userMap, Map<UUID, WorkflowStatus> statusMap, List<AttachmentResponseDto> attachments) {
         WorkflowStatus status = issue.getStatusId() != null ? statusMap.get(issue.getStatusId()) : null;
 
         return IssueResponseDto.builder()
@@ -133,6 +152,7 @@ public class IssueService {
                         .collect(Collectors.toSet()))
                 .statusName(status != null ? status.getName() : null)
                 .statusCategory(status != null && status.getCategory() != null ? status.getCategory().name() : null)
+                .attachments(attachments != null ? attachments : Collections.emptyList())
                 .build();
     }
 
@@ -147,12 +167,19 @@ public class IssueService {
                         .map(status -> Map.of(status.getId(), status))
                         .orElse(Collections.emptyMap())
                 : Collections.emptyMap();
-        return toDto(issue, fetchUsers(ids), statusMap);
+
+        List<AttachmentResponseDto> attachments = attachmentRepository.findByIssueId(issue.getId())
+                .stream()
+                .map(this::toAttachmentDto)
+                .collect(Collectors.toList());
+
+        return toDto(issue, fetchUsers(ids), statusMap, attachments);
     }
 
     private List<IssueResponseDto> enrichList(List<Issue> issues) {
         Set<UUID> ids = new HashSet<>();
         Set<UUID> statusIds = new HashSet<>();
+        List<UUID> issueIds = new ArrayList<>();
         for (Issue i : issues) {
             if (i.getAssigneeId() != null)
                 ids.add(i.getAssigneeId());
@@ -160,13 +187,26 @@ public class IssueService {
                 ids.add(i.getReporterId());
             if (i.getStatusId() != null)
                 statusIds.add(i.getStatusId());
+            issueIds.add(i.getId());
         }
         Map<UUID, UserDetailDto> userMap = fetchUsers(ids);
         Map<UUID, WorkflowStatus> statusMap = statusIds.isEmpty()
                 ? Collections.emptyMap()
                 : workflowStatusRepository.findAllById(statusIds).stream()
                         .collect(Collectors.toMap(WorkflowStatus::getId, status -> status));
-        return issues.stream().map(i -> toDto(i, userMap, statusMap)).collect(Collectors.toList());
+
+        Map<UUID, List<AttachmentResponseDto>> attachmentsByIssueId = new HashMap<>();
+        if (!issueIds.isEmpty()) {
+            List<Attachment> allAttachments = attachmentRepository.findByIssueIdIn(issueIds);
+            for (Attachment att : allAttachments) {
+                attachmentsByIssueId.computeIfAbsent(att.getIssueId(), k -> new ArrayList<>())
+                        .add(toAttachmentDto(att));
+            }
+        }
+
+        return issues.stream()
+                .map(i -> toDto(i, userMap, statusMap, attachmentsByIssueId.get(i.getId())))
+                .collect(Collectors.toList());
     }
 
     // ── Issue CRUD ───────────────────────────────────────────────────────────
@@ -192,6 +232,20 @@ public class IssueService {
         int nextSortOrder = issueRepository.findMaxSortOrderByProjectId(projectId).orElse(0) + 1;
 
         Issue saved = createIssueEntity(projectId, dto, reporterId, issueKey, defaultStatusId, nextSortOrder, true);
+
+        if (dto.getAttachments() != null && !dto.getAttachments().isEmpty()) {
+            for (AttachmentRequestDto attDto : dto.getAttachments()) {
+                attachmentService.addAttachment(
+                        saved.getId(),
+                        attDto.getFileId(),
+                        attDto.getFileName(),
+                        attDto.getFileUrl(),
+                        attDto.getFileType(),
+                        attDto.getFileSize(),
+                        reporterId
+                );
+            }
+        }
 
         // Notify assignee if different from reporter
         if (saved.getAssigneeId() != null && !saved.getAssigneeId().equals(reporterId)) {
@@ -312,6 +366,39 @@ public class IssueService {
 
         if (dto.getStatusId() != null && !dto.getStatusId().equals(issue.getStatusId())) {
             changeStatus(issue, dto.getStatusId(), userId);
+        }
+
+        if (dto.getAttachments() != null) {
+            List<Attachment> existing = attachmentRepository.findByIssueId(issueId);
+            Set<String> newFileIds = dto.getAttachments().stream()
+                    .map(AttachmentRequestDto::getFileId)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toSet());
+
+            for (Attachment att : existing) {
+                if (!newFileIds.contains(att.getFileId())) {
+                    attachmentRepository.delete(att);
+                }
+            }
+
+            Set<String> existingFileIds = existing.stream()
+                    .map(Attachment::getFileId)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toSet());
+
+            for (AttachmentRequestDto attDto : dto.getAttachments()) {
+                if (!existingFileIds.contains(attDto.getFileId())) {
+                    attachmentService.addAttachment(
+                            issueId,
+                            attDto.getFileId(),
+                            attDto.getFileName(),
+                            attDto.getFileUrl(),
+                            attDto.getFileType(),
+                            attDto.getFileSize(),
+                            userId
+                    );
+                }
+            }
         }
 
         return enrich(issueRepository.save(issue));

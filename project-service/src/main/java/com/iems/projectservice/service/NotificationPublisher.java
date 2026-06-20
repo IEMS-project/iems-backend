@@ -229,6 +229,27 @@ public class NotificationPublisher {
         sendAsync(req);
     }
 
+    public void notifyCommentReplied(UUID recipientId, UUID actorId, String actorName,
+                                     String issueKey, UUID issueId,
+                                     UUID commentId, UUID projectId, String projectName) {
+        if (recipientId == null || recipientId.equals(actorId)) return;
+        CreateNotificationRequest req = CreateNotificationRequest.builder()
+                .recipientId(recipientId)
+                .actorId(actorId)
+                .actorName(actorName)
+                .type("COMMENT_REPLIED")
+                .title("Reply on your comment in " + issueKey)
+                .body(actorDisplay(actorName) + " replied to your comment in " + issueKey)
+                .entityId(issueId.toString())
+                .entityType("ISSUE")
+                .projectId(projectId)
+                .projectName(projectName)
+                .linkPath("/projects/" + projectId + "/backlog?issueId=" + issueId + "&commentId=" + commentId)
+                .build();
+        attachRecipientInfo(req);
+        sendAsync(req);
+    }
+
     public void notifyMentioned(List<UUID> recipientIds, UUID actorId, String actorName,
                                  String issueKey, String issueTitle, UUID issueId,
                                  UUID commentId, UUID projectId, String projectName) {

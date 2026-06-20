@@ -24,4 +24,5 @@ public class CreateIssueDto {
     private Integer storyPoints;
     private LocalDate dueDate;
     private java.util.List<UUID> labelIds;
+    private java.util.List<AttachmentRequestDto> attachments;
 }
