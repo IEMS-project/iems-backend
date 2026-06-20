@@ -39,4 +39,5 @@ public class IssueResponseDto {
 
     private String statusName;
     private String statusCategory;
+    private java.util.List<AttachmentResponseDto> attachments;
 }
