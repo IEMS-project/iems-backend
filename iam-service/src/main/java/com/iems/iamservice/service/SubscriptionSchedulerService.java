@@ -35,20 +35,7 @@ public class SubscriptionSchedulerService {
     public void autoDowngradeExpiredAccounts() {
         log.info("[SubscriptionScheduler] Checking for expired premium accounts...");
 
-        Instant now = Instant.now();
-        List<Account> allPremium = accountRepository.findBySubscriptionType(SubscriptionType.PREMIUM);
-
-        int downgraded = 0;
-        for (Account account : allPremium) {
-            if (account.getPremiumUntil() != null && account.getPremiumUntil().isBefore(now)) {
-                account.setSubscriptionType(SubscriptionType.FREE);
-                account.setPremiumUntil(null);
-                accountRepository.save(account);
-                downgraded++;
-                log.warn("[SubscriptionScheduler] Auto-downgraded account {} ({}) to FREE – premium expired",
-                        account.getId(), account.getUsername());
-            }
-        }
+        int downgraded = accountRepository.downgradeExpiredPremiumAccounts(Instant.now());
 
         log.info("[SubscriptionScheduler] Auto-downgrade complete. downgraded={}", downgraded);
     }

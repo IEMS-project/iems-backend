@@ -11,6 +11,7 @@ import com.iems.projectservice.entity.WorkflowStatus;
 import com.iems.projectservice.entity.WorkflowTransition;
 import com.iems.projectservice.entity.enums.ProjectPermission;
 import com.iems.projectservice.exception.AppException;
+import com.iems.projectservice.service.ProjectService;
 import com.iems.projectservice.service.WorkflowService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -32,6 +33,7 @@ import java.util.UUID;
 public class WorkflowController {
 
     private final WorkflowService workflowService;
+    private final ProjectService projectService;
 
     // --- Workflow CRUD ---
     @PostMapping
@@ -40,7 +42,8 @@ public class WorkflowController {
     public ResponseEntity<ApiResponseDto<Workflow>> createWorkflow(
             @PathVariable UUID projectId,
             @Valid @RequestBody CreateWorkflowDto dto) throws AppException {
-        Workflow wf = workflowService.createWorkflow(projectId, dto);
+        UUID userId = projectService.getUserIdFromRequest();
+        Workflow wf = workflowService.createWorkflow(projectId, dto, userId);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(new ApiResponseDto<>("success", "Workflow created successfully", wf));
     }
@@ -52,7 +55,8 @@ public class WorkflowController {
             @PathVariable UUID projectId,
             @PathVariable UUID workflowId,
             @Valid @RequestBody CreateWorkflowDto dto) throws AppException {
-        Workflow wf = workflowService.updateWorkflow(workflowId, dto);
+        UUID userId = projectService.getUserIdFromRequest();
+        Workflow wf = workflowService.updateWorkflow(workflowId, dto, userId);
         return ResponseEntity.ok(new ApiResponseDto<>("success", "Workflow updated successfully", wf));
     }
 
@@ -62,7 +66,8 @@ public class WorkflowController {
     public ResponseEntity<ApiResponseDto<Void>> deleteWorkflow(
             @PathVariable UUID projectId,
             @PathVariable UUID workflowId) throws AppException {
-        workflowService.deleteWorkflow(workflowId);
+        UUID userId = projectService.getUserIdFromRequest();
+        workflowService.deleteWorkflow(workflowId, userId);
         return ResponseEntity.ok(new ApiResponseDto<>("success", "Workflow deleted successfully", null));
     }
 
@@ -92,7 +97,8 @@ public class WorkflowController {
             @PathVariable UUID projectId,
             @PathVariable UUID workflowId,
             @Valid @RequestBody CreateWorkflowStatusDto dto) throws AppException {
-        WorkflowStatus status = workflowService.addStatus(workflowId, dto);
+        UUID userId = projectService.getUserIdFromRequest();
+        WorkflowStatus status = workflowService.addStatus(workflowId, dto, userId);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(new ApiResponseDto<>("success", "Status added successfully", status));
     }
@@ -105,7 +111,8 @@ public class WorkflowController {
             @PathVariable UUID workflowId,
             @PathVariable UUID statusId,
             @Valid @RequestBody CreateWorkflowStatusDto dto) throws AppException {
-        WorkflowStatus status = workflowService.updateStatus(statusId, dto);
+        UUID userId = projectService.getUserIdFromRequest();
+        WorkflowStatus status = workflowService.updateStatus(statusId, dto, userId);
         return ResponseEntity.ok(new ApiResponseDto<>("success", "Status updated successfully", status));
     }
 
@@ -116,7 +123,8 @@ public class WorkflowController {
             @PathVariable UUID projectId,
             @PathVariable UUID workflowId,
             @PathVariable UUID statusId) throws AppException {
-        workflowService.deleteStatus(statusId);
+        UUID userId = projectService.getUserIdFromRequest();
+        workflowService.deleteStatus(statusId, userId);
         return ResponseEntity.ok(new ApiResponseDto<>("success", "Status deleted successfully", null));
     }
 
@@ -137,7 +145,8 @@ public class WorkflowController {
             @PathVariable UUID projectId,
             @PathVariable UUID workflowId,
             @RequestBody BatchWorkflowStatusSyncRequest request) throws AppException {
-        List<WorkflowStatus> statuses = workflowService.syncStatuses(workflowId, request.getStatuses());
+        UUID userId = projectService.getUserIdFromRequest();
+        List<WorkflowStatus> statuses = workflowService.syncStatuses(workflowId, request.getStatuses(), userId);
         return ResponseEntity.ok(new ApiResponseDto<>("success", "Statuses synced successfully", statuses));
     }
 
@@ -149,7 +158,8 @@ public class WorkflowController {
             @PathVariable UUID projectId,
             @PathVariable UUID workflowId,
             @Valid @RequestBody CreateWorkflowTransitionDto dto) throws AppException {
-        WorkflowTransition t = workflowService.addTransition(workflowId, dto);
+        UUID userId = projectService.getUserIdFromRequest();
+        WorkflowTransition t = workflowService.addTransition(workflowId, dto, userId);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(new ApiResponseDto<>("success", "Transition added successfully", t));
     }
@@ -161,7 +171,8 @@ public class WorkflowController {
             @PathVariable UUID projectId,
             @PathVariable UUID workflowId,
             @PathVariable UUID transitionId) throws AppException {
-        workflowService.deleteTransition(transitionId);
+        UUID userId = projectService.getUserIdFromRequest();
+        workflowService.deleteTransition(transitionId, userId);
         return ResponseEntity.ok(new ApiResponseDto<>("success", "Transition deleted successfully", null));
     }
 

@@ -7,6 +7,7 @@ import com.iems.projectservice.entity.IssuePriority;
 import com.iems.projectservice.entity.enums.ProjectPermission;
 import com.iems.projectservice.repository.ProjectRepository;
 import com.iems.projectservice.service.IssueService;
+import com.iems.projectservice.service.ProjectService;
 import com.iems.projectservice.service.SubscriptionLimitService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -28,6 +29,7 @@ public class IssuePriorityController {
     private final IssueService issueService;
     private final ProjectRepository projectRepository;
     private final SubscriptionLimitService subscriptionLimitService;
+    private final ProjectService projectService;
 
     private String ownerSub(UUID projectId) {
         return projectRepository.findById(projectId)
@@ -49,8 +51,9 @@ public class IssuePriorityController {
             @PathVariable UUID projectId,
             @RequestBody Map<String, String> body) {
         subscriptionLimitService.checkCanModifyIssuePriority(ownerSub(projectId));
+        UUID userId = projectService.getUserIdFromRequest();
         IssuePriority priority = issueService.createIssuePriority(projectId,
-                body.get("name"), body.get("iconUrl"), body.get("color"));
+                body.get("name"), body.get("iconUrl"), body.get("color"), userId);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(new ApiResponseDto<>("success", "Issue priority created", priority));
     }
@@ -62,7 +65,8 @@ public class IssuePriorityController {
             @PathVariable UUID projectId,
             @RequestBody BatchIssuePrioritySyncRequest request) {
         subscriptionLimitService.checkCanModifyIssuePriority(ownerSub(projectId));
-        List<IssuePriority> priorities = issueService.syncIssuePriorities(projectId, request.getPriorities());
+        UUID userId = projectService.getUserIdFromRequest();
+        List<IssuePriority> priorities = issueService.syncIssuePriorities(projectId, request.getPriorities(), userId);
         return ResponseEntity.ok(new ApiResponseDto<>("success", "Issue priorities synced", priorities));
     }
 
@@ -74,8 +78,9 @@ public class IssuePriorityController {
             @PathVariable UUID id,
             @RequestBody Map<String, String> body) {
         subscriptionLimitService.checkCanModifyIssuePriority(ownerSub(projectId));
+        UUID userId = projectService.getUserIdFromRequest();
         IssuePriority priority = issueService.updateIssuePriority(id,
-                body.get("name"), body.get("iconUrl"), body.get("color"));
+                body.get("name"), body.get("iconUrl"), body.get("color"), userId);
         return ResponseEntity.ok(new ApiResponseDto<>("success", "Issue priority updated", priority));
     }
 
@@ -86,7 +91,8 @@ public class IssuePriorityController {
             @PathVariable UUID projectId,
             @PathVariable UUID id) {
         subscriptionLimitService.checkCanModifyIssuePriority(ownerSub(projectId));
-        issueService.deleteIssuePriority(id);
+        UUID userId = projectService.getUserIdFromRequest();
+        issueService.deleteIssuePriority(id, userId);
         return ResponseEntity.ok(new ApiResponseDto<>("success", "Issue priority deleted", null));
     }
 }

@@ -5,9 +5,11 @@ import com.iems.iamservice.entity.enums.SubscriptionType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -42,6 +44,19 @@ public interface AccountRepository extends JpaRepository<Account, UUID> {
 
     /** Find all accounts with a given subscription type (used by scheduler). */
     List<Account> findBySubscriptionType(SubscriptionType subscriptionType);
+
+    List<Account> findBySubscriptionTypeAndPremiumUntilLessThanEqual(SubscriptionType subscriptionType, Instant now);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            UPDATE Account a
+            SET a.subscriptionType = com.iems.iamservice.entity.enums.SubscriptionType.FREE,
+                a.premiumUntil = null
+            WHERE a.subscriptionType = com.iems.iamservice.entity.enums.SubscriptionType.PREMIUM
+              AND a.premiumUntil IS NOT NULL
+              AND a.premiumUntil <= :now
+            """)
+    int downgradeExpiredPremiumAccounts(@Param("now") Instant now);
 }
 
 

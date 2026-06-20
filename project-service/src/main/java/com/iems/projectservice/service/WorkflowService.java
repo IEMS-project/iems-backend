@@ -18,9 +18,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 @Service
@@ -32,10 +34,9 @@ public class WorkflowService {
     private final WorkflowTransitionRepository workflowTransitionRepository;
     private final ProjectRepository projectRepository;
     private final SubscriptionLimitService subscriptionLimitService;
+    private final ActivityLogService activityLogService;
 
-    // --- Workflow CRUD ---
-    public Workflow createWorkflow(UUID projectId, CreateWorkflowDto dto) {
-        // Requires Premium — free projects cannot create custom workflows
+    public Workflow createWorkflow(UUID projectId, CreateWorkflowDto dto, UUID userId) {
         String ownerSub = projectRepository.findById(projectId)
                 .map(p -> p.getOwnerSubscription()).orElse("FREE");
         subscriptionLimitService.checkCanModifyWorkflow(ownerSub);
@@ -45,35 +46,53 @@ public class WorkflowService {
         wf.setName(dto.getName());
         wf.setDescription(dto.getDescription());
         wf.setIsDefault(dto.getIsDefault() != null ? dto.getIsDefault() : false);
-        return workflowRepository.save(wf);
+        Workflow saved = workflowRepository.save(wf);
+        activityLogService.log(projectId, null, userId, "WORKFLOW_CREATED",
+                "Created workflow: " + saved.getName());
+        return saved;
     }
 
-    public Workflow updateWorkflow(UUID workflowId, CreateWorkflowDto dto) {
+    public Workflow updateWorkflow(UUID workflowId, CreateWorkflowDto dto, UUID userId) {
         Workflow wf = workflowRepository.findById(workflowId)
                 .orElseThrow(() -> new AppException(ProjectErrorCode.WORKFLOW_NOT_FOUND));
-        // Requires Premium to modify
         String ownerSub = projectRepository.findById(wf.getProjectId())
                 .map(p -> p.getOwnerSubscription()).orElse("FREE");
         subscriptionLimitService.checkCanModifyWorkflow(ownerSub);
-        if (dto.getName() != null)
+
+        List<String> changedFields = new ArrayList<>();
+        if (dto.getName() != null && !Objects.equals(wf.getName(), dto.getName())) {
             wf.setName(dto.getName());
-        if (dto.getDescription() != null)
+            changedFields.add("name");
+        }
+        if (dto.getDescription() != null && !Objects.equals(wf.getDescription(), dto.getDescription())) {
             wf.setDescription(dto.getDescription());
-        if (dto.getIsDefault() != null)
+            changedFields.add("description");
+        }
+        if (dto.getIsDefault() != null && !Objects.equals(wf.getIsDefault(), dto.getIsDefault())) {
             wf.setIsDefault(dto.getIsDefault());
-        return workflowRepository.save(wf);
+            changedFields.add("default flag");
+        }
+
+        Workflow saved = workflowRepository.save(wf);
+        if (!changedFields.isEmpty()) {
+            activityLogService.log(saved.getProjectId(), null, userId, "WORKFLOW_UPDATED",
+                    "Updated workflow " + saved.getName() + ": " + String.join(", ", changedFields));
+        }
+        return saved;
     }
 
     @Transactional
-    public void deleteWorkflow(UUID workflowId) {
+    public void deleteWorkflow(UUID workflowId, UUID userId) {
         Workflow wf = workflowRepository.findById(workflowId)
                 .orElseThrow(() -> new AppException(ProjectErrorCode.WORKFLOW_NOT_FOUND));
-        // Requires Premium to delete
         String ownerSub = projectRepository.findById(wf.getProjectId())
                 .map(p -> p.getOwnerSubscription()).orElse("FREE");
         subscriptionLimitService.checkCanModifyWorkflow(ownerSub);
+
         workflowTransitionRepository.deleteByWorkflowId(workflowId);
         workflowStatusRepository.deleteByWorkflowId(workflowId);
+        activityLogService.log(wf.getProjectId(), null, userId, "WORKFLOW_DELETED",
+                "Deleted workflow: " + wf.getName());
         workflowRepository.delete(wf);
     }
 
@@ -86,11 +105,9 @@ public class WorkflowService {
                 .orElseThrow(() -> new AppException(ProjectErrorCode.WORKFLOW_NOT_FOUND));
     }
 
-    // --- Status CRUD ---
-    public WorkflowStatus addStatus(UUID workflowId, CreateWorkflowStatusDto dto) {
+    public WorkflowStatus addStatus(UUID workflowId, CreateWorkflowStatusDto dto, UUID userId) {
         Workflow wf = workflowRepository.findById(workflowId)
                 .orElseThrow(() -> new AppException(ProjectErrorCode.WORKFLOW_NOT_FOUND));
-        // Requires Premium
         String ownerSub = projectRepository.findById(wf.getProjectId())
                 .map(p -> p.getOwnerSubscription()).orElse("FREE");
         subscriptionLimitService.checkCanModifyWorkflow(ownerSub);
@@ -104,38 +121,60 @@ public class WorkflowService {
         status.setCategory(dto.getCategory() != null ? dto.getCategory() : StatusCategory.TODO);
         status.setSortOrder(nextOrder);
         status.setColor(dto.getColor());
-        return workflowStatusRepository.save(status);
+        WorkflowStatus saved = workflowStatusRepository.save(status);
+        activityLogService.log(wf.getProjectId(), null, userId, "WORKFLOW_STATUS_CREATED",
+                "Added status " + saved.getName() + " to workflow " + wf.getName());
+        return saved;
     }
 
-    public WorkflowStatus updateStatus(UUID statusId, CreateWorkflowStatusDto dto) {
+    public WorkflowStatus updateStatus(UUID statusId, CreateWorkflowStatusDto dto, UUID userId) {
         WorkflowStatus status = workflowStatusRepository.findById(statusId)
                 .orElseThrow(() -> new AppException(ProjectErrorCode.WORKFLOW_STATUS_NOT_FOUND));
-        // Requires Premium — look up the project via the workflow
-        workflowRepository.findById(status.getWorkflowId()).ifPresent(wf -> {
-            String ownerSub = projectRepository.findById(wf.getProjectId())
-                    .map(p -> p.getOwnerSubscription()).orElse("FREE");
-            subscriptionLimitService.checkCanModifyWorkflow(ownerSub);
-        });
-        if (dto.getName() != null)
+        Workflow wf = workflowRepository.findById(status.getWorkflowId())
+                .orElseThrow(() -> new AppException(ProjectErrorCode.WORKFLOW_NOT_FOUND));
+        String ownerSub = projectRepository.findById(wf.getProjectId())
+                .map(p -> p.getOwnerSubscription()).orElse("FREE");
+        subscriptionLimitService.checkCanModifyWorkflow(ownerSub);
+
+        String oldName = status.getName();
+        List<String> changedFields = new ArrayList<>();
+        if (dto.getName() != null && !Objects.equals(status.getName(), dto.getName())) {
             status.setName(dto.getName());
-        if (dto.getCategory() != null)
+            changedFields.add("name");
+        }
+        if (dto.getCategory() != null && !Objects.equals(status.getCategory(), dto.getCategory())) {
             status.setCategory(dto.getCategory());
-        if (dto.getSortOrder() != null)
+            changedFields.add("category");
+        }
+        if (dto.getSortOrder() != null && !Objects.equals(status.getSortOrder(), dto.getSortOrder())) {
             status.setSortOrder(dto.getSortOrder());
-        if (dto.getColor() != null)
+            changedFields.add("sort order");
+        }
+        if (dto.getColor() != null && !Objects.equals(status.getColor(), dto.getColor())) {
             status.setColor(dto.getColor());
-        return workflowStatusRepository.save(status);
+            changedFields.add("color");
+        }
+
+        WorkflowStatus saved = workflowStatusRepository.save(status);
+        if (!changedFields.isEmpty()) {
+            activityLogService.log(wf.getProjectId(), null, userId, "WORKFLOW_STATUS_UPDATED",
+                    "Updated status " + oldName + " in workflow " + wf.getName() + ": "
+                            + String.join(", ", changedFields));
+        }
+        return saved;
     }
 
-    public void deleteStatus(UUID statusId) {
+    public void deleteStatus(UUID statusId, UUID userId) {
         WorkflowStatus status = workflowStatusRepository.findById(statusId)
                 .orElseThrow(() -> new AppException(ProjectErrorCode.WORKFLOW_STATUS_NOT_FOUND));
-        // Requires Premium
-        workflowRepository.findById(status.getWorkflowId()).ifPresent(wf -> {
-            String ownerSub = projectRepository.findById(wf.getProjectId())
-                    .map(p -> p.getOwnerSubscription()).orElse("FREE");
-            subscriptionLimitService.checkCanModifyWorkflow(ownerSub);
-        });
+        Workflow wf = workflowRepository.findById(status.getWorkflowId())
+                .orElseThrow(() -> new AppException(ProjectErrorCode.WORKFLOW_NOT_FOUND));
+        String ownerSub = projectRepository.findById(wf.getProjectId())
+                .map(p -> p.getOwnerSubscription()).orElse("FREE");
+        subscriptionLimitService.checkCanModifyWorkflow(ownerSub);
+
+        activityLogService.log(wf.getProjectId(), null, userId, "WORKFLOW_STATUS_DELETED",
+                "Deleted status " + status.getName() + " from workflow " + wf.getName());
         workflowStatusRepository.delete(status);
     }
 
@@ -144,10 +183,9 @@ public class WorkflowService {
     }
 
     @Transactional
-    public List<WorkflowStatus> syncStatuses(UUID workflowId, List<WorkflowStatusSyncItemDto> items) {
+    public List<WorkflowStatus> syncStatuses(UUID workflowId, List<WorkflowStatusSyncItemDto> items, UUID userId) {
         Workflow wf = workflowRepository.findById(workflowId)
                 .orElseThrow(() -> new AppException(ProjectErrorCode.WORKFLOW_NOT_FOUND));
-        // Requires Premium
         String ownerSub = projectRepository.findById(wf.getProjectId())
                 .map(p -> p.getOwnerSubscription()).orElse("FREE");
         subscriptionLimitService.checkCanModifyWorkflow(ownerSub);
@@ -160,6 +198,9 @@ public class WorkflowService {
         }
 
         int sortOrder = 0;
+        int createdCount = 0;
+        int updatedCount = 0;
+        int deletedCount = 0;
         for (WorkflowStatusSyncItemDto item : safeItems) {
             if (item == null) {
                 continue;
@@ -167,7 +208,12 @@ public class WorkflowService {
             boolean removed = Boolean.TRUE.equals(item.getRemoved());
 
             if (removed && item.getId() != null) {
-                deleteStatus(item.getId());
+                WorkflowStatus status = existingById.get(item.getId());
+                if (status == null || !status.getWorkflowId().equals(workflowId)) {
+                    throw new AppException(ProjectErrorCode.WORKFLOW_STATUS_NOT_FOUND);
+                }
+                workflowStatusRepository.delete(status);
+                deletedCount++;
                 continue;
             }
 
@@ -176,17 +222,27 @@ public class WorkflowService {
                 if (status == null || !status.getWorkflowId().equals(workflowId)) {
                     throw new AppException(ProjectErrorCode.WORKFLOW_STATUS_NOT_FOUND);
                 }
+
+                boolean changed = false;
                 if (item.getName() != null && !item.getName().trim().isEmpty()) {
-                    status.setName(item.getName().trim());
+                    String nextName = item.getName().trim();
+                    changed = changed || !Objects.equals(status.getName(), nextName);
+                    status.setName(nextName);
                 }
                 if (item.getColor() != null) {
+                    changed = changed || !Objects.equals(status.getColor(), item.getColor());
                     status.setColor(item.getColor());
                 }
                 if (item.getCategory() != null) {
+                    changed = changed || !Objects.equals(status.getCategory(), item.getCategory());
                     status.setCategory(item.getCategory());
                 }
+                changed = changed || !Objects.equals(status.getSortOrder(), sortOrder);
                 status.setSortOrder(sortOrder++);
                 workflowStatusRepository.save(status);
+                if (changed) {
+                    updatedCount++;
+                }
                 continue;
             }
 
@@ -201,38 +257,48 @@ public class WorkflowService {
             created.setCategory(item.getCategory() != null ? item.getCategory() : StatusCategory.TODO);
             created.setSortOrder(sortOrder++);
             workflowStatusRepository.save(created);
+            createdCount++;
+        }
+
+        if (createdCount > 0 || updatedCount > 0 || deletedCount > 0) {
+            activityLogService.log(wf.getProjectId(), null, userId, "WORKFLOW_STATUSES_SYNCED",
+                    "Synced statuses in workflow " + wf.getName() + ": "
+                            + createdCount + " created, " + updatedCount + " updated, " + deletedCount + " deleted");
         }
 
         return workflowStatusRepository.findByWorkflowIdOrderBySortOrderAsc(workflowId);
     }
 
-    // --- Transition CRUD ---
-    public WorkflowTransition addTransition(UUID workflowId, CreateWorkflowTransitionDto dto) {
+    public WorkflowTransition addTransition(UUID workflowId, CreateWorkflowTransitionDto dto, UUID userId) {
         Workflow wf = workflowRepository.findById(workflowId)
                 .orElseThrow(() -> new AppException(ProjectErrorCode.WORKFLOW_NOT_FOUND));
-        // Requires Premium
         String ownerSub = projectRepository.findById(wf.getProjectId())
                 .map(p -> p.getOwnerSubscription()).orElse("FREE");
         subscriptionLimitService.checkCanModifyWorkflow(ownerSub);
 
-        WorkflowTransition t = new WorkflowTransition();
-        t.setWorkflowId(workflowId);
-        t.setFromStatusId(dto.getFromStatusId());
-        t.setToStatusId(dto.getToStatusId());
-        t.setName(dto.getName());
-        return workflowTransitionRepository.save(t);
+        WorkflowTransition transition = new WorkflowTransition();
+        transition.setWorkflowId(workflowId);
+        transition.setFromStatusId(dto.getFromStatusId());
+        transition.setToStatusId(dto.getToStatusId());
+        transition.setName(dto.getName());
+        WorkflowTransition saved = workflowTransitionRepository.save(transition);
+        activityLogService.log(wf.getProjectId(), null, userId, "WORKFLOW_TRANSITION_CREATED",
+                "Added transition " + transitionName(saved) + " to workflow " + wf.getName());
+        return saved;
     }
 
-    public void deleteTransition(UUID transitionId) {
-        WorkflowTransition t = workflowTransitionRepository.findById(transitionId)
+    public void deleteTransition(UUID transitionId, UUID userId) {
+        WorkflowTransition transition = workflowTransitionRepository.findById(transitionId)
                 .orElseThrow(() -> new AppException(ProjectErrorCode.WORKFLOW_TRANSITION_NOT_FOUND));
-        // Requires Premium
-        workflowRepository.findById(t.getWorkflowId()).ifPresent(wf -> {
-            String ownerSub = projectRepository.findById(wf.getProjectId())
-                    .map(p -> p.getOwnerSubscription()).orElse("FREE");
-            subscriptionLimitService.checkCanModifyWorkflow(ownerSub);
-        });
-        workflowTransitionRepository.delete(t);
+        Workflow wf = workflowRepository.findById(transition.getWorkflowId())
+                .orElseThrow(() -> new AppException(ProjectErrorCode.WORKFLOW_NOT_FOUND));
+        String ownerSub = projectRepository.findById(wf.getProjectId())
+                .map(p -> p.getOwnerSubscription()).orElse("FREE");
+        subscriptionLimitService.checkCanModifyWorkflow(ownerSub);
+
+        activityLogService.log(wf.getProjectId(), null, userId, "WORKFLOW_TRANSITION_DELETED",
+                "Deleted transition " + transitionName(transition) + " from workflow " + wf.getName());
+        workflowTransitionRepository.delete(transition);
     }
 
     public List<WorkflowTransition> getTransitions(UUID workflowId) {
@@ -244,9 +310,6 @@ public class WorkflowService {
                 workflowId, fromStatusId, toStatusId);
     }
 
-    /**
-     * Create a default workflow with standard statuses for a new project.
-     */
     @Transactional
     public Workflow createDefaultWorkflow(UUID projectId) {
         Workflow wf = new Workflow();
@@ -256,13 +319,11 @@ public class WorkflowService {
         wf.setIsDefault(true);
         wf = workflowRepository.save(wf);
 
-        // Create default statuses
         WorkflowStatus todo = createStatus(wf.getId(), "To Do", StatusCategory.TODO, 0, "#6B7280");
         WorkflowStatus inProgress = createStatus(wf.getId(), "In Progress", StatusCategory.IN_PROGRESS, 1, "#3B82F6");
         WorkflowStatus review = createStatus(wf.getId(), "Review", StatusCategory.IN_PROGRESS, 2, "#F59E0B");
         WorkflowStatus done = createStatus(wf.getId(), "Done", StatusCategory.DONE, 3, "#10B981");
 
-        // Create default transitions
         createTransitionInternal(wf.getId(), todo.getId(), inProgress.getId(), "Start Progress");
         createTransitionInternal(wf.getId(), inProgress.getId(), review.getId(), "Submit for Review");
         createTransitionInternal(wf.getId(), review.getId(), done.getId(), "Approve");
@@ -284,11 +345,18 @@ public class WorkflowService {
     }
 
     private void createTransitionInternal(UUID workflowId, UUID fromId, UUID toId, String name) {
-        WorkflowTransition t = new WorkflowTransition();
-        t.setWorkflowId(workflowId);
-        t.setFromStatusId(fromId);
-        t.setToStatusId(toId);
-        t.setName(name);
-        workflowTransitionRepository.save(t);
+        WorkflowTransition transition = new WorkflowTransition();
+        transition.setWorkflowId(workflowId);
+        transition.setFromStatusId(fromId);
+        transition.setToStatusId(toId);
+        transition.setName(name);
+        workflowTransitionRepository.save(transition);
+    }
+
+    private String transitionName(WorkflowTransition transition) {
+        if (transition.getName() != null && !transition.getName().isBlank()) {
+            return transition.getName();
+        }
+        return transition.getFromStatusId() + " -> " + transition.getToStatusId();
     }
 }

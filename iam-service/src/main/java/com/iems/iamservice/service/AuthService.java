@@ -101,6 +101,7 @@ public class AuthService {
             // Update last login time
             user.setLastLoginAt(Instant.now());
             accountService.save(user);
+            user = accountService.normalizeExpiredSubscription(user);
 
             // Get roles information
             Set<String> roles = userRolePermissionService.getUserRoles(user.getId());
@@ -175,6 +176,7 @@ public class AuthService {
             // Check if user still exists and is active
             Account user = accountService.findByUsernameOrEmail(username)
                     .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND_BY_EMAIL));
+            user = accountService.normalizeExpiredSubscription(user);
 
             if (!user.getEnabled()) {
                 throw new AppException(ErrorCode.ACCOUNT_LOCKED);
@@ -363,6 +365,7 @@ public class AuthService {
             userRolePermissionService.assignRolesToUser(account.getId(), Set.of(DEFAULT_ROLE));
             roles = userRolePermissionService.getUserRoles(account.getId());
         }
+        account = accountService.normalizeExpiredSubscription(account);
 
         String accessToken = jwtService.generateTokenWithUserInfo(
                 account.getId(), account.getUsername(), account.getEmail(), roles,

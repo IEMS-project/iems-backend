@@ -198,6 +198,7 @@ public class UserService {
     public AccountSubscriptionResponseDto getAccountSubscription(UUID accountId) {
         Account account = accountRepository.findById(accountId)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXIST));
+        account = accountService.normalizeExpiredSubscription(account);
         return new AccountSubscriptionResponseDto(
                 account.getId(),
                 account.getSubscriptionType(),
@@ -283,10 +284,20 @@ public class UserService {
     }
 
     private void applySelfProfileUpdates(User user, CreateUserDto userRequest) {
+        if (userRequest.getFirstName() != null)
+            user.setFirstName(userRequest.getFirstName());
+        if (userRequest.getLastName() != null)
+            user.setLastName(userRequest.getLastName());
+        if (userRequest.getEmail() != null)
+            user.setEmail(userRequest.getEmail());
         if (userRequest.getAddress() != null)
             user.setAddress(userRequest.getAddress());
         if (userRequest.getPhone() != null)
             user.setPhone(userRequest.getPhone());
+        if (userRequest.getDob() != null)
+            user.setDob(userRequest.getDob());
+        if (userRequest.getGender() != null)
+            user.setGender(userRequest.getGender());
         if (userRequest.getImage() != null)
             user.setImage(userRequest.getImage());
     }

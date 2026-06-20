@@ -101,7 +101,8 @@ public class IssueController {
     public ResponseEntity<ApiResponseDto<Void>> deleteIssue(
             @PathVariable UUID projectId,
             @PathVariable UUID issueId) throws AppException {
-        issueService.deleteIssue(issueId);
+        UUID userId = projectService.getUserIdFromRequest();
+        issueService.deleteIssue(issueId, userId);
         return ResponseEntity.ok(new ApiResponseDto<>("success", "Issue deleted successfully", null));
     }
 

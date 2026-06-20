@@ -38,6 +38,16 @@ public interface IssueRepository extends JpaRepository<Issue, UUID> {
     @Query("SELECT COUNT(i) FROM Issue i WHERE i.projectId = :projectId")
     long countByProjectId(@Param("projectId") UUID projectId);
 
+    @Query(value = """
+            SELECT COALESCE(MAX(CAST(SUBSTRING(issue_key FROM LENGTH(:projectKey) + 2) AS INTEGER)), 0)
+            FROM issues
+            WHERE project_id = :projectId
+              AND issue_key LIKE CONCAT(:projectKey, '-%')
+              AND SUBSTRING(issue_key FROM LENGTH(:projectKey) + 2) ~ '^[0-9]+$'
+            """, nativeQuery = true)
+    int findMaxIssueNumberByProjectIdAndProjectKey(@Param("projectId") UUID projectId,
+                                                   @Param("projectKey") String projectKey);
+
     @Query("SELECT i.id FROM Issue i WHERE i.projectId = :projectId")
     List<UUID> findIdsByProjectId(@Param("projectId") UUID projectId);
 

@@ -204,6 +204,19 @@ public class AccountService {
         return accountRepository.save(user);
     }
 
+    @Transactional
+    public Account normalizeExpiredSubscription(Account account) {
+        if (account != null
+                && account.getSubscriptionType() == SubscriptionType.PREMIUM
+                && account.getPremiumUntil() != null
+                && !account.getPremiumUntil().isAfter(Instant.now())) {
+            account.setSubscriptionType(SubscriptionType.FREE);
+            account.setPremiumUntil(null);
+            return accountRepository.save(account);
+        }
+        return account;
+    }
+
     /**
      * Check if username exists
      */
@@ -254,6 +267,7 @@ public class AccountService {
      * Convert Account entity to AccountResponseDto
      */
     public AccountResponseDto toUserResponse(Account user) {
+        user = normalizeExpiredSubscription(user);
         AccountResponseDto dto = new AccountResponseDto();
         dto.setId(user.getId());
         dto.setUserId(user.getId()); // accountId
@@ -271,6 +285,7 @@ public class AccountService {
     }
 
     public AdminAccountResponseDto toAdminAccountResponse(Account account, User user) {
+        account = normalizeExpiredSubscription(account);
         String displayName = user == null
                 ? null
                 : (String.join(" ",

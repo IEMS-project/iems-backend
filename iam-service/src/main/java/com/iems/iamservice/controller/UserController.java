@@ -11,6 +11,7 @@ import com.iems.iamservice.dto.response.UserResponseDto;
 import com.iems.iamservice.security.JwtUserDetails;
 import com.iems.iamservice.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -53,7 +54,7 @@ public class UserController {
 
         @Operation(summary = "Create user", description = "Create a new user in the system")
         @PostMapping
-        public ResponseEntity<ApiResponseDto<UserResponseDto>> saveUser(@RequestBody CreateUserDto userRequest) {
+        public ResponseEntity<ApiResponseDto<UserResponseDto>> saveUser(@Valid @RequestBody CreateUserDto userRequest) {
                 log.info("Creating user: {}", userRequest.getEmail());
                 UserResponseDto savedUser = service.createUser(userRequest);
                 return ResponseEntity.ok(ApiResponseDto.<UserResponseDto>builder()
@@ -161,7 +162,7 @@ public class UserController {
         @PutMapping("/{id}")
         public ResponseEntity<ApiResponseDto<UserResponseDto>> updateUser(
                         @PathVariable UUID id,
-                        @RequestBody UpdateUserDto userRequest) {
+                        @Valid @RequestBody UpdateUserDto userRequest) {
                 log.info("Updating user with ID: {}", id);
                 return service.updateUser(id, userRequest)
                                 .map(updated -> ResponseEntity.ok(ApiResponseDto.<UserResponseDto>builder()
@@ -175,7 +176,7 @@ public class UserController {
         @Operation(summary = "Update my profile", description = "Update the profile of the authenticated user")
         @PutMapping("/me")
         public ResponseEntity<ApiResponseDto<UserResponseDto>> updateMyProfile(
-                        @RequestBody CreateUserDto userRequest) {
+                        @Valid @RequestBody CreateUserDto userRequest) {
                 UUID accountId = getCurrentAccountId();
                 log.info("Updating profile for account ID: {}", accountId);
 

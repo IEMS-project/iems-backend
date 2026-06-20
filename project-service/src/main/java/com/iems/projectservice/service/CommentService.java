@@ -119,12 +119,19 @@ public class CommentService {
         return commentRepository.save(comment);
     }
 
+    @Transactional
     public void deleteComment(UUID commentId, UUID userId) {
         Comment comment = commentRepository.findById(commentId)
                 .orElseThrow(() -> new AppException(ProjectErrorCode.COMMENT_NOT_FOUND));
         if (!comment.getAuthorId().equals(userId)) {
             throw new AppException(ProjectErrorCode.PERMISSION_DENIED);
         }
+        deleteCommentTree(comment);
+    }
+
+    private void deleteCommentTree(Comment comment) {
+        List<Comment> children = commentRepository.findByParentCommentId(comment.getId());
+        children.forEach(this::deleteCommentTree);
         commentRepository.delete(comment);
     }
 

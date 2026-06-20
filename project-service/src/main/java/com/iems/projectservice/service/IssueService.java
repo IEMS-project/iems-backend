@@ -225,7 +225,7 @@ public class IssueService {
         // Check issue limit based on project owner's subscription
         long count = issueRepository.countByProjectId(projectId);
         subscriptionLimitService.checkCanCreateIssue(count, project.getOwnerSubscription());
-        String issueKey = project.getProjectKey() + "-" + (count + 1);
+        String issueKey = buildIssueKey(project, nextIssueNumber(project));
 
         UUID defaultStatusId = resolveDefaultStatusId(projectId);
 
@@ -282,9 +282,9 @@ public class IssueService {
         issue.setIssueKey(issueKey);
         issue.setIssueTypeId(dto.getIssueTypeId());
         issue.setParentId(dto.getParentId());
-        issue.setTitle(dto.getTitle());
-        issue.setDescription(dto.getDescription());
-        issue.setStatusId(defaultStatusId);
+        issue.setTitle(dto.getTitle().trim());
+        issue.setDescription(normalizeNullableText(dto.getDescription()));
+        issue.setStatusId(dto.getStatusId() != null ? dto.getStatusId() : defaultStatusId);
         issue.setPriorityId(dto.getPriorityId());
         issue.setAssigneeId(dto.getAssigneeId());
         issue.setReporterId(reporterId);
@@ -313,14 +313,30 @@ public class IssueService {
         Issue issue = issueRepository.findById(issueId)
                 .orElseThrow(() -> new AppException(ProjectErrorCode.ISSUE_NOT_FOUND));
 
-        if (dto.getTitle() != null)
-            issue.setTitle(dto.getTitle());
-        if (dto.getDescription() != null)
-            issue.setDescription(dto.getDescription());
-        if (dto.getIssueTypeId() != null)
+        List<String> changedFields = new ArrayList<>();
+
+        if (dto.getTitle() != null) {
+            String nextTitle = dto.getTitle().trim();
+            if (nextTitle.isEmpty()) {
+                throw new IllegalArgumentException("Title is required");
+            }
+            if (!Objects.equals(issue.getTitle(), nextTitle)) {
+                issue.setTitle(nextTitle);
+                changedFields.add("title");
+            }
+        }
+        if (dto.isDescriptionSet() && !Objects.equals(issue.getDescription(), normalizeNullableText(dto.getDescription()))) {
+            issue.setDescription(normalizeNullableText(dto.getDescription()));
+            changedFields.add("description");
+        }
+        if (dto.getIssueTypeId() != null && !Objects.equals(issue.getIssueTypeId(), dto.getIssueTypeId())) {
             issue.setIssueTypeId(dto.getIssueTypeId());
-        if (dto.getPriorityId() != null)
+            changedFields.add("issue type");
+        }
+        if (dto.isPriorityIdSet() && !Objects.equals(issue.getPriorityId(), dto.getPriorityId())) {
             issue.setPriorityId(dto.getPriorityId());
+            changedFields.add("priority");
+        }
         if (dto.isAssigneeIdSet()) {
             UUID previousAssigneeId = issue.getAssigneeId();
             UUID nextAssigneeId = dto.getAssigneeId();
@@ -348,20 +364,31 @@ public class IssueService {
                 }
             }
         }
-        if (dto.getSprintId() != null)
+        if (dto.isSprintIdSet() && !Objects.equals(issue.getSprintId(), dto.getSprintId())) {
             issue.setSprintId(dto.getSprintId());
-        if (dto.getParentId() != null)
+            changedFields.add("sprint");
+        }
+        if (dto.isParentIdSet() && !Objects.equals(issue.getParentId(), dto.getParentId())) {
             issue.setParentId(dto.getParentId());
-        if (dto.getStoryPoints() != null)
+            changedFields.add("parent");
+        }
+        if (dto.isStoryPointsSet() && !Objects.equals(issue.getStoryPoints(), dto.getStoryPoints())) {
             issue.setStoryPoints(dto.getStoryPoints());
-        if (dto.getSortOrder() != null)
+            changedFields.add("story points");
+        }
+        if (dto.getSortOrder() != null && !Objects.equals(issue.getSortOrder(), dto.getSortOrder())) {
             issue.setSortOrder(dto.getSortOrder());
-        if (dto.getDueDate() != null)
+            changedFields.add("sort order");
+        }
+        if (dto.isDueDateSet() && !Objects.equals(issue.getDueDate(), dto.getDueDate())) {
             issue.setDueDate(dto.getDueDate());
+            changedFields.add("due date");
+        }
 
         if (dto.getLabelIds() != null) {
             List<Label> labels = labelRepository.findAllById(dto.getLabelIds());
             issue.setLabels(new HashSet<>(labels));
+            changedFields.add("labels");
         }
 
         if (dto.getStatusId() != null && !dto.getStatusId().equals(issue.getStatusId())) {
@@ -399,9 +426,20 @@ public class IssueService {
                     );
                 }
             }
+            changedFields.add("attachments");
         }
 
-        return enrich(issueRepository.save(issue));
+        Issue saved = issueRepository.save(issue);
+        if (!changedFields.isEmpty()) {
+            activityLogService.log(
+                    saved.getProjectId(),
+                    saved.getId(),
+                    userId,
+                    "ISSUE_UPDATED",
+                    saved.getIssueKey() + ": Updated " + String.join(", ", changedFields));
+        }
+
+        return enrich(saved);
     }
 
     private void changeStatus(Issue issue, UUID newStatusId, UUID userId) {
@@ -435,9 +473,11 @@ public class IssueService {
     }
 
     @Transactional
-    public void deleteIssue(UUID issueId) {
+    public void deleteIssue(UUID issueId, UUID userId) {
         Issue issue = issueRepository.findById(issueId)
                 .orElseThrow(() -> new AppException(ProjectErrorCode.ISSUE_NOT_FOUND));
+        activityLogService.log(issue.getProjectId(), issueId, userId, "ISSUE_DELETED",
+                "Deleted issue " + issue.getIssueKey() + ": " + issue.getTitle());
         issueRepository.delete(issue);
     }
 
@@ -532,7 +572,7 @@ public class IssueService {
         int insertedCount = 0;
         int updatedCount = 0;
         int unchangedCount = 0;
-        long issueCount = issueRepository.countByProjectId(projectId);
+        int nextIssueNumber = nextIssueNumber(project);
         int nextSortOrder = issueRepository.findMaxSortOrderByProjectId(projectId).orElse(0) + 1;
         UUID defaultStatusId = resolveDefaultStatusId(projectId);
 
@@ -555,8 +595,7 @@ public class IssueService {
                 }
             }
 
-            String newIssueKey = project.getProjectKey() + "-" + (issueCount + 1);
-            issueCount++;
+            String newIssueKey = buildIssueKey(project, nextIssueNumber++);
             createIssueEntity(projectId, row.createDto(), reporterId, newIssueKey, defaultStatusId, nextSortOrder++,
                     true);
             insertedCount++;
@@ -570,6 +609,14 @@ public class IssueService {
                 .message("Import completed: " + insertedCount + " inserted, " + updatedCount + " updated, "
                         + unchangedCount + " unchanged")
                 .build();
+    }
+
+    private int nextIssueNumber(Project project) {
+        return issueRepository.findMaxIssueNumberByProjectIdAndProjectKey(project.getId(), project.getProjectKey()) + 1;
+    }
+
+    private String buildIssueKey(Project project, int issueNumber) {
+        return project.getProjectKey() + "-" + issueNumber;
     }
 
     public byte[] exportIssuesToExcel(UUID projectId) {
@@ -953,6 +1000,13 @@ public class IssueService {
         return value == null ? "" : value;
     }
 
+    private String normalizeNullableText(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return null;
+        }
+        return value;
+    }
+
     private List<String> resolveAssigneeEmails(UUID projectId) {
         List<ProjectMember> members = projectMemberRepository.findByProjectId(projectId);
         Set<UUID> accountIds = members.stream()
@@ -1140,37 +1194,58 @@ public class IssueService {
         return issuePriorityRepository.findByProjectIdOrderBySortOrderAsc(projectId);
     }
 
-    public IssuePriority createIssuePriority(UUID projectId, String name, String iconUrl, String color) {
+    public IssuePriority createIssuePriority(UUID projectId, String name, String iconUrl, String color, UUID userId) {
         int sortOrder = (int) issuePriorityRepository.countByProjectId(projectId);
-        return createIssuePriorityWithSortOrder(projectId, name, iconUrl, color, sortOrder);
+        IssuePriority priority = createIssuePriorityWithSortOrder(projectId, name, iconUrl, color, sortOrder);
+        activityLogService.log(projectId, null, userId, "ISSUE_PRIORITY_CREATED",
+                "Created issue priority: " + priority.getName());
+        return priority;
     }
 
-    public IssuePriority updateIssuePriority(UUID id, String name, String iconUrl, String color) {
+    public IssuePriority updateIssuePriority(UUID id, String name, String iconUrl, String color, UUID userId) {
         IssuePriority ip = issuePriorityRepository.findById(id)
                 .orElseThrow(() -> new AppException(ProjectErrorCode.ISSUE_PRIORITY_NOT_FOUND));
-        if (name != null)
+        String oldName = ip.getName();
+        List<String> changedFields = new ArrayList<>();
+        if (name != null && !Objects.equals(ip.getName(), name)) {
             ip.setName(name);
-        if (iconUrl != null)
+            changedFields.add("name");
+        }
+        if (iconUrl != null && !Objects.equals(ip.getIconUrl(), iconUrl)) {
             ip.setIconUrl(iconUrl);
-        if (color != null)
+            changedFields.add("icon");
+        }
+        if (color != null && !Objects.equals(ip.getColor(), color)) {
             ip.setColor(color);
-        return issuePriorityRepository.save(ip);
+            changedFields.add("color");
+        }
+        IssuePriority saved = issuePriorityRepository.save(ip);
+        if (!changedFields.isEmpty()) {
+            activityLogService.log(saved.getProjectId(), null, userId, "ISSUE_PRIORITY_UPDATED",
+                    "Updated issue priority " + oldName + ": " + String.join(", ", changedFields));
+        }
+        return saved;
     }
 
-    public void deleteIssuePriority(UUID id) {
+    public void deleteIssuePriority(UUID id, UUID userId) {
         IssuePriority ip = issuePriorityRepository.findById(id)
                 .orElseThrow(() -> new AppException(ProjectErrorCode.ISSUE_PRIORITY_NOT_FOUND));
+        activityLogService.log(ip.getProjectId(), null, userId, "ISSUE_PRIORITY_DELETED",
+                "Deleted issue priority: " + ip.getName());
         issuePriorityRepository.delete(ip);
     }
 
     @Transactional
-    public List<IssuePriority> syncIssuePriorities(UUID projectId, List<IssuePrioritySyncItemDto> items) {
+    public List<IssuePriority> syncIssuePriorities(UUID projectId, List<IssuePrioritySyncItemDto> items, UUID userId) {
         List<IssuePrioritySyncItemDto> safeItems = items != null ? items : List.of();
         List<IssuePriority> existing = issuePriorityRepository.findByProjectIdOrderBySortOrderAsc(projectId);
         Map<UUID, IssuePriority> existingById = existing.stream()
                 .collect(Collectors.toMap(IssuePriority::getId, i -> i));
 
         int sortOrder = 0;
+        int createdCount = 0;
+        int updatedCount = 0;
+        int deletedCount = 0;
         for (IssuePrioritySyncItemDto item : safeItems) {
             if (item == null) {
                 continue;
@@ -1178,7 +1253,12 @@ public class IssueService {
             boolean removed = Boolean.TRUE.equals(item.getRemoved());
 
             if (removed && item.getId() != null) {
-                deleteIssuePriority(item.getId());
+                IssuePriority priority = existingById.get(item.getId());
+                if (priority == null || !priority.getProjectId().equals(projectId)) {
+                    throw new AppException(ProjectErrorCode.ISSUE_PRIORITY_NOT_FOUND);
+                }
+                issuePriorityRepository.delete(priority);
+                deletedCount++;
                 continue;
             }
 
@@ -1187,13 +1267,22 @@ public class IssueService {
                 if (priority == null || !priority.getProjectId().equals(projectId)) {
                     throw new AppException(ProjectErrorCode.ISSUE_PRIORITY_NOT_FOUND);
                 }
+                boolean changed = false;
                 if (item.getName() != null && !item.getName().trim().isEmpty()) {
-                    priority.setName(item.getName().trim());
+                    String nextName = item.getName().trim();
+                    changed = changed || !Objects.equals(priority.getName(), nextName);
+                    priority.setName(nextName);
                 }
+                changed = changed || !Objects.equals(priority.getIconUrl(), item.getIconUrl());
+                changed = changed || !Objects.equals(priority.getColor(), item.getColor());
+                changed = changed || !Objects.equals(priority.getSortOrder(), sortOrder);
                 priority.setIconUrl(item.getIconUrl());
                 priority.setColor(item.getColor());
                 priority.setSortOrder(sortOrder++);
                 issuePriorityRepository.save(priority);
+                if (changed) {
+                    updatedCount++;
+                }
                 continue;
             }
 
@@ -1208,6 +1297,13 @@ public class IssueService {
             created.setColor(item.getColor());
             created.setSortOrder(sortOrder++);
             issuePriorityRepository.save(created);
+            createdCount++;
+        }
+
+        if (createdCount > 0 || updatedCount > 0 || deletedCount > 0) {
+            activityLogService.log(projectId, null, userId, "ISSUE_PRIORITIES_SYNCED",
+                    "Synced issue priorities: " + createdCount + " created, "
+                            + updatedCount + " updated, " + deletedCount + " deleted");
         }
 
         return issuePriorityRepository.findByProjectIdOrderBySortOrderAsc(projectId);
