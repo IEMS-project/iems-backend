@@ -34,3 +34,5 @@ build/
 # Environment variables
 **/.env
 .env
+deploy/.env.*
+!deploy/.env.example

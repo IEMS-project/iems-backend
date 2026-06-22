@@ -42,6 +42,9 @@ public class OpenRouterChatService {
             List<String> selectedDocumentIds,
             String documentContext,
             String conversationContext) {
+        if (isSimpleGreeting(question, documentContext)) {
+            return "Xin chào! Mình là Project Copilot của IEMS. Bạn muốn mình tóm tắt dự án, lập kế hoạch hôm nay hay phân tích rủi ro?";
+        }
         ensureApiKeyConfigured();
 
         String scopedQuestion = buildScopedQuestion(question, selectedDocumentIds, documentContext,
@@ -69,7 +72,7 @@ public class OpenRouterChatService {
 
         String text = extractMessageContent(response);
         if (text != null && !text.isBlank()) {
-            String repaired = repairVietnameseMarkdownIfNeeded(text.trim(), scopedQuestion);
+            String repaired = normalizeMarkdown(repairVietnameseMarkdownIfNeeded(text.trim(), scopedQuestion));
             log.info("OpenRouter ask done answerChars={}", repaired.length());
             return repaired;
         }
@@ -82,6 +85,10 @@ public class OpenRouterChatService {
             String documentContext,
             String conversationContext,
             Consumer<String> onChunk) {
+        if (isSimpleGreeting(question, documentContext)) {
+            onChunk.accept("Xin chào! Mình là Project Copilot của IEMS. Bạn muốn mình tóm tắt dự án, lập kế hoạch hôm nay hay phân tích rủi ro?");
+            return;
+        }
         ensureApiKeyConfigured();
 
         String scopedQuestion = buildScopedQuestion(question, selectedDocumentIds, documentContext,
@@ -208,7 +215,34 @@ public class OpenRouterChatService {
                 .body(Map.class);
 
         String repaired = extractMessageContent(response);
-        return repaired == null || repaired.isBlank() ? answer : repaired.trim();
+        return repaired == null || repaired.isBlank() ? answer : normalizeMarkdown(repaired.trim());
+    }
+
+    private boolean isSimpleGreeting(String question, String documentContext) {
+        if (documentContext != null && !documentContext.isBlank()) {
+            return false;
+        }
+        if (question == null) {
+            return false;
+        }
+        String normalized = question.toLowerCase().trim();
+        return normalized.matches("^(hi|hello|hey|xin chao|xin chào|chao|chào|alo|yo)[!.\\s]*$");
+    }
+
+    private String normalizeMarkdown(String text) {
+        if (text == null || text.isBlank()) {
+            return text;
+        }
+        return text
+                .replaceAll("(?<!\\n)(#{2,6}\\s+)", "\n\n$1")
+                .replaceAll("(?<!\\n)(-\\s+)", "\n- ")
+                .replaceAll("(?i)Tom tat ngan", "Tóm tắt ngắn")
+                .replaceAll("(?i)Giai thich chi tiet", "Giải thích chi tiết")
+                .replaceAll("(?i)Giai thiet chi tiet", "Giải thích chi tiết")
+                .replaceAll("(?i)Vi du de hieu", "Ví dụ dễ hiểu")
+                .replaceAll("(?i)Ket luan", "Kết luận")
+                .replaceAll("\\n{3,}", "\n\n")
+                .trim();
     }
 
     private boolean looksMostlyEnglish(String text) {
@@ -263,19 +297,22 @@ public class OpenRouterChatService {
                 .append("\n- Neu tai lieu co it thong tin, noi ro phan nao suy luan tu ngu canh va phan nao lay tu tai lieu.")
                 .append("\n- Khi dung noi dung tai lieu, cite marker dung dang [fileName #chunkIndex], vi du [git.docx #2].")
                 .append("\n- Neu cau hoi mo ho nhung da co tai lieu/memory, tu chon cach giai thich huu ich nhat thay vi hoi lai ngay.")
-                .append("\n\nOutput format bat buoc khi tra loi ve tai lieu:")
-                .append("\n- Phai copy dung Markdown structure ben duoi.")
-                .append("\n- Moi heading phai bat dau bang '## ' va phai co dong trong truoc/sau heading.")
-                .append("\n- Moi bullet phai bat dau bang '- ' tren dong rieng.")
-                .append("\n- Code lenh Git phai nam trong fenced code block ```bash.")
-                .append("\n\n## Tom tat ngan\n")
-                .append("\n- 2-4 y ngan gon.\n")
-                .append("\n## Giai thich chi tiet\n")
-                .append("\n- Giai thich tung y theo ngon ngu de hieu.\n")
-                .append("\n## Vi du de hieu\n")
-                .append("\n- Neu phu hop, dua vi du gan voi du an/lap trinh.\n")
-                .append("\n## Ket luan\n")
-                .append("\n- 1-2 cau chot lai.\n");
+                .append("\n- Neu chi la cau chao/cau xa giao, tra loi ngan gon trong 1-2 cau, khong tao cac muc giai thich.");
+
+        if (documentContext != null && !documentContext.isBlank()) {
+            prompt.append("\n\nOutput format khi tra loi ve tai lieu:")
+                    .append("\n- Moi heading phai bat dau bang '## ' va phai co dong trong truoc/sau heading.")
+                    .append("\n- Moi bullet phai bat dau bang '- ' tren dong rieng.")
+                    .append("\n- Code lenh Git phai nam trong fenced code block ```bash.")
+                    .append("\n\n## Tóm tắt ngắn\n")
+                    .append("\n- 2-4 ý ngắn gọn.\n")
+                    .append("\n## Giải thích chi tiết\n")
+                    .append("\n- Giải thích từng ý theo ngôn ngữ dễ hiểu.\n")
+                    .append("\n## Ví dụ dễ hiểu\n")
+                    .append("\n- Nếu phù hợp, đưa ví dụ gần với dự án/lập trình.\n")
+                    .append("\n## Kết luận\n")
+                    .append("\n- 1-2 câu chốt lại.\n");
+        }
 
         if (documentContext != null && !documentContext.isBlank()) {
             prompt.append("\n\nDocument context:\n").append(documentContext);

@@ -19,13 +19,16 @@ public class AgentOrchestratorService {
     private final AgentIntentRouterService intentRouterService;
     private final OpenRouterChatService openRouterChatService;
     private final ProjectIssueToolService projectIssueToolService;
+    private final AgentResponseSanitizer responseSanitizer;
 
     public AgentOrchestratorService(AgentIntentRouterService intentRouterService,
             OpenRouterChatService openRouterChatService,
-            ProjectIssueToolService projectIssueToolService) {
+            ProjectIssueToolService projectIssueToolService,
+            AgentResponseSanitizer responseSanitizer) {
         this.intentRouterService = intentRouterService;
         this.openRouterChatService = openRouterChatService;
         this.projectIssueToolService = projectIssueToolService;
+        this.responseSanitizer = responseSanitizer;
     }
 
     public AgentChatResponse handle(String userId,
@@ -36,21 +39,27 @@ public class AgentOrchestratorService {
             String conversationContext,
             String model) {
         AgentDecision decision = intentRouterService.route(request.question());
-        if (decision.intent() == AgentIntent.ISSUE_ACTION) {
+        if (decision.intent() == AgentIntent.ISSUE_ACTION || decision.intent() == AgentIntent.ISSUE_UPDATE) {
             return executeAction(userId, conversationId, request, authorization, decision, model);
         }
-        if (decision.intent() == AgentIntent.ISSUE_QUERY) {
+        if (decision.intent() == AgentIntent.ISSUE_QUERY || decision.intent() == AgentIntent.ISSUE_SEARCH) {
             return executeIssueQuery(conversationId, request, authorization, decision, model);
         }
-        if (decision.intent() == AgentIntent.ISSUE_ANALYSIS) {
+        if (decision.intent() == AgentIntent.ISSUE_ANALYSIS
+                || decision.intent() == AgentIntent.PROJECT_SUMMARY
+                || decision.intent() == AgentIntent.DAILY_PLAN
+                || decision.intent() == AgentIntent.RISK_ANALYSIS
+                || decision.intent() == AgentIntent.SPRINT_REPORT
+                || decision.intent() == AgentIntent.MEMBER_WORKLOAD
+                || decision.intent() == AgentIntent.DEADLINE_CHECK) {
             return executeIssueAnalysis(conversationId, request, authorization, decision, model);
         }
 
         String enhancedQuestion = buildPromptForIntent(decision, request.question());
-        String answer = openRouterChatService.ask(enhancedQuestion,
+        String answer = responseSanitizer.sanitize(openRouterChatService.ask(enhancedQuestion,
                 request.selectedDocumentIds(),
                 documentContext,
-                conversationContext);
+                conversationContext));
 
         return new AgentChatResponse(
                 answer,
@@ -77,7 +86,7 @@ public class AgentOrchestratorService {
                         "userInstruction", request.question()));
 
         return new AgentChatResponse(
-                executeActionDirectly(userId, request, action, authorization),
+                executeActionDirectly(request, action, authorization),
                 model,
                 conversationId,
                 Instant.now(),
@@ -92,8 +101,8 @@ public class AgentOrchestratorService {
             String authorization,
             AgentDecision decision,
             String model) {
-        String answer = projectIssueToolService.handleIssueQuery(request.question(), request.projectId(),
-                authorization);
+        String answer = responseSanitizer.sanitize(projectIssueToolService.handleIssueQuery(request.question(), request.projectId(),
+                authorization));
         return new AgentChatResponse(
                 answer,
                 model,
@@ -110,8 +119,8 @@ public class AgentOrchestratorService {
             String authorization,
             AgentDecision decision,
             String model) {
-        String answer = projectIssueToolService.handleIssueAnalysis(request.question(), request.projectId(),
-                authorization);
+        String answer = responseSanitizer.sanitize(projectIssueToolService.handleIssueAnalysis(request.question(), request.projectId(),
+                authorization));
         return new AgentChatResponse(
                 answer,
                 model,
@@ -123,24 +132,23 @@ public class AgentOrchestratorService {
                 buildSources(request.selectedDocumentIds(), request.projectId()));
     }
 
-    private String executeActionDirectly(String userId,
-            AgentChatRequest request,
+    private String executeActionDirectly(AgentChatRequest request,
             AgentProposedAction action,
             String authorization) {
         String result = projectIssueToolService.handleIssueAction(request.question(), request.projectId(),
                 authorization);
-        return "User " + userId + " -> " + action.type() + "\n" + result;
+        return responseSanitizer.sanitize(result);
     }
 
     private String buildPromptForIntent(AgentDecision decision, String question) {
         return switch (decision.intent()) {
             case ISSUE_QUERY ->
-                "Ban la tro ly issue tracker. Tra loi ngan gon theo du lieu issue/task.\n\nUser query: " + question;
+                "Bạn là trợ lý quản lý dự án. Trả lời bằng tiếng Việt có dấu, ngắn gọn, không hiển thị UUID, projectId, internal id, raw JSON, endpoint, token hoặc stack trace.\n\nCâu hỏi: " + question;
             case ISSUE_ANALYSIS ->
-                "Ban la tro ly phan tich issue. Hay dua ra nguyen nhan kha di, rui ro, de xuat hanh dong tiep theo va muc uu tien.\n\nUser query: "
+                "Bạn là trợ lý phân tích dự án. Trả lời bằng tiếng Việt tự nhiên, chuyên nghiệp; chỉ dùng issue key, title, status, priority, assignee và due date khi cần. Không hiển thị dữ liệu kỹ thuật.\n\nCâu hỏi: "
                         + question;
             case SPRINT_SUMMARY ->
-                "Ban la tro ly scrum. Hay tom tat sprint/worklog, blocker, va de xuat 3 hanh dong uu tien.\n\nUser query: "
+                "Bạn là trợ lý scrum. Tóm tắt tiến độ, blocker và 3 hành động ưu tiên bằng tiếng Việt có dấu. Không hiển thị dữ liệu kỹ thuật.\n\nCâu hỏi: "
                         + question;
             default -> question;
         };

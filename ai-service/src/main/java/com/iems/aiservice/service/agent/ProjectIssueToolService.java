@@ -4,6 +4,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.text.Normalizer;
 import java.time.LocalDate;
@@ -24,7 +26,18 @@ import java.util.stream.Collectors;
 @Service
 public class ProjectIssueToolService {
 
-    private static final Pattern ISSUE_KEY_PATTERN = Pattern.compile("\\b([A-Z]+-\\d+)\\b");
+    private static final Pattern ISSUE_KEY_PATTERN = Pattern.compile("\\b([A-Z][A-Z0-9]*-\\d+)\\b");
+    private static final ObjectMapper JSON = new ObjectMapper();
+
+    private enum ReportType {
+        REPORT_STATS,
+        SUMMARY_PROGRESS,
+        DAILY_PLAN,
+        RISK_ANALYSIS,
+        MEMBER_WORKLOAD,
+        DEADLINE_CHECK,
+        GENERAL_ANALYSIS
+    }
 
     private final RestClient restClient;
 
@@ -37,20 +50,22 @@ public class ProjectIssueToolService {
 
     public String handleIssueQuery(String question, String projectId, String authorization) {
         if (projectId == null || projectId.isBlank()) {
-            return "Can projectId de truy van danh sach issue/cong viec.";
+            return "Mình cần biết dự án hiện tại để xem danh sách issue.";
         }
 
         String normalized = normalize(question);
         boolean myOnly = hasAnyPhrase(normalized, "my", "cua toi", "cua minh", "viec cua toi");
-        boolean includeAll = hasAnyPhrase(normalized, "tat ca", "all", "het");
         List<Map<String, Object>> issues = getScopedIssues(projectId, authorization, myOnly);
         Map<String, String> priorityById = getIssuePriorities(projectId, authorization);
         Map<String, String> typeById = getIssueTypes(projectId, authorization);
         Map<String, String> statusById = getWorkflowStatuses(projectId, authorization);
         LocalDate today = LocalDate.now();
+        ReportType reportType = detectReportType(normalized);
+        if (reportType == ReportType.REPORT_STATS) {
+            return buildIssueStatisticsReport(issues, priorityById, statusById);
+        }
         boolean needImportanceReason = hasAnyPhrase(normalized,
                 "quan trong", "priority", "uu tien", "important", "quan trng", "quan trnog");
-        boolean myAllAsBadge = myOnly && includeAll;
 
         List<Map<String, Object>> filtered = new ArrayList<>(issues);
 
@@ -98,18 +113,16 @@ public class ProjectIssueToolService {
         }
 
         if (filtered.isEmpty()) {
-            return "Khong tim thay issue/cong viec phu hop.";
+            return "Mình chưa tìm thấy issue phù hợp với yêu cầu này.";
         }
 
-        int limit = includeAll ? filtered.size() : Math.min(filtered.size(), 30);
+        int limit = Math.min(filtered.size(), 7);
         StringBuilder response = new StringBuilder();
         if (needImportanceReason) {
-            response.append("Danh sach cong viec quan trong:\n");
-        } else if (myAllAsBadge) {
-            response.append("Tat ca cong viec cua toi (badge):\n");
+            response.append("Các việc nên ưu tiên:\n");
         } else {
-            response.append("Tim thay ").append(filtered.size()).append(" issue. Hien thi ").append(limit)
-                    .append(" muc dau:\n");
+            response.append("Mình tìm thấy ").append(filtered.size()).append(" issue phù hợp. Hiển thị ")
+                    .append(limit).append(" issue quan trọng nhất:\n");
         }
 
         for (int i = 0; i < limit; i++) {
@@ -124,92 +137,78 @@ public class ProjectIssueToolService {
                 String reason = buildImportantReason(issue, priorityById, statusById, today);
                 response.append(i + 1).append(". ")
                         .append(formatIssueCardLine(issue, statusName, priorityName, dueDate, reason));
-            } else if (!myAllAsBadge) {
+            } else {
                 response.append(i + 1).append(". ")
                         .append(formatIssueCardLine(issue, statusName, priorityName, dueDate, null));
-            } else {
-                response.append(i + 1).append(". ").append(key == null ? "(no-key)" : key);
             }
             response.append("\n");
         }
+        appendRemainingIssueNote(response, filtered.size(), limit);
 
         return response.toString().trim();
     }
 
     public String handleIssueAction(String question, String projectId, String authorization) {
         if (projectId == null || projectId.isBlank()) {
-            return "Can projectId de thuc thi thay doi status issue.";
+            return structuredError("Mình cần biết dự án hiện tại trước khi cập nhật issue.");
+        }
+
+        if (extractIssueKeys(question).isEmpty()) {
+            return structuredError("Bạn muốn cập nhật issue nào? Hãy gửi rõ issue key, ví dụ: \"Chuyển IEMS2-5 sang Done\".");
+        }
+
+        String normalizedQuestion = normalize(question);
+        if (hasAnyPhrase(normalizedQuestion, "gan", "assign", "assignee", "nguoi phu trach")) {
+            return buildConfirmation("assign_issue", "Xác nhận gán người phụ trách",
+                    "Mình sẽ chỉ thực hiện sau khi bạn xác nhận.",
+                    Map.of("issueKey", extractIssueKeys(question).getFirst(), "instruction", question));
+        }
+        if (hasAnyPhrase(normalizedQuestion, "priority", "do uu tien", "muc uu tien")) {
+            return buildConfirmation("update_issue_priority", "Xác nhận cập nhật priority",
+                    "Mình sẽ chỉ thực hiện sau khi bạn xác nhận.",
+                    Map.of("issueKey", extractIssueKeys(question).getFirst(), "instruction", question));
         }
 
         List<Map<String, Object>> issues = getScopedIssues(projectId, authorization, false);
         if (issues.isEmpty()) {
-            return "Khong co issue nao trong project de cap nhat.";
+            return structuredError("Mình chưa thấy issue nào trong dự án để cập nhật.");
         }
 
         Map<String, String> statuses = getWorkflowStatuses(projectId, authorization);
         if (statuses.isEmpty()) {
-            return "Khong tim thay workflow status trong project.";
+            return structuredError("Mình chưa lấy được danh sách trạng thái của dự án. Bạn thử lại sau vài giây nhé.");
         }
 
         String targetStatusPhrase = extractTargetStatus(question);
         Map.Entry<String, String> matchedStatus = findStatusByPhrase(statuses, targetStatusPhrase);
         if (matchedStatus == null) {
-            return "Khong the xac dinh status dich tu cau lenh. Hay noi ro vi du: 'sang In Progress' hoac 'sang Done'.";
+            return structuredError("Bạn muốn chuyển issue sang trạng thái nào? Hãy nói rõ, ví dụ: \"sang In Progress\" hoặc \"sang Done\".");
         }
 
         List<Map<String, Object>> targets = resolveTargets(question, issues, projectId, authorization);
         if (targets.isEmpty()) {
-            return "Khong tim thay issue muc tieu de cap nhat status.";
+            return structuredError("Mình không tìm thấy issue key bạn vừa nêu trong dự án này. Bạn kiểm tra lại giúp mình nhé.");
         }
-
-        int success = 0;
-        List<String> failed = new ArrayList<>();
-        int processed = 0;
-
-        for (Map<String, Object> issue : targets) {
-            if (processed >= 50) {
-                failed.add("Da dung sau 50 issue de tranh tac dong qua lon trong 1 lenh.");
-                break;
-            }
-            processed++;
-
-            String issueId = stringValue(issue.get("id"));
-            String issueKey = stringValue(issue.get("issueKey"));
-            try {
-                changeIssueStatus(projectId, issueId, matchedStatus.getKey(), authorization);
-                success++;
-            } catch (Exception ex) {
-                failed.add((issueKey == null ? issueId : issueKey) + ": " + safeMessage(ex));
-            }
-        }
-
-        StringBuilder result = new StringBuilder();
-        result.append("Da cap nhat status sang '")
-                .append(matchedStatus.getValue())
-                .append("' cho ")
-                .append(success)
-                .append("/")
-                .append(processed)
-                .append(" issue.");
-
-        if (!failed.isEmpty()) {
-            result.append("\nLoi:\n");
-            failed.stream().limit(10).forEach(item -> result.append("- ").append(item).append("\n"));
-        }
-
-        return result.toString().trim();
+        List<Map<String, Object>> issueCards = targets.stream()
+                .limit(5)
+                .map(issue -> normalizeIssueForPrompt(issue, Map.of(), Map.of(), Map.of()))
+                .collect(Collectors.toList());
+        return buildConfirmation("update_issue_status", "Xác nhận đổi trạng thái issue",
+                "Bạn xác nhận chuyển " + issueCards.size() + " issue sang \"" + matchedStatus.getValue()
+                        + "\"? Mình chưa thực hiện thay đổi nào.",
+                Map.of("targetStatus", matchedStatus.getValue(), "issues", issueCards));
     }
 
     public String handleIssueAnalysis(String question, String projectId, String authorization) {
         if (projectId == null || projectId.isBlank()) {
-            return "Can projectId de phan tich cong viec.";
+            return "Mình cần biết dự án hiện tại để phân tích công việc.";
         }
 
         String normalized = normalize(question);
         boolean myOnly = hasAnyPhrase(normalized, "my", "cua toi", "cua minh", "viec cua toi");
         List<Map<String, Object>> issues = getScopedIssues(projectId, authorization, myOnly);
         if (issues.isEmpty()) {
-            return "Khong co issue nao de phan tich.";
+            return "Mình chưa thấy issue nào để phân tích trong dự án này.";
         }
 
         Map<String, String> priorityById = getIssuePriorities(projectId, authorization);
@@ -241,16 +240,33 @@ public class ProjectIssueToolService {
         List<Map<String, Object>> taskTargets = selectTaskTargets(question, issues, openIssues,
                 priorityById, statusById, today);
         if (taskTargets.isEmpty()) {
-            return "Khong tim thay task phu hop de phan tich.";
+            return "Mình chưa tìm thấy task phù hợp để phân tích.";
         }
 
-        if (hasAnyPhrase(normalized, "standup", "bao cao standup", "tom tat tien do", "tinh hinh cong viec",
-                "bao cao tien do")) {
+        ReportType reportType = detectReportType(normalized);
+
+        if (reportType == ReportType.SUMMARY_PROGRESS) {
             return buildStandupBrief(issues, openIssues, priorityById, statusById, today);
         }
 
-        if (hasAnyPhrase(normalized, "rui ro", "risk", "blocker", "stuck", "ket", "tre deadline", "qua han")) {
+        if (reportType == ReportType.DAILY_PLAN) {
+            return buildDailyPlan(taskTargets, priorityById, statusById, today);
+        }
+
+        if (reportType == ReportType.RISK_ANALYSIS) {
             return buildProjectRiskReview(openIssues, priorityById, statusById, today);
+        }
+
+        if (reportType == ReportType.MEMBER_WORKLOAD) {
+            return buildMemberWorkloadReport(issues, priorityById, statusById, today);
+        }
+
+        if (reportType == ReportType.DEADLINE_CHECK) {
+            return buildDeadlineCheck(openIssues, priorityById, statusById, today);
+        }
+
+        if (reportType == ReportType.REPORT_STATS) {
+            return buildIssueStatisticsReport(issues, priorityById, statusById);
         }
 
         if (hasAnyPhrase(normalized, "grooming", "lam ro", "thieu mo ta", "acceptance", "test case",
@@ -323,6 +339,65 @@ public class ProjectIssueToolService {
         }
 
         return result.toString().trim();
+    }
+
+    public Map<String, Object> getProjectOverview(String projectId, String authorization) {
+        List<Map<String, Object>> issues = getScopedIssues(projectId, authorization, false);
+        Map<String, String> priorityById = getIssuePriorities(projectId, authorization);
+        Map<String, String> statusById = getWorkflowStatuses(projectId, authorization);
+        LocalDate today = LocalDate.now();
+        return Map.of(
+                "totalIssues", issues.size(),
+                "issues", normalizeIssuesForPrompt(issues, priorityById, statusById, today));
+    }
+
+    public List<Map<String, Object>> getProjectIssues(String projectId, String authorization) {
+        List<Map<String, Object>> issues = getScopedIssues(projectId, authorization, false);
+        return normalizeIssuesForPrompt(issues, getIssuePriorities(projectId, authorization),
+                getWorkflowStatuses(projectId, authorization), LocalDate.now());
+    }
+
+    public Map<String, Object> getSprintStatus(String projectId, String authorization) {
+        return getProjectOverview(projectId, authorization);
+    }
+
+    public Map<String, Object> getMemberWorkload(String projectId, String authorization) {
+        List<Map<String, Object>> issues = getProjectIssues(projectId, authorization);
+        Map<String, Long> counts = issues.stream()
+                .collect(Collectors.groupingBy(issue -> stringValue(issue.get("assigneeName")), LinkedHashMap::new,
+                        Collectors.counting()));
+        return Map.of("members", counts.entrySet().stream()
+                .map(e -> Map.of("name", e.getKey(), "openIssues", e.getValue()))
+                .toList());
+    }
+
+    public List<Map<String, Object>> getRiskSignals(String projectId, String authorization) {
+        List<Map<String, Object>> issues = getScopedIssues(projectId, authorization, false);
+        Map<String, String> priorityById = getIssuePriorities(projectId, authorization);
+        Map<String, String> statusById = getWorkflowStatuses(projectId, authorization);
+        LocalDate today = LocalDate.now();
+        return normalizeIssuesForPrompt(issues.stream()
+                .filter(issue -> isBlockedIssue(issue, statusById) || isOverdue(issue, today) || isDueSoon(issue, today))
+                .sorted(Comparator.comparingInt(issue -> -issueImportanceScore(issue, priorityById, statusById, today)))
+                .limit(7)
+                .toList(), priorityById, statusById, today);
+    }
+
+    public String updateIssueStatus(String question, String projectId, String authorization) {
+        return handleIssueAction(question, projectId, authorization);
+    }
+
+    public String assignIssue(String question, String projectId, String authorization) {
+        return handleIssueAction(question, projectId, authorization);
+    }
+
+    public String createIssue(String question, String projectId, String authorization) {
+        return buildConfirmation("create_issue", "Xác nhận tạo issue",
+                "Mình sẽ chỉ tạo issue sau khi bạn xác nhận.", Map.of("instruction", question));
+    }
+
+    public List<Map<String, Object>> searchProjectDocuments(String question, String projectId, String authorization) {
+        return List.of();
     }
 
     private List<Map<String, Object>> resolveTargets(String question,
@@ -543,16 +618,26 @@ public class ProjectIssueToolService {
         String path = myIssues
                 ? "/projects/{projectId}/issues/my-issues"
                 : "/projects/{projectId}/issues";
+        List<Map<String, Object>> result = new ArrayList<>();
+        mergeIssues(result, readIssueList(path, projectId, authorization));
+
+        if (!myIssues) {
+            mergeIssues(result, readPagedIssues(projectId, authorization));
+        }
+
+        return result;
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> readIssueList(String path, String projectId, String authorization) {
         Map<String, Object> response = restClient.get()
                 .uri(path, projectId)
                 .header("Authorization", authorization)
                 .retrieve()
                 .body(Map.class);
-
         if (response == null) {
             return List.of();
         }
-
         Object data = response.get("data");
         if (!(data instanceof List<?> list)) {
             return List.of();
@@ -565,6 +650,70 @@ public class ProjectIssueToolService {
             }
         }
         return result;
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> readPagedIssues(String projectId, String authorization) {
+        List<Map<String, Object>> result = new ArrayList<>();
+        int page = 0;
+        int totalPages = 1;
+        do {
+            Map<String, Object> response = restClient.get()
+                    .uri(uriBuilder -> uriBuilder
+                            .path("/projects/{projectId}/issues/paged")
+                            .queryParam("page", page)
+                            .queryParam("size", 200)
+                            .build(projectId))
+                    .header("Authorization", authorization)
+                    .retrieve()
+                    .body(Map.class);
+            if (response == null || !(response.get("data") instanceof Map<?, ?> dataMapRaw)) {
+                break;
+            }
+            Map<String, Object> data = (Map<String, Object>) dataMapRaw;
+            Object content = firstNonNull(data.get("content"), data.get("items"), data.get("data"));
+            if (content instanceof List<?> list) {
+                for (Object item : list) {
+                    if (item instanceof Map<?, ?> map) {
+                        result.add(new LinkedHashMap<>((Map<String, Object>) map));
+                    }
+                }
+            }
+            totalPages = parseIntValue(data.get("totalPages")) == null ? 1 : parseIntValue(data.get("totalPages"));
+            page++;
+        } while (page < totalPages && page < 20);
+
+        return result;
+    }
+
+    private void mergeIssues(List<Map<String, Object>> target, List<Map<String, Object>> source) {
+        Set<String> seen = target.stream()
+                .map(this::issueIdentity)
+                .collect(Collectors.toCollection(HashSet::new));
+        for (Map<String, Object> issue : source) {
+            String identity = issueIdentity(issue);
+            if (seen.add(identity)) {
+                target.add(issue);
+            }
+        }
+    }
+
+    private String issueIdentity(Map<String, Object> issue) {
+        String id = firstNonBlank(stringValue(issue.get("id")), stringValue(issue.get("issueId")));
+        if (id != null) {
+            return "id:" + id;
+        }
+        String key = stringValue(issue.get("issueKey"));
+        return key == null ? "object:" + System.identityHashCode(issue) : "key:" + normalize(key);
+    }
+
+    private Object firstNonNull(Object... values) {
+        for (Object value : values) {
+            if (value != null) {
+                return value;
+            }
+        }
+        return null;
     }
 
     @SuppressWarnings("unchecked")
@@ -805,33 +954,79 @@ public class ProjectIssueToolService {
         long overdueCount = openIssues.stream().filter(issue -> isOverdue(issue, today)).count();
         long inProgressCount = openIssues.stream().filter(issue -> isInProgressIssue(issue, statusById)).count();
 
+        Map<String, Long> statusCounts = countByDisplayName(issues, statusById, "statusId", "Chưa phân loại");
         StringBuilder out = new StringBuilder();
-        out.append("Bao cao standup nhanh:\n");
+        out.append("## Tổng quan\n")
+                .append("- Tổng số issue: ").append(issues.size()).append("\n")
+                .append("- Đang mở: ").append(openIssues.size()).append("\n")
+                .append("- Đang làm: ").append(inProgressCount).append("\n")
+                .append("- Đã xong: ").append(doneCount).append("\n")
+                .append("- Quá hạn/rủi ro: ").append(overdueCount + blockedCount).append("\n\n");
+
+        out.append("## Thống kê theo trạng thái\n\n")
+                .append("| Trạng thái | Số issue |\n")
+                .append("|---|---:|\n");
+        statusCounts.forEach((status, count) -> out.append("| ").append(status).append(" | ").append(count).append(" |\n"));
+
+        out.append("\n## Việc đang làm\n");
+        appendIssueLines(out, focus.stream()
+                .filter(issue -> isInProgressIssue(issue, statusById))
+                .limit(5)
+                .collect(Collectors.toList()), priorityById, statusById, today);
+
+        out.append("\n## Việc đã xong\n");
+        List<Map<String, Object>> doneIssues = issues.stream()
+                .filter(issue -> isDoneStatus(normalize(statusById.getOrDefault(stringValue(issue.get("statusId")), ""))))
+                .limit(5)
+                .collect(Collectors.toList());
+        appendIssueLines(out, doneIssues, priorityById, statusById, today);
+
+        out.append("\n## Việc quá hạn/rủi ro\n");
         for (int i = 0; i < focus.size(); i++) {
             Map<String, Object> issue = focus.get(i);
+            if (!isOverdue(issue, today) && !isBlockedIssue(issue, statusById)) {
+                continue;
+            }
             String statusName = statusById.getOrDefault(stringValue(issue.get("statusId")), "unknown");
             String priorityName = priorityById.getOrDefault(stringValue(issue.get("priorityId")), "unknown");
             String dueDate = stringValue(issue.get("dueDate"));
             String reason = buildStandupReason(issue, priorityById, statusById, today);
-            out.append(i + 1).append(". ")
+            out.append("- ")
                     .append(formatIssueCardLine(issue, statusName, priorityName, dueDate, reason))
                     .append("\n");
         }
 
-        out.append("\n---\n\n")
-                .append("## Standup notes\n\n")
-                .append("- Tong issue: ").append(issues.size()).append("\n")
-                .append("- Da done: ").append(doneCount).append("\n")
-                .append("- Dang mo: ").append(openIssues.size()).append("\n")
-                .append("- Dang lam: ").append(inProgressCount).append("\n")
-                .append("- Blocker/stuck: ").append(blockedCount).append("\n")
-                .append("- Qua han: ").append(overdueCount).append("\n\n")
-                .append("## Nen noi trong standup\n\n")
-                .append("- Hom qua/hien tai: tap trung vao cac card uu tien o tren.\n")
-                .append("- Hom nay: xu ly task qua han/blocker truoc, sau do den task priority cao.\n")
-                .append("- Can ho tro: hoi ro owner/requirement cho task thieu mo ta hoac dang stuck.\n");
+        out.append("\n## Nhận xét sức khỏe dự án\n")
+                .append(buildProjectHealthComment(openIssues.size(), overdueCount, blockedCount, issues.size()));
+        appendRemainingIssueNote(out, openIssues.size(), Math.min(openIssues.size(), 7));
 
-        return out.toString().trim();
+        return structured(Map.of(
+                "type", "summary",
+                "title", "Tóm tắt sức khỏe dự án",
+                "summary", "Dự án hiện có " + issues.size() + " issue, trong đó " + openIssues.size()
+                        + " issue đang mở.",
+                "metrics", List.of(
+                        metric("Tổng issue", issues.size()),
+                        metric("Đang mở", openIssues.size()),
+                        metric("Đã xong", doneCount),
+                        metric("Quá hạn", overdueCount),
+                        metric("Blocker", blockedCount)),
+                "sections", List.of(
+                        section("Tổng quan", List.of("Tổng số issue: " + issues.size(),
+                                "Đang mở: " + openIssues.size(), "Đang làm: " + inProgressCount,
+                                "Đã xong: " + doneCount)),
+                        section("Thống kê theo trạng thái", statusCounts.entrySet().stream()
+                                .map(e -> e.getKey() + ": " + e.getValue()).toList()),
+                        section("Việc đang làm", issueSummaries(focus.stream()
+                                .filter(issue -> isInProgressIssue(issue, statusById)).limit(5).toList(),
+                                priorityById, statusById, today)),
+                        section("Việc đã xong", issueSummaries(doneIssues, priorityById, statusById, today)),
+                        section("Việc quá hạn/rủi ro", issueSummaries(focus.stream()
+                                .filter(issue -> isOverdue(issue, today) || isBlockedIssue(issue, statusById))
+                                .limit(7).toList(), priorityById, statusById, today)),
+                        section("Nhận xét sức khỏe dự án",
+                                List.of(buildProjectHealthComment(openIssues.size(), overdueCount, blockedCount, issues.size())))),
+                "issues", normalizeIssuesForPrompt(focus, priorityById, statusById, today)));
     }
 
     private String buildProjectRiskReview(List<Map<String, Object>> openIssues,
@@ -848,11 +1043,22 @@ public class ProjectIssueToolService {
                 .collect(Collectors.toList());
 
         if (riskIssues.isEmpty()) {
-            return "Chua thay rui ro lon trong cac issue dang mo. Van nen kiem tra cac task thieu due date/mo ta truoc sprint review.";
+            return structured(Map.of(
+                    "type", "risk_analysis",
+                    "title", "Phân tích rủi ro",
+                    "summary", "Mức rủi ro chung: Thấp. Chưa thấy rủi ro lớn trong các issue đang mở.",
+                    "metrics", List.of(metric("Mức rủi ro", "Thấp")),
+                    "sections", List.of(section("Hành động đề xuất",
+                            List.of("Kiểm tra các task thiếu hạn chót hoặc thiếu mô tả trước sprint review."))),
+                    "issues", List.of(),
+                    "actions", List.of("Tiếp tục theo dõi issue gần hạn.")));
         }
 
         StringBuilder out = new StringBuilder();
-        out.append("Rui ro can xu ly truoc:\n");
+        long criticalSignals = riskIssues.stream().filter(issue -> isBlockedIssue(issue, statusById) || isOverdue(issue, today)).count();
+        String level = criticalSignals >= 3 ? "Cao" : criticalSignals >= 1 ? "Trung bình" : "Thấp";
+        out.append("## Mức rủi ro chung: ").append(level).append("\n\n")
+                .append("## Rủi ro chính\n");
         for (int i = 0; i < riskIssues.size(); i++) {
             Map<String, Object> issue = riskIssues.get(i);
             String statusName = statusById.getOrDefault(stringValue(issue.get("statusId")), "unknown");
@@ -864,14 +1070,30 @@ public class ProjectIssueToolService {
                     .append("\n");
         }
 
-        out.append("\n---\n\n")
-                .append("## Cach xu ly\n\n")
-                .append("- Blocker/stuck: can owner go blocker va deadline clear trong ngay.\n")
-                .append("- Qua han: cap nhat ETA moi, cat scope neu can, va thong bao stakeholder.\n")
-                .append("- Priority cao: tach viec nho hon, chot acceptance criteria, tranh lam lan man.\n")
-                .append("- Task thieu context: hoi lai requirement truoc khi code de tranh rework.\n");
+        out.append("\n## Tác động\n")
+                .append("- Có thể làm chậm mốc hoàn thành nếu blocker hoặc issue quá hạn không được xử lý trong ngày.\n")
+                .append("- Các issue priority cao dễ kéo theo rework nếu thiếu owner hoặc tiêu chí hoàn thành rõ ràng.\n\n")
+                .append("## Hành động đề xuất\n")
+                .append("- Gỡ blocker trước, chốt owner và thời hạn xử lý rõ ràng.\n")
+                .append("- Với issue quá hạn, cập nhật ETA mới và cắt scope nếu cần.\n")
+                .append("- Với issue priority cao, chia nhỏ việc và xác nhận acceptance criteria trước khi triển khai.\n");
 
-        return out.toString().trim();
+        return structured(Map.of(
+                "type", "risk_analysis",
+                "title", "Phân tích rủi ro",
+                "summary", "Mức rủi ro chung: " + level,
+                "metrics", List.of(metric("Mức rủi ro", level), metric("Issue rủi ro", riskIssues.size())),
+                "sections", List.of(
+                        section("Rủi ro chính", issueSummaries(riskIssues, priorityById, statusById, today)),
+                        section("Tác động", List.of(
+                                "Có thể làm chậm mốc hoàn thành nếu blocker hoặc issue quá hạn không được xử lý trong ngày.",
+                                "Các issue priority cao dễ kéo theo rework nếu thiếu owner hoặc tiêu chí hoàn thành rõ ràng.")),
+                        section("Hành động đề xuất", List.of(
+                                "Gỡ blocker trước, chốt owner và thời hạn xử lý rõ ràng.",
+                                "Với issue quá hạn, cập nhật ETA mới và cắt scope nếu cần.",
+                                "Với issue priority cao, chia nhỏ việc và xác nhận acceptance criteria trước khi triển khai."))),
+                "issues", normalizeIssuesForPrompt(riskIssues, priorityById, statusById, today),
+                "actions", List.of("Gỡ blocker", "Cập nhật ETA", "Chia nhỏ issue priority cao")));
     }
 
     private String buildIssueQualityAudit(List<Map<String, Object>> openIssues,
@@ -1723,30 +1945,347 @@ public class ProjectIssueToolService {
         return value == null ? null : String.valueOf(value);
     }
 
+    private String structured(Map<String, Object> payload) {
+        try {
+            return JSON.writeValueAsString(payload);
+        } catch (JsonProcessingException ex) {
+            return "{\"type\":\"error\",\"title\":\"Không thể tạo phản hồi\",\"summary\":\"Mình chưa thể tạo phản hồi lúc này.\"}";
+        }
+    }
+
+    private String structuredError(String message) {
+        return structured(Map.of(
+                "type", "error",
+                "title", "Mình cần thêm thông tin",
+                "summary", message));
+    }
+
+    private String buildConfirmation(String actionType, String title, String summary, Map<String, Object> payload) {
+        return structured(Map.of(
+                "type", "confirmation",
+                "title", title,
+                "summary", summary,
+                "actions", List.of(Map.of(
+                        "type", actionType,
+                        "label", "Xác nhận",
+                        "payload", payload))));
+    }
+
+    private Map<String, Object> metric(String label, Object value) {
+        return Map.of("label", label, "value", value == null ? "" : value);
+    }
+
+    private Map<String, Object> section(String title, List<String> items) {
+        return Map.of("title", title, "items", items == null ? List.of() : items);
+    }
+
+    private List<String> issueSummaries(List<Map<String, Object>> issues,
+            Map<String, String> priorityById,
+            Map<String, String> statusById,
+            LocalDate today) {
+        if (issues == null || issues.isEmpty()) {
+            return List.of("Chưa có issue nổi bật.");
+        }
+        return issues.stream()
+                .limit(7)
+                .map(issue -> {
+                    String statusName = statusById.getOrDefault(stringValue(issue.get("statusId")), "unknown");
+                    String priorityName = priorityById.getOrDefault(stringValue(issue.get("priorityId")), "unknown");
+                    String dueDate = stringValue(issue.get("dueDate"));
+                    return formatIssueCardLine(issue, statusName, priorityName, dueDate,
+                            buildStandupReason(issue, priorityById, statusById, today));
+                })
+                .toList();
+    }
+
+    private List<Map<String, Object>> normalizeIssuesForPrompt(List<Map<String, Object>> issues,
+            Map<String, String> priorityById,
+            Map<String, String> statusById,
+            LocalDate today) {
+        if (issues == null) {
+            return List.of();
+        }
+        return issues.stream()
+                .limit(7)
+                .map(issue -> normalizeIssueForPrompt(issue, priorityById, statusById, Map.of(
+                        "reason", buildStandupReason(issue, priorityById, statusById, today))))
+                .toList();
+    }
+
+    private Map<String, Object> normalizeIssueForPrompt(Map<String, Object> issue,
+            Map<String, String> priorityById,
+            Map<String, String> statusById,
+            Map<String, Object> extra) {
+        Map<String, Object> normalized = new LinkedHashMap<>();
+        normalized.put("issueKey", cardValue(stringValue(issue.get("issueKey")), "Issue chưa có key"));
+        normalized.put("title", cardValue(stringValue(issue.get("title")), "Chưa có tiêu đề"));
+        normalized.put("statusName", cleanDisplay(statusById.get(stringValue(issue.get("statusId"))), "Chưa phân loại"));
+        normalized.put("priorityName", cleanDisplay(priorityById.get(stringValue(issue.get("priorityId"))), "Chưa phân loại"));
+        normalized.put("assigneeName", cleanDisplay(firstNonBlank(
+                stringValue(issue.get("assigneeName")),
+                stringValue(issue.get("assignee")),
+                stringValue(issue.get("assigneeFullName"))), "Chưa có người phụ trách"));
+        normalized.put("dueDate", cleanDisplay(stringValue(issue.get("dueDate")), "Chưa có hạn chót"));
+        normalized.put("sprintName", cleanDisplay(stringValue(issue.get("sprintName")), ""));
+        normalized.put("updatedAt", cleanDisplay(stringValue(issue.get("updatedAt")), ""));
+        if (extra != null) {
+            normalized.putAll(extra);
+        }
+        return normalized;
+    }
+
+    private ReportType detectReportType(String normalized) {
+        if (hasAnyPhrase(normalized, "tom tat tien do", "tom tat tinh trang", "tinh trang du an",
+                "tinh hinh du an", "bao cao tien do", "progress summary", "standup", "bao cao standup")) {
+            return ReportType.SUMMARY_PROGRESS;
+        }
+        if (hasAnyPhrase(normalized, "lap ke hoach hom nay", "ke hoach hom nay", "5 viec uu tien",
+                "nam viec uu tien", "top 5", "de xuat viec can lam", "de xuat buoc tiep theo",
+                "buoc tiep theo", "viec can lam", "uu tien hom nay")) {
+            return ReportType.DAILY_PLAN;
+        }
+        if (hasAnyPhrase(normalized, "phan tich rui ro", "rui ro", "risk", "blocker", "stuck", "ket",
+                "tre deadline", "qua han")) {
+            return ReportType.RISK_ANALYSIS;
+        }
+        if (hasAnyPhrase(normalized, "ai dang qua tai", "qua tai", "workload", "tai cong viec")) {
+            return ReportType.MEMBER_WORKLOAD;
+        }
+        if (hasAnyPhrase(normalized, "deadline", "han chot", "qua han", "tre deadline")) {
+            return ReportType.DEADLINE_CHECK;
+        }
+        if (hasAnyPhrase(normalized,
+                "dem so issue", "bao nhieu issue", "thong ke", "thong ke theo status", "thong ke theo priority",
+                "status va priority", "count issue", "report")) {
+            return ReportType.REPORT_STATS;
+        }
+        return ReportType.GENERAL_ANALYSIS;
+    }
+
+    private String buildIssueStatisticsReport(List<Map<String, Object>> issues,
+            Map<String, String> priorityById,
+            Map<String, String> statusById) {
+        Map<String, Long> byStatus = countByDisplayName(issues, statusById, "statusId", "Chưa phân loại");
+        Map<String, Long> byPriority = countByDisplayName(issues, priorityById, "priorityId", "Chưa phân loại");
+
+        StringBuilder out = new StringBuilder();
+        out.append("## Thống kê issue\n\n")
+                .append("Tổng số issue: ").append(issues.size()).append("\n\n")
+                .append("### Theo trạng thái\n\n")
+                .append("| Trạng thái | Số issue |\n")
+                .append("|---|---:|\n");
+        byStatus.forEach((status, count) -> out.append("| ").append(status).append(" | ").append(count).append(" |\n"));
+
+        out.append("\n### Theo priority\n\n")
+                .append("| Priority | Số issue |\n")
+                .append("|---|---:|\n");
+        byPriority.forEach((priority, count) -> out.append("| ").append(priority).append(" | ").append(count).append(" |\n"));
+
+        out.append("\nMình chỉ thống kê theo nhóm để dễ đọc, không liệt kê toàn bộ issue ở đây.");
+        return structured(Map.of(
+                "type", "summary",
+                "title", "Thống kê issue",
+                "summary", "Tổng số issue: " + issues.size(),
+                "metrics", List.of(metric("Tổng issue", issues.size())),
+                "sections", List.of(
+                        section("Theo trạng thái", byStatus.entrySet().stream()
+                                .map(e -> e.getKey() + ": " + e.getValue()).toList()),
+                        section("Theo priority", byPriority.entrySet().stream()
+                                .map(e -> e.getKey() + ": " + e.getValue()).toList()))));
+    }
+
+    private String buildDailyPlan(List<Map<String, Object>> taskTargets,
+            Map<String, String> priorityById,
+            Map<String, String> statusById,
+            LocalDate today) {
+        List<Map<String, Object>> top = taskTargets.stream()
+                .filter(issue -> !isDoneStatus(normalize(statusById.getOrDefault(stringValue(issue.get("statusId")), ""))))
+                .sorted(Comparator.comparingInt(issue -> -issueImportanceScore(issue, priorityById, statusById, today)))
+                .limit(5)
+                .collect(Collectors.toList());
+        if (top.isEmpty()) {
+            top = taskTargets.stream()
+                    .sorted(Comparator.comparingInt(issue -> -issueImportanceScore(issue, priorityById, statusById, today)))
+                    .limit(5)
+                    .collect(Collectors.toList());
+        }
+
+        StringBuilder out = new StringBuilder();
+        out.append("## Top 5 việc nên ưu tiên hôm nay\n");
+        for (int i = 0; i < top.size(); i++) {
+            Map<String, Object> issue = top.get(i);
+            String statusName = statusById.getOrDefault(stringValue(issue.get("statusId")), "unknown");
+            String priorityName = priorityById.getOrDefault(stringValue(issue.get("priorityId")), "unknown");
+            String dueDate = stringValue(issue.get("dueDate"));
+            String reason = buildStandupReason(issue, priorityById, statusById, today);
+            out.append(i + 1).append(". ")
+                    .append(formatIssueCardLine(issue, statusName, priorityName, dueDate, reason))
+                    .append("\n");
+        }
+
+        out.append("\n## Lý do ưu tiên\n")
+                .append("- Ưu tiên issue quá hạn, gần hạn, priority cao hoặc đang bị kẹt.\n")
+                .append("- Giữ số lượng việc trong ngày ở mức có thể hoàn thành để demo tiến độ rõ ràng.\n\n")
+                .append("## Người/nhóm cần phối hợp\n")
+                .append("- Trao đổi với assignee của các issue priority cao hoặc đang bị kẹt.\n")
+                .append("- Nếu issue chưa có người phụ trách, cần chốt owner trước khi bắt đầu.\n\n")
+                .append("## Kết quả kỳ vọng cuối ngày\n")
+                .append("- Cập nhật trạng thái cho các issue đã xử lý.\n")
+                .append("- Gỡ được blocker chính hoặc có ETA rõ ràng cho các việc còn mở.");
+        appendRemainingIssueNote(out, taskTargets.size(), top.size());
+        return structured(Map.of(
+                "type", "daily_plan",
+                "title", "Lập kế hoạch hôm nay",
+                "summary", "Top " + top.size() + " việc nên ưu tiên hôm nay.",
+                "metrics", List.of(metric("Việc ưu tiên", top.size())),
+                "sections", List.of(
+                        section("Lý do ưu tiên", List.of(
+                                "Ưu tiên issue quá hạn, gần hạn, priority cao hoặc đang bị kẹt.",
+                                "Giữ số lượng việc trong ngày ở mức có thể hoàn thành để demo tiến độ rõ ràng.")),
+                        section("Người/nhóm cần phối hợp", List.of(
+                                "Trao đổi với assignee của các issue priority cao hoặc đang bị kẹt.",
+                                "Nếu issue chưa có người phụ trách, cần chốt owner trước khi bắt đầu.")),
+                        section("Kết quả kỳ vọng cuối ngày", List.of(
+                                "Cập nhật trạng thái cho các issue đã xử lý.",
+                                "Gỡ được blocker chính hoặc có ETA rõ ràng cho các việc còn mở."))),
+                "issues", normalizeIssuesForPrompt(top, priorityById, statusById, today),
+                "actions", List.of("Chốt owner", "Xử lý issue quá hạn", "Cập nhật tiến độ cuối ngày")));
+    }
+
+    private String buildMemberWorkloadReport(List<Map<String, Object>> issues,
+            Map<String, String> priorityById,
+            Map<String, String> statusById,
+            LocalDate today) {
+        Map<String, Long> workload = issues.stream()
+                .filter(issue -> !isDoneStatus(normalize(statusById.getOrDefault(stringValue(issue.get("statusId")), ""))))
+                .collect(Collectors.groupingBy(issue -> cleanDisplay(firstNonBlank(
+                        stringValue(issue.get("assigneeName")),
+                        stringValue(issue.get("assignee")),
+                        stringValue(issue.get("assigneeFullName"))), "Chưa có người phụ trách"),
+                        LinkedHashMap::new, Collectors.counting()));
+        List<String> rows = workload.entrySet().stream()
+                .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
+                .map(e -> e.getKey() + ": " + e.getValue() + " issue đang mở")
+                .toList();
+        return structured(Map.of(
+                "type", "summary",
+                "title", "Phân tích workload thành viên",
+                "summary", rows.isEmpty() ? "Chưa có issue mở để đánh giá workload." : "Các thành viên có nhiều issue mở nhất đang cần được theo dõi.",
+                "sections", List.of(section("Ai đang quá tải?", rows),
+                        section("Hành động đề xuất", List.of(
+                                "Giảm tải cho người có nhiều issue mở hoặc issue priority cao.",
+                                "Chốt owner cho các issue chưa có người phụ trách.",
+                                "Ưu tiên xử lý blocker/quá hạn trước khi nhận thêm việc."))),
+                "issues", normalizeIssuesForPrompt(issues.stream()
+                        .filter(issue -> !isDoneStatus(normalize(statusById.getOrDefault(stringValue(issue.get("statusId")), ""))))
+                        .sorted(Comparator.comparingInt(issue -> -issueImportanceScore(issue, priorityById, statusById, today)))
+                        .limit(7).toList(), priorityById, statusById, today)));
+    }
+
+    private String buildDeadlineCheck(List<Map<String, Object>> openIssues,
+            Map<String, String> priorityById,
+            Map<String, String> statusById,
+            LocalDate today) {
+        List<Map<String, Object>> deadlineIssues = openIssues.stream()
+                .filter(issue -> isOverdue(issue, today) || isDueSoon(issue, today))
+                .sorted(Comparator.comparingInt(issue -> -issueImportanceScore(issue, priorityById, statusById, today)))
+                .limit(7)
+                .toList();
+        return structured(Map.of(
+                "type", "risk_analysis",
+                "title", "Kiểm tra deadline",
+                "summary", deadlineIssues.isEmpty()
+                        ? "Chưa thấy issue mở nào quá hạn hoặc sát hạn."
+                        : "Có " + deadlineIssues.size() + " issue cần chú ý về deadline.",
+                "sections", List.of(section("Hành động đề xuất", List.of(
+                        "Cập nhật ETA cho issue quá hạn.",
+                        "Đẩy issue sát hạn vào kế hoạch hôm nay.",
+                        "Thông báo sớm cho stakeholder nếu cần đổi scope."))),
+                "issues", normalizeIssuesForPrompt(deadlineIssues, priorityById, statusById, today)));
+    }
+
+    private Map<String, Long> countByDisplayName(List<Map<String, Object>> issues,
+            Map<String, String> displayById,
+            String field,
+            String fallback) {
+        Map<String, Long> counts = new LinkedHashMap<>();
+        for (Map<String, Object> issue : issues) {
+            String name = cleanDisplay(displayById.get(stringValue(issue.get(field))), fallback);
+            counts.put(name, counts.getOrDefault(name, 0L) + 1L);
+        }
+        return counts;
+    }
+
+    private void appendIssueLines(StringBuilder out,
+            List<Map<String, Object>> issues,
+            Map<String, String> priorityById,
+            Map<String, String> statusById,
+            LocalDate today) {
+        if (issues.isEmpty()) {
+            out.append("- Chưa có issue nổi bật.\n");
+            return;
+        }
+        int limit = Math.min(issues.size(), 5);
+        for (int i = 0; i < limit; i++) {
+            Map<String, Object> issue = issues.get(i);
+            String statusName = statusById.getOrDefault(stringValue(issue.get("statusId")), "unknown");
+            String priorityName = priorityById.getOrDefault(stringValue(issue.get("priorityId")), "unknown");
+            String dueDate = stringValue(issue.get("dueDate"));
+            out.append("- ").append(formatIssueCardLine(issue, statusName, priorityName, dueDate,
+                    buildStandupReason(issue, priorityById, statusById, today))).append("\n");
+        }
+    }
+
+    private void appendRemainingIssueNote(StringBuilder out, int total, int shown) {
+        int remaining = total - shown;
+        if (remaining > 0) {
+            out.append("\nCòn ").append(remaining).append(" issue khác, bạn có thể xem chi tiết ở tab Issues.");
+        }
+    }
+
+    private String buildProjectHealthComment(long openCount, long overdueCount, long blockedCount, long totalCount) {
+        if (totalCount == 0) {
+            return "Dự án chưa có issue để đánh giá.";
+        }
+        if (blockedCount > 0 || overdueCount >= 3) {
+            return "Sức khỏe dự án đang ở mức cần chú ý. Nên xử lý blocker và issue quá hạn trước khi nhận thêm việc mới.";
+        }
+        if (openCount > totalCount / 2) {
+            return "Dự án đang ở mức trung bình. Khối lượng việc mở còn nhiều, nên tập trung đóng các issue gần hoàn thành.";
+        }
+        return "Dự án đang khá ổn. Tiếp tục giữ nhịp cập nhật trạng thái và xử lý các issue ưu tiên cao.";
+    }
+
+    private String cleanDisplay(String value, String fallback) {
+        if (value == null || value.isBlank()) {
+            return fallback;
+        }
+        String trimmed = value.trim();
+        String normalized = normalize(trimmed);
+        if (normalized.equals("unknown") || normalized.equals("null") || normalized.equals("undefined")) {
+            return fallback;
+        }
+        return trimmed.replace('|', '/').replaceAll("\\s+", " ");
+    }
+
     private String formatIssueCardLine(Map<String, Object> issue,
             String statusName,
             String priorityName,
             String dueDate,
             String reason) {
         StringBuilder out = new StringBuilder();
-        out.append(cardValue(stringValue(issue.get("issueKey")), "(no-key)"))
+        out.append(cardValue(stringValue(issue.get("issueKey")), "Issue chưa có key"))
                 .append(" | ")
-                .append(cardValue(stringValue(issue.get("title")), "(no-title)"))
+                .append(cardValue(stringValue(issue.get("title")), "Chưa có tiêu đề"))
                 .append(" | status=")
-                .append(cardValue(statusName, "unknown"))
+                .append(cleanDisplay(statusName, "Chưa phân loại"))
                 .append(" | priority=")
-                .append(cardValue(priorityName, "unknown"));
+                .append(cleanDisplay(priorityName, "Chưa phân loại"));
 
-        String issueId = stringValue(issue.get("id"));
-        if (issueId != null && !issueId.isBlank()) {
-            out.append(" | id=").append(cardValue(issueId, ""));
-        }
-        String projectId = stringValue(issue.get("projectId"));
-        if (projectId != null && !projectId.isBlank()) {
-            out.append(" | projectId=").append(cardValue(projectId, ""));
-        }
         if (dueDate != null && !dueDate.isBlank()) {
-            out.append(" | due=").append(cardValue(dueDate, ""));
+            out.append(" | due=").append(cleanDisplay(dueDate, "Chưa có hạn chót"));
+        } else {
+            out.append(" | due=Chưa có hạn chót");
         }
         if (reason != null && !reason.isBlank()) {
             out.append(" | reason=").append(cardValue(reason, ""));

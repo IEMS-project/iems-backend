@@ -235,7 +235,15 @@ public class AiChatController {
                 AgentDecision decision = agentIntentRouterService.route(request.question());
                 if (decision.intent() == AgentIntent.ISSUE_QUERY
                         || decision.intent() == AgentIntent.ISSUE_ACTION
-                        || decision.intent() == AgentIntent.ISSUE_ANALYSIS) {
+                        || decision.intent() == AgentIntent.ISSUE_ANALYSIS
+                        || decision.intent() == AgentIntent.PROJECT_SUMMARY
+                        || decision.intent() == AgentIntent.DAILY_PLAN
+                        || decision.intent() == AgentIntent.RISK_ANALYSIS
+                        || decision.intent() == AgentIntent.SPRINT_REPORT
+                        || decision.intent() == AgentIntent.ISSUE_SEARCH
+                        || decision.intent() == AgentIntent.ISSUE_UPDATE
+                        || decision.intent() == AgentIntent.MEMBER_WORKLOAD
+                        || decision.intent() == AgentIntent.DEADLINE_CHECK) {
                     AgentChatRequest agentRequest = new AgentChatRequest(
                             request.question(),
                             conversationId,
@@ -291,7 +299,7 @@ public class AiChatController {
                 try {
                     emitter.send(SseEmitter.event().data(Map.of(
                             "type", "error",
-                            "error", e.getMessage() == null ? "Streaming failed" : e.getMessage())));
+                            "error", "MÃ¬nh chÆ°a thá»ƒ láº¥y dá»¯ liá»‡u dá»± Ã¡n lÃºc nÃ y. Báº¡n thá»­ láº¡i sau vÃ i giÃ¢y nhÃ©.")));
                 } catch (Exception ignored) {
                 }
                 emitter.completeWithError(e);
@@ -456,22 +464,16 @@ public class AiChatController {
         extractUserIdFromAuthorization(authorization);
 
         List<Map<String, String>> options = List.of(
-                Map.of(
-                        "id", "daily_plan",
-                        "label", "Lập kế hoạch hôm nay",
-                        "prompt", "Đọc các issue/task trong dự án này và lập kế hoạch làm việc hôm nay cho tôi. Ưu tiên việc quan trọng, việc gần deadline, blocker, và đưa ra thứ tự nên làm kèm lý do."),
-                Map.of(
-                        "id", "project_risk_review",
-                        "label", "Phân tích rủi ro",
-                        "prompt", "Phân tích tình hình công việc hiện tại trong dự án: task nào đang rủi ro, task nào có khả năng trễ, blocker nằm ở đâu, và đề xuất hành động tiếp theo."),
-                Map.of(
-                        "id", "progress_summary",
-                        "label", "Tóm tắt tiến độ",
-                        "prompt", "Tóm tắt tiến độ dự án hiện tại theo nhóm: việc đã xong, việc đang làm, việc bị kẹt, việc cần ưu tiên. Trả lời ngắn gọn nhưng đủ để báo cáo standup."),
-                Map.of(
-                        "id", "next_actions",
-                        "label", "Đề xuất bước tiếp theo",
-                        "prompt", "Dựa trên dữ liệu issue/task hiện tại, hãy đề xuất 5 hành động tiếp theo tôi nên làm để đẩy dự án tiến lên. Nếu có issue cụ thể, nêu issue key và lý do."));
+                Map.of("id", "project_health", "label", "Tóm tắt sức khỏe dự án",
+                        "prompt", "Tóm tắt sức khỏe dự án theo các mục: Tổng quan, Thống kê theo trạng thái, Việc đang làm, Việc đã xong, Việc quá hạn/rủi ro và Nhận xét sức khỏe dự án."),
+                Map.of("id", "daily_plan", "label", "Lập kế hoạch hôm nay",
+                        "prompt", "Lập kế hoạch hôm nay, chỉ nêu Top 5 issue ưu tiên với issue key, title, status, priority, due date và lý do ưu tiên."),
+                Map.of("id", "sprint_risk", "label", "Phân tích rủi ro sprint",
+                        "prompt", "Phân tích rủi ro sprint hiện tại, nêu mức rủi ro, issue rủi ro chính, tác động và hành động đề xuất."),
+                Map.of("id", "member_workload", "label", "Ai đang quá tải?",
+                        "prompt", "Phân tích workload thành viên trong dự án: ai đang quá tải, ai cần hỗ trợ và nên phân bổ lại việc nào."),
+                Map.of("id", "standup_report", "label", "Tạo báo cáo standup",
+                        "prompt", "Tạo báo cáo standup ngắn gọn cho dự án hôm nay: đã xong, đang làm, blocker, rủi ro và việc ưu tiên tiếp theo."));
 
         return ResponseEntity.ok(Map.of(
                 "success", true,

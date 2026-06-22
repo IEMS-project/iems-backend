@@ -20,6 +20,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -93,6 +94,9 @@ public class UserService {
         try {
             return repository.findByAccountId(accountId)
                     .map(existing -> {
+                        if (!hasSelfProfileChanges(existing, userRequest)) {
+                            throw new AppException(ErrorCode.NO_CHANGES_DETECTED);
+                        }
                         applySelfProfileUpdates(existing, userRequest);
                         return convertToUserResponse(repository.save(existing));
                     })
@@ -300,6 +304,17 @@ public class UserService {
             user.setGender(userRequest.getGender());
         if (userRequest.getImage() != null)
             user.setImage(userRequest.getImage());
+    }
+
+    private boolean hasSelfProfileChanges(User user, CreateUserDto userRequest) {
+        return (userRequest.getFirstName() != null && !Objects.equals(user.getFirstName(), userRequest.getFirstName()))
+                || (userRequest.getLastName() != null && !Objects.equals(user.getLastName(), userRequest.getLastName()))
+                || (userRequest.getEmail() != null && !Objects.equals(user.getEmail(), userRequest.getEmail()))
+                || (userRequest.getAddress() != null && !Objects.equals(user.getAddress(), userRequest.getAddress()))
+                || (userRequest.getPhone() != null && !Objects.equals(user.getPhone(), userRequest.getPhone()))
+                || (userRequest.getDob() != null && !Objects.equals(user.getDob(), userRequest.getDob()))
+                || (userRequest.getGender() != null && !Objects.equals(user.getGender(), userRequest.getGender()))
+                || (userRequest.getImage() != null && !Objects.equals(user.getImage(), userRequest.getImage()));
     }
 
     public Optional<UserResponseDto> updateAvatarByAccountId(UUID accountId, String imageUrl) {

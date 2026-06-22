@@ -6,14 +6,24 @@ import org.springframework.stereotype.Service;
 
 import java.text.Normalizer;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 @Service
 public class AgentIntentRouterService {
 
+    private static final Pattern ISSUE_KEY_PATTERN = Pattern.compile("\\b[A-Z][A-Z0-9]*-\\d+\\b", Pattern.CASE_INSENSITIVE);
+
     private static final Set<String> ISSUE_ACTION_TERMS = Set.of(
             "tao issue", "create issue", "cap nhat issue", "update issue", "chuyen trang thai", "assign",
-            "doi assignee", "them comment", "close issue", "mo issue", "chuyen issue", "doi status",
-            "chuyen sang", "move issue", "cap nhat trang thai", "doi trang thai", "mark done");
+            "gan", "doi assignee", "them comment", "close issue", "mo issue", "chuyen issue", "doi status",
+            "chuyen sang", "move issue", "cap nhat trang thai", "doi trang thai", "mark done",
+            "doi trang thai thanh", "cap nhat priority", "doi priority");
+
+    private static final Set<String> REPORT_TERMS = Set.of(
+            "tom tat tien do", "dem so issue", "thong ke", "thong ke theo status", "thong ke theo priority",
+            "phan tich rui ro", "lap ke hoach hom nay", "de xuat viec can lam", "bao nhieu issue",
+            "tinh trang du an", "tom tat tinh trang", "suc khoe du an", "bao cao", "report", "summary",
+            "count issue", "status va priority", "ai dang qua tai", "qua tai", "deadline", "han chot");
 
     private static final Set<String> ISSUE_ANALYSIS_TERMS = Set.of(
             "phan tich", "root cause", "nguyen nhan", "rui ro", "risk", "duplicate", "trung lap", "blocker",
@@ -38,20 +48,69 @@ public class AgentIntentRouterService {
 
         String normalized = normalize(question);
 
-        if (containsAnyFuzzy(normalized, ISSUE_ACTION_TERMS)) {
-            return new AgentDecision(AgentIntent.ISSUE_ACTION, 0.88, "matched_issue_action_terms");
+        if (isExplicitIssueUpdate(question, normalized)) {
+            return new AgentDecision(AgentIntent.ISSUE_UPDATE, 0.88, "matched_issue_action_terms");
         }
+
+        if (containsAnyFuzzy(normalized, REPORT_TERMS)) {
+            if (containsAnyFuzzy(normalized, Set.of("lap ke hoach hom nay", "ke hoach hom nay", "5 viec uu tien", "top 5"))) {
+                return new AgentDecision(AgentIntent.DAILY_PLAN, 0.92, "matched_daily_plan_terms");
+            }
+            if (containsAnyFuzzy(normalized, Set.of("rui ro", "risk", "blocker"))) {
+                return new AgentDecision(AgentIntent.RISK_ANALYSIS, 0.92, "matched_risk_terms");
+            }
+            if (containsAnyFuzzy(normalized, Set.of("workload", "qua tai", "ai dang qua tai"))) {
+                return new AgentDecision(AgentIntent.MEMBER_WORKLOAD, 0.92, "matched_workload_terms");
+            }
+            if (containsAnyFuzzy(normalized, Set.of("deadline", "han chot", "qua han"))) {
+                return new AgentDecision(AgentIntent.DEADLINE_CHECK, 0.92, "matched_deadline_terms");
+            }
+            return new AgentDecision(AgentIntent.PROJECT_SUMMARY, 0.9, "matched_report_terms");
+        }
+
         if (containsAnyFuzzy(normalized, ISSUE_ANALYSIS_TERMS)) {
-            return new AgentDecision(AgentIntent.ISSUE_ANALYSIS, 0.82, "matched_issue_analysis_terms");
+            if (containsAnyFuzzy(normalized, Set.of("workload", "qua tai", "ai dang qua tai"))) {
+                return new AgentDecision(AgentIntent.MEMBER_WORKLOAD, 0.86, "matched_workload_terms");
+            }
+            if (containsAnyFuzzy(normalized, Set.of("deadline", "qua han", "tre deadline", "han chot"))) {
+                return new AgentDecision(AgentIntent.DEADLINE_CHECK, 0.86, "matched_deadline_terms");
+            }
+            if (containsAnyFuzzy(normalized, Set.of("lap ke hoach", "ke hoach hom nay", "de xuat viec can lam"))) {
+                return new AgentDecision(AgentIntent.DAILY_PLAN, 0.86, "matched_daily_plan_terms");
+            }
+            if (containsAnyFuzzy(normalized, Set.of("rui ro", "risk", "blocker"))) {
+                return new AgentDecision(AgentIntent.RISK_ANALYSIS, 0.86, "matched_risk_terms");
+            }
+            return new AgentDecision(AgentIntent.PROJECT_SUMMARY, 0.82, "matched_issue_analysis_terms");
         }
         if (containsAnyFuzzy(normalized, SPRINT_TERMS)) {
-            return new AgentDecision(AgentIntent.SPRINT_SUMMARY, 0.8, "matched_sprint_terms");
+            return new AgentDecision(AgentIntent.SPRINT_REPORT, 0.8, "matched_sprint_terms");
         }
         if (containsAnyFuzzy(normalized, ISSUE_QUERY_TERMS)) {
-            return new AgentDecision(AgentIntent.ISSUE_QUERY, 0.75, "matched_issue_query_terms");
+            return new AgentDecision(AgentIntent.ISSUE_SEARCH, 0.75, "matched_issue_query_terms");
         }
 
         return new AgentDecision(AgentIntent.GENERAL_CHAT, 0.68, "fallback_general_chat");
+    }
+
+    private static boolean isExplicitIssueUpdate(String original, String normalized) {
+        boolean hasAction = containsAnyFuzzy(normalized, ISSUE_ACTION_TERMS);
+        if (!hasAction) {
+            return false;
+        }
+
+        boolean hasTargetIssue = ISSUE_KEY_PATTERN.matcher(original).find();
+        boolean hasDirectObject = normalized.contains("task nay") || normalized.contains("issue nay")
+                || normalized.contains("cong viec nay");
+        boolean hasTargetStatus = normalized.contains(" done") || normalized.endsWith("done")
+                || normalized.contains("in progress") || normalized.contains("dang lam")
+                || normalized.contains("todo") || normalized.contains("to do")
+                || normalized.contains("high") || normalized.contains("medium") || normalized.contains("low")
+                || normalized.contains("cao") || normalized.contains("trung binh") || normalized.contains("thap");
+        boolean hasAssignmentTarget = normalized.contains(" gan ") || normalized.startsWith("gan ")
+                || normalized.contains("assign") || normalized.contains(" cho ");
+
+        return (hasTargetIssue || hasDirectObject) && (hasTargetStatus || hasAssignmentTarget);
     }
 
     private static String normalize(String text) {

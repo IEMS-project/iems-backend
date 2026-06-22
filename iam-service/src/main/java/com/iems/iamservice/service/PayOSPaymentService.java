@@ -133,8 +133,9 @@ public class PayOSPaymentService {
         PaymentTransaction transaction = paymentTransactionRepository.findByOrderCode(orderCode)
                 .orElseThrow(() -> new AppException(ErrorCode.PAYMENT_TRANSACTION_NOT_FOUND));
 
-        if (transaction.getStatus() == PaymentStatus.PAID || transaction.getStatus() == PaymentStatus.CANCELLED) {
-            return toStatusResponse(transaction);
+        PaymentStatus status = transaction.getStatus();
+        if (status != PaymentStatus.PENDING && status != PaymentStatus.PROCESSING && status != PaymentStatus.FAILED) {
+            throw new AppException(ErrorCode.PAYMENT_INVALID_STATE);
         }
 
         PaymentLink paymentLink;
@@ -154,8 +155,8 @@ public class PayOSPaymentService {
         PaymentTransaction transaction = paymentTransactionRepository.findByOrderCode(orderCode)
                 .orElseThrow(() -> new AppException(ErrorCode.PAYMENT_TRANSACTION_NOT_FOUND));
 
-        if (transaction.getStatus() == PaymentStatus.PAID || transaction.getStatus() == PaymentStatus.CANCELLED) {
-            return toStatusResponse(transaction);
+        if (transaction.getStatus() != PaymentStatus.PENDING) {
+            throw new AppException(ErrorCode.PAYMENT_INVALID_STATE);
         }
 
         try {

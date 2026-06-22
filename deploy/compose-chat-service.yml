@@ -1,0 +1,28 @@
+services:
+  chat-service:
+    image: pthngws/chat-service:latest
+    container_name: chat-service
+    restart: unless-stopped
+    ports:
+      - "8099:8099"
+    environment:
+      SERVER_PORT: 8099
+      SPRING_APPLICATION_NAME: chat-service
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+      EUREKA_INSTANCE_PREFER_IP_ADDRESS: "true"
+      EUREKA_CLIENT_REGISTER_WITH_EUREKA: "true"
+      EUREKA_CLIENT_FETCH_REGISTRY: "true"
+      JAVA_TOOL_OPTIONS: -Deureka.client.serviceUrl.defaultZone=http://eureka-server:8761/eureka/
+
+      MONGODB_URI: ${CHAT_MONGODB_URI:?CHAT_MONGODB_URI is required}
+      SPRING_DATA_MONGODB_DATABASE: ${CHAT_MONGODB_DATABASE:-iems-chat}
+
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-86400000}
+      JWT_REFRESH_EXPIRATION: ${JWT_REFRESH_EXPIRATION:-604800000}
+    networks:
+      - iems-network
+
+networks:
+  iems-network:
+    external: true

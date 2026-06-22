@@ -16,6 +16,7 @@ public enum ErrorCode {
     EMAIL_EXIST_REGISTER("Email already in use", HttpStatus.CONFLICT),
     USERNAME_EXIST_REGISTER("Username already in use", HttpStatus.CONFLICT),
     INVALID_SIGNUP_DATA("Invalid sign-up data", HttpStatus.BAD_REQUEST),
+    NO_CHANGES_DETECTED("No changes detected", HttpStatus.BAD_REQUEST),
 
     // User Management Errors
     USER_NOT_EXIST("User not found", HttpStatus.NOT_FOUND),
@@ -81,6 +82,7 @@ public enum ErrorCode {
     // Payment Errors
     PAYMENT_INVALID_PLAN("Invalid premium plan", HttpStatus.BAD_REQUEST),
     PAYMENT_INVALID_REQUEST("Invalid payment request", HttpStatus.BAD_REQUEST),
+    PAYMENT_INVALID_STATE("Payment action is not allowed for current status", HttpStatus.BAD_REQUEST),
     PAYMENT_TRANSACTION_NOT_FOUND("Payment transaction not found", HttpStatus.NOT_FOUND),
     PAYMENT_CREATE_FAILED("Failed to create payment link", HttpStatus.SERVICE_UNAVAILABLE),
 
