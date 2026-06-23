@@ -2,6 +2,7 @@ package com.iems.iamservice.config;
 
 import com.iems.iamservice.security.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -18,6 +19,8 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import jakarta.servlet.http.HttpServletResponse;
+
 
 /**
  * Security Configuration
@@ -44,12 +47,22 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/**").permitAll()
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
                         .requestMatchers("/swagger-ui.html", "/webjars/**").permitAll()
+                        .requestMatchers("/api/payments/payos/webhook").permitAll()
+                        .requestMatchers("/api/subscription-plans/active").permitAll()
+                        .requestMatchers("/api/promotions/active").permitAll()
                         // Admin endpoints
-                        .anyRequest().permitAll()
-                )
+                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                        .requestMatchers("/api/accounts/me/**").authenticated()
+                        .requestMatchers("/api/accounts/**").hasRole("ADMIN")
+                        .requestMatchers("/users/me", "/users/me/**").authenticated()
+                        .anyRequest().authenticated())
                 .sessionManagement(session -> session
-                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-                )
+                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .exceptionHandling(exception -> exception
+                        .authenticationEntryPoint((request, response, authException) -> response
+                                .sendError(HttpServletResponse.SC_UNAUTHORIZED, "Unauthorized"))
+                        .accessDeniedHandler((request, response, accessDeniedException) -> response
+                                .sendError(HttpServletResponse.SC_FORBIDDEN, "Forbidden")))
                 .authenticationProvider(authenticationProvider())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
@@ -74,5 +87,3 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder();
     }
 }
-
-

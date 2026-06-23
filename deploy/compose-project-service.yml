@@ -1,0 +1,27 @@
+services:
+  project-service:
+    image: pthngws/project-service:latest
+    container_name: project-service
+    restart: unless-stopped
+    ports:
+      - "8087:8087"
+    environment:
+      SERVER_PORT: 8087
+      SPRING_APPLICATION_NAME: project-service
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+
+      DB_URL: ${PROJECT_DB_URL:?PROJECT_DB_URL is required}
+      DB_USERNAME: ${PROJECT_DB_USERNAME:?PROJECT_DB_USERNAME is required}
+      DB_PASSWORD: ${PROJECT_DB_PASSWORD:?PROJECT_DB_PASSWORD is required}
+
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-86400000}
+      JWT_REFRESH_EXPIRATION: ${JWT_REFRESH_EXPIRATION:-604800000}
+
+      NOTIFICATION_SERVICE_URL: http://notification-service:8090
+    networks:
+      - iems-network
+
+networks:
+  iems-network:
+    external: true

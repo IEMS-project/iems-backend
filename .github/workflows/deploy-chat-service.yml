@@ -1,0 +1,24 @@
+name: Deploy Chat Service
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "chat-service/**"
+      - "pom.xml"
+      - "mvnw"
+      - ".mvn/**"
+      - "deploy/compose-chat-service.yml"
+      - ".github/workflows/_deploy-service.yml"
+      - ".github/workflows/deploy-chat-service.yml"
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/_deploy-service.yml
+    with:
+      service: chat-service
+      image: chat-service
+      compose_file: compose-chat-service.yml
+      env_file: .env.chat
+    secrets: inherit

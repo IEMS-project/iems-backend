@@ -22,6 +22,9 @@ public class StoredFile {
     @UuidGenerator(style = UuidGenerator.Style.RANDOM)
     private UUID id;
 
+    @Version
+    private Long version;
+
     @Column(nullable = false)
     private String name;
 
@@ -32,7 +35,7 @@ public class StoredFile {
     @Column(name = "owner_id", nullable = false)
     private UUID ownerId;
 
-    // path/key in MinIO bucket
+    // Object storage key
     @Column(nullable = false)
     private String path;
 
@@ -46,6 +49,9 @@ public class StoredFile {
 
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
+
+    @Column(name = "deleted_at")
+    private OffsetDateTime deletedAt;
 }
 
 

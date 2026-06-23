@@ -1,0 +1,23 @@
+name: Deploy API Gateway
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "api-gateway/**"
+      - "pom.xml"
+      - "mvnw"
+      - ".mvn/**"
+      - "deploy/compose-api-gateway.yml"
+      - ".github/workflows/_deploy-service.yml"
+      - ".github/workflows/deploy-api-gateway.yml"
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/_deploy-service.yml
+    with:
+      service: api-gateway
+      image: api-gateway
+      compose_file: compose-api-gateway.yml
+    secrets: inherit

@@ -1,5 +1,7 @@
 package com.iems.iamservice.entity;
 
+import com.iems.iamservice.entity.enums.SubscriptionType;
+import com.iems.iamservice.entity.enums.UserRole;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -25,9 +27,6 @@ public class Account {
     @Column(name = "id", updatable = false, nullable = false)
     private UUID id;
 
-    @Column(nullable = false, unique = true)
-    private UUID userId;
-
     @Column(nullable = false, unique = true, length = 100)
     private String username;
 
@@ -51,6 +50,18 @@ public class Account {
     @Column
     private Instant lastLoginAt;
 
+    @Enumerated(EnumType.STRING)
+    @Column(length = 20, nullable = false)
+    @Builder.Default
+    private SubscriptionType subscriptionType = SubscriptionType.FREE;
+
+    @Column
+    private Instant premiumUntil;
+
+    @Enumerated(EnumType.STRING)
+    @Column(length = 20)
+    @Builder.Default
+    private UserRole role = UserRole.USER;
 
     @PreUpdate
     public void preUpdate() {

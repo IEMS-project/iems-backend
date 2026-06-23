@@ -4,22 +4,29 @@ import com.iems.documentservice.dto.request.CreateFolderRequest;
 import com.iems.documentservice.dto.request.ShareRequest;
 import com.iems.documentservice.dto.request.RenameRequest;
 import com.iems.documentservice.dto.request.UpdateSharePermissionRequest;
+import com.iems.documentservice.dto.request.BatchDeleteRequest;
+import com.iems.documentservice.dto.request.BatchMoveRequest;
+import com.iems.documentservice.dto.request.RegisterFileMetadataRequest;
 import com.iems.documentservice.dto.response.ApiResponseDto;
 import com.iems.documentservice.dto.response.FileResponse;
 import com.iems.documentservice.dto.response.FolderResponse;
 import com.iems.documentservice.dto.response.SimpleFileResponse;
+import com.iems.documentservice.dto.response.BatchDeleteResponse;
+import com.iems.documentservice.dto.response.BatchMoveResponse;
 import com.iems.documentservice.service.DriveService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpHeaders;
-import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.InputStream;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -35,37 +42,31 @@ public class DriveController {
 
     @PostMapping("/folders")
     @Operation(summary = "Create folder")
-    @PreAuthorize("hasAuthority('DOC_CREATE')")
     public ResponseEntity<ApiResponseDto<FolderResponse>> createFolder(@Valid @RequestBody CreateFolderRequest request) {
         FolderResponse data = driveService.createFolder(request);
         return ResponseEntity.ok(new ApiResponseDto<>(200, "Folder created", data));
     }
 
-
     @GetMapping("/folders")
     @Operation(summary = "List all folders of owner")
-    @PreAuthorize("hasAuthority('DOC_READ')")
     public ResponseEntity<ApiResponseDto<Object>> listFolders() {
         return ResponseEntity.ok(new ApiResponseDto<>(200, "OK", driveService.listFolders()));
     }
 
     @GetMapping("/files")
     @Operation(summary = "List all files of owner")
-    @PreAuthorize("hasAuthority('DOC_READ')")
     public ResponseEntity<ApiResponseDto<Object>> listFiles() {
         return ResponseEntity.ok(new ApiResponseDto<>(200, "OK", driveService.listFiles()));
     }
 
     @GetMapping("/files/accessible")
     @Operation(summary = "List all files accessible to requester (owned/public/shared)")
-    @PreAuthorize("hasAuthority('DOC_READ')")
     public ResponseEntity<ApiResponseDto<Object>> listAccessibleFiles() {
         return ResponseEntity.ok(new ApiResponseDto<>(200, "OK", driveService.listAccessibleFiles()));
     }
 
     @GetMapping("/folders/{id}/contents")
     @Operation(summary = "List all folders and files inside a folder")
-    @PreAuthorize("hasAuthority('DOC_READ')")
     public ResponseEntity<ApiResponseDto<Object>> listFolderContents(@PathVariable UUID id) {
         return ResponseEntity.ok(new ApiResponseDto<>(200, "OK", driveService.listFolderContents(id)));
     }
@@ -78,34 +79,58 @@ public class DriveController {
         return ResponseEntity.ok(new ApiResponseDto<>(200, "File uploaded", data));
     }
 
+    @PostMapping("/files/upload-signature")
+    @Operation(summary = "Generate direct upload presigned URL for S3")
+    public ResponseEntity<ApiResponseDto<Map<String, Object>>> generateUploadSignature(
+            @RequestParam("fileName") String fileName,
+            @RequestParam(required = false) String contentType,
+            @RequestParam(required = false) UUID folderId) {
+        Map<String, Object> data = driveService.generateUploadSignature(fileName, contentType, folderId);
+        return ResponseEntity.ok(new ApiResponseDto<>(200, "Signature generated", data));
+    }
+
+    @PostMapping("/files/register-metadata")
+    @Operation(summary = "Register file metadata after direct upload")
+    public ResponseEntity<ApiResponseDto<FileResponse>> registerMetadata(
+            @Valid @RequestBody RegisterFileMetadataRequest request) throws Exception {
+        FileResponse data = driveService.registerMetadata(request);
+        return ResponseEntity.ok(new ApiResponseDto<>(200, "File metadata registered", data));
+    }
+
     @PostMapping(value = "/files/upload-batch", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "Upload multiple files and return public URLs")
-    public ResponseEntity<ApiResponseDto<java.util.List<SimpleFileResponse>>> uploadFiles(
+    public ResponseEntity<ApiResponseDto<List<SimpleFileResponse>>> uploadFiles(
             @RequestParam(required = false) UUID folderId,
             @RequestPart("files") MultipartFile[] files) throws Exception {
-        java.util.List<SimpleFileResponse> data = driveService.uploadFilesAndBuildPublicUrls(folderId, files);
-        return ResponseEntity.ok(new ApiResponseDto<java.util.List<SimpleFileResponse>>(200, "Files uploaded", data));
+        List<SimpleFileResponse> data = driveService.uploadFilesAndBuildPublicUrls(folderId, files);
+        return ResponseEntity.ok(new ApiResponseDto<List<SimpleFileResponse>>(200, "Files uploaded", data));
+    }
+
+    @PostMapping(value = "/files/upload-public", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Upload multiple files to public folder and return public URLs")
+    public ResponseEntity<ApiResponseDto<List<SimpleFileResponse>>> uploadFilesToPublic(
+            @RequestPart("files") MultipartFile[] files) throws Exception {
+        List<SimpleFileResponse> data = driveService.uploadFilesToPublicFolder(files);
+        return ResponseEntity.ok(new ApiResponseDto<List<SimpleFileResponse>>(200, "Files uploaded to public folder", data));
     }
 
     @PostMapping(value = "/files/upload-chat", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "Upload chat media to conversation path and return public URLs")
-    public ResponseEntity<ApiResponseDto<java.util.List<SimpleFileResponse>>> uploadChatFiles(
+    public ResponseEntity<ApiResponseDto<List<SimpleFileResponse>>> uploadChatFiles(
             @RequestParam("conversationId") String conversationId,
             @RequestPart("files") MultipartFile[] files) throws Exception {
-        java.util.List<SimpleFileResponse> data = driveService.uploadChatFiles(conversationId, files);
-        return ResponseEntity.ok(new ApiResponseDto<java.util.List<SimpleFileResponse>>(200, "Chat files uploaded", data));
+        List<SimpleFileResponse> data = driveService.uploadChatFiles(conversationId, files);
+        return ResponseEntity.ok(new ApiResponseDto<List<SimpleFileResponse>>(200, "Chat files uploaded", data));
     }
 
     @GetMapping("/files/{id}/download")
     @Operation(summary = "Download file stream")
-    public ResponseEntity<byte[]> download(@PathVariable UUID id) throws Exception {
-        try (InputStream in = driveService.downloadStream(id)) {
-            byte[] bytes = in.readAllBytes();
-            return ResponseEntity.ok()
-                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + id + "\"")
-                    .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                    .body(bytes);
-        }
+    public ResponseEntity<InputStreamResource> download(@PathVariable UUID id) throws Exception {
+        InputStream in = driveService.downloadStream(id);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + id + "\"")
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .body(new InputStreamResource(in));
     }
 
     @GetMapping("/files/{id}/link")
@@ -127,6 +152,20 @@ public class DriveController {
     public ResponseEntity<ApiResponseDto<Object>> deleteFolder(@PathVariable UUID id) throws Exception {
         driveService.deleteFolderRecursive(id);
         return ResponseEntity.ok(new ApiResponseDto<>(200, "Folder deleted", null));
+    }
+
+    @PostMapping("/batch-delete")
+    @Operation(summary = "Delete multiple files and folders at once")
+    public ResponseEntity<ApiResponseDto<BatchDeleteResponse>> batchDelete(@Valid @RequestBody BatchDeleteRequest request) throws Exception {
+        BatchDeleteResponse data = driveService.batchDelete(request.getFileIds(), request.getFolderIds());
+        return ResponseEntity.ok(new ApiResponseDto<>(200, "Batch delete completed", data));
+    }
+
+    @PostMapping("/batch-move")
+    @Operation(summary = "Move multiple files and folders to a destination folder")
+    public ResponseEntity<ApiResponseDto<BatchMoveResponse>> batchMove(@Valid @RequestBody BatchMoveRequest request) {
+        BatchMoveResponse data = driveService.batchMove(request.getFileIds(), request.getFolderIds(), request.getDestinationFolderId());
+        return ResponseEntity.ok(new ApiResponseDto<>(200, "Batch move completed", data));
     }
 
     // Search
@@ -203,6 +242,12 @@ public class DriveController {
         return ResponseEntity.ok(new ApiResponseDto<>(200, "OK", driveService.getSharedUsers(id, type)));
     }
 
+    @GetMapping("/items/{id}/activities")
+    @Operation(summary = "Get activity history for an item")
+    public ResponseEntity<ApiResponseDto<Object>> getItemActivities(@PathVariable UUID id, @RequestParam("type") String type) {
+        return ResponseEntity.ok(new ApiResponseDto<>(200, "OK", driveService.listItemActivities(id, type)));
+    }
+
     // Update share permission
     @PatchMapping("/shares/{shareId}/permission")
     @Operation(summary = "Update share permission (VIEWER/EDITOR)")
@@ -234,6 +279,47 @@ public class DriveController {
         driveService.moveFile(fileId, newFolderId);
         return ResponseEntity.ok(new ApiResponseDto<>(200, "File moved successfully", null));
     }
+
+    // ==================== TRASH APIs ====================
+
+    @GetMapping("/trash")
+    @Operation(summary = "List all items in trash")
+    public ResponseEntity<ApiResponseDto<Object>> listTrash() {
+        return ResponseEntity.ok(new ApiResponseDto<>(200, "OK", driveService.listTrash()));
+    }
+
+    @PostMapping("/trash/files/{fileId}/restore")
+    @Operation(summary = "Restore file from trash")
+    public ResponseEntity<ApiResponseDto<Object>> restoreFile(@PathVariable UUID fileId) {
+        driveService.restoreFile(fileId);
+        return ResponseEntity.ok(new ApiResponseDto<>(200, "File restored successfully", null));
+    }
+
+    @PostMapping("/trash/folders/{folderId}/restore")
+    @Operation(summary = "Restore folder from trash")
+    public ResponseEntity<ApiResponseDto<Object>> restoreFolder(@PathVariable UUID folderId) {
+        driveService.restoreFolder(folderId);
+        return ResponseEntity.ok(new ApiResponseDto<>(200, "Folder restored successfully", null));
+    }
+
+    @DeleteMapping("/trash/files/{fileId}")
+    @Operation(summary = "Permanently delete file from trash")
+    public ResponseEntity<ApiResponseDto<Object>> permanentDeleteFile(@PathVariable UUID fileId) throws Exception {
+        driveService.permanentDeleteFile(fileId);
+        return ResponseEntity.ok(new ApiResponseDto<>(200, "File permanently deleted", null));
+    }
+
+    @DeleteMapping("/trash/folders/{folderId}")
+    @Operation(summary = "Permanently delete folder from trash")
+    public ResponseEntity<ApiResponseDto<Object>> permanentDeleteFolder(@PathVariable UUID folderId) throws Exception {
+        driveService.permanentDeleteFolder(folderId);
+        return ResponseEntity.ok(new ApiResponseDto<>(200, "Folder permanently deleted", null));
+    }
+
+    @DeleteMapping("/trash/empty")
+    @Operation(summary = "Empty entire trash")
+    public ResponseEntity<ApiResponseDto<Object>> emptyTrash() throws Exception {
+        driveService.emptyTrash();
+        return ResponseEntity.ok(new ApiResponseDto<>(200, "Trash emptied successfully", null));
+    }
 }
-
-

@@ -16,6 +16,7 @@ public enum ErrorCode {
     EMAIL_EXIST_REGISTER("Email already in use", HttpStatus.CONFLICT),
     USERNAME_EXIST_REGISTER("Username already in use", HttpStatus.CONFLICT),
     INVALID_SIGNUP_DATA("Invalid sign-up data", HttpStatus.BAD_REQUEST),
+    NO_CHANGES_DETECTED("No changes detected", HttpStatus.BAD_REQUEST),
 
     // User Management Errors
     USER_NOT_EXIST("User not found", HttpStatus.NOT_FOUND),
@@ -43,6 +44,7 @@ public enum ErrorCode {
 
     // Authentication Service Errors
     LOGIN_FAILED("Login failed", HttpStatus.UNAUTHORIZED),
+    REGISTRATION_FAILED("Registration failed", HttpStatus.INTERNAL_SERVER_ERROR),
     ACCOUNT_LOCKED("Account is locked", HttpStatus.FORBIDDEN),
     INVALID_CREDENTIALS("Invalid credentials", HttpStatus.UNAUTHORIZED),
     TOKEN_VALIDATION_FAILED("Token validation failed", HttpStatus.UNAUTHORIZED),
@@ -56,14 +58,6 @@ public enum ErrorCode {
     USER_LOCK_FAILED("User lock/unlock failed", HttpStatus.INTERNAL_SERVER_ERROR),
     USER_DELETE_FAILED("User deletion failed", HttpStatus.INTERNAL_SERVER_ERROR),
 
-    // Permission Service Errors
-    PERMISSION_CODE_ALREADY_EXISTS("Permission code already exists", HttpStatus.CONFLICT),
-    PERMISSION_NOT_FOUND_BY_ID("Permission not found", HttpStatus.NOT_FOUND),
-    PERMISSION_NOT_FOUND_BY_CODE("Permission not found", HttpStatus.NOT_FOUND),
-    PERMISSION_UPDATE_FAILED("Permission update failed", HttpStatus.INTERNAL_SERVER_ERROR),
-    PERMISSION_DELETE_FAILED("Permission deletion failed", HttpStatus.INTERNAL_SERVER_ERROR),
-    PERMISSION_IN_USE("Permission is in use", HttpStatus.CONFLICT),
-
     // Role Service Errors
     ROLE_CODE_ALREADY_EXISTS("Role code already exists", HttpStatus.CONFLICT),
     ROLE_NOT_FOUND_BY_ID("Role not found", HttpStatus.NOT_FOUND),
@@ -71,15 +65,29 @@ public enum ErrorCode {
     ROLE_UPDATE_FAILED("Role update failed", HttpStatus.INTERNAL_SERVER_ERROR),
     ROLE_DELETE_FAILED("Role deletion failed", HttpStatus.INTERNAL_SERVER_ERROR),
     ROLE_IN_USE("Role is in use", HttpStatus.CONFLICT),
-    ROLE_PERMISSION_ASSIGNMENT_FAILED("Assigning permissions to role failed", HttpStatus.INTERNAL_SERVER_ERROR),
 
-    // User Role Permission Service Errors
+    // User Role Service Errors
     USER_ROLE_ASSIGNMENT_FAILED("Assigning role to user failed", HttpStatus.INTERNAL_SERVER_ERROR),
-    USER_PERMISSION_ASSIGNMENT_FAILED("Assigning permission to user failed", HttpStatus.INTERNAL_SERVER_ERROR),
     USER_ROLE_REMOVAL_FAILED("Removing role from user failed", HttpStatus.INTERNAL_SERVER_ERROR),
-    USER_PERMISSION_REMOVAL_FAILED("Removing permission from user failed", HttpStatus.INTERNAL_SERVER_ERROR),
     ROLE_REPLACEMENT_FAILED("Replacing user's roles failed", HttpStatus.INTERNAL_SERVER_ERROR),
-    PERMISSION_REPLACEMENT_FAILED("Replacing user's permissions failed", HttpStatus.INTERNAL_SERVER_ERROR),
+    MULTIPLE_ROLES_NOT_ALLOWED("User can only have one role", HttpStatus.BAD_REQUEST),
+
+    // Subscription Errors
+    SUBSCRIPTION_NOT_FOUND("Subscription not found", HttpStatus.NOT_FOUND),
+    SUBSCRIPTION_PLAN_CODE_EXISTS("Subscription plan code already exists", HttpStatus.CONFLICT),
+    SUBSCRIPTION_PLAN_IN_USE("Subscription plan already has payments", HttpStatus.CONFLICT),
+    ALREADY_PREMIUM("Account is already premium", HttpStatus.CONFLICT),
+    NOT_PREMIUM("Account is not premium", HttpStatus.BAD_REQUEST),
+
+    // Payment Errors
+    PAYMENT_INVALID_PLAN("Invalid premium plan", HttpStatus.BAD_REQUEST),
+    PAYMENT_INVALID_REQUEST("Invalid payment request", HttpStatus.BAD_REQUEST),
+    PAYMENT_INVALID_STATE("Payment action is not allowed for current status", HttpStatus.BAD_REQUEST),
+    PAYMENT_TRANSACTION_NOT_FOUND("Payment transaction not found", HttpStatus.NOT_FOUND),
+    PAYMENT_CREATE_FAILED("Failed to create payment link", HttpStatus.SERVICE_UNAVAILABLE),
+
+    // Promotion Errors
+    PROMOTION_NOT_FOUND("Promotion not found", HttpStatus.NOT_FOUND),
 
     // System Errors
     INTERNAL_SERVER_ERROR("Internal server error", HttpStatus.INTERNAL_SERVER_ERROR),

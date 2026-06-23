@@ -1,0 +1,18 @@
+package com.iems.aiservice.model.agent;
+
+public enum AgentIntent {
+    GENERAL_CHAT,
+    ISSUE_QUERY,
+    ISSUE_ANALYSIS,
+    ISSUE_ACTION,
+    SPRINT_SUMMARY,
+    PROJECT_SUMMARY,
+    DAILY_PLAN,
+    RISK_ANALYSIS,
+    SPRINT_REPORT,
+    ISSUE_SEARCH,
+    ISSUE_UPDATE,
+    MEMBER_WORKLOAD,
+    DEADLINE_CHECK,
+    DOCUMENT_QA
+}

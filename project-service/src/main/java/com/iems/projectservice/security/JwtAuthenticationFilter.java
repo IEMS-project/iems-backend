@@ -80,10 +80,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
                 // Validate token
                 if (jwtService.isTokenValid(jwt, userDetails) && jwtService.isAccessToken(jwt)) {
-                    // Create authentication token
+                    // Create authentication token — store raw JWT as credentials so
+                    // SubscriptionLimitService can decode subscription claims without a Feign call.
                     UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
                             userDetails,
-                            null,
+                            jwt,   // ← store token as credentials
                             userDetails.getAuthorities()
                     );
                     authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
@@ -91,10 +92,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     // Set authentication to SecurityContext
                     SecurityContextHolder.getContext().setAuthentication(authToken);
 
+                    log.debug("User {} authenticated successfully", username);
+                } else {
+                    log.warn("Invalid JWT token for user: {}", username);
                 }
             }
         } catch (Exception e) {
-
+            log.warn("JWT authentication failed: {}", e.getMessage());
             // Don't throw exception to avoid breaking filter chain
         }
 

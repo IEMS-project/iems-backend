@@ -1,15 +1,15 @@
 package com.iems.chatservice.controller;
 
+import com.iems.chatservice.service.IMessageService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.handler.annotation.SendTo;
 import org.springframework.stereotype.Controller;
 import com.iems.chatservice.entity.Message;
-import com.iems.chatservice.service.MessageService;
 import com.iems.chatservice.entity.Conversation;
-import com.iems.chatservice.repository.ConversationRepository;
 import org.springframework.data.mongodb.core.MongoTemplate;
 
 import java.util.Map;
@@ -18,9 +18,10 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class ChatController {
 
-    private final MessageService messageService;
-    private final MongoTemplate mongoTemplate;
-    private final ConversationRepository conversationRepository;
+    @Autowired
+    private IMessageService messageService;
+    @Autowired
+    private MongoTemplate mongoTemplate;
 
     // Send to a conversation (group topic)
     @MessageMapping("/conversations/{conversationId}/send")

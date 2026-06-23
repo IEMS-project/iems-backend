@@ -19,7 +19,9 @@ public interface ProjectRepository extends JpaRepository<Project, UUID> {
     
     Optional<Project> findByName(String name);
     
-    List<Project> findByManagerId(UUID managerId);
+    Optional<Project> findByProjectKey(String projectKey);
+    
+    List<Project> findByManagerAccountId(UUID managerAccountId);
     
     List<Project> findByStatus(ProjectStatus status);
     
@@ -27,8 +29,22 @@ public interface ProjectRepository extends JpaRepository<Project, UUID> {
     List<Project> findByDateRange(@Param("startDate") LocalDateTime startDate, 
                                   @Param("endDate") LocalDateTime endDate);
     
-    @Query("SELECT p FROM Project p JOIN p.members pm WHERE pm.userId = :userId")
-    List<Project> findByMemberId(@Param("userId") UUID userId);
+    @Query("SELECT DISTINCT p FROM Project p JOIN ProjectMember pm ON pm.projectId = p.id WHERE pm.accountId = :accountId AND pm.status = com.iems.projectservice.entity.enums.MemberStatus.ACTIVE")
+    List<Project> findByMemberAccountId(@Param("accountId") UUID accountId);
+
+        @Query(value = "SELECT DISTINCT p FROM Project p LEFT JOIN ProjectMember pm ON pm.projectId = p.id " +
+            "WHERE p.managerAccountId = :accountId OR (pm.accountId = :accountId AND pm.status = com.iems.projectservice.entity.enums.MemberStatus.ACTIVE)",
+            countQuery = "SELECT COUNT(DISTINCT p.id) FROM Project p LEFT JOIN ProjectMember pm ON pm.projectId = p.id " +
+                "WHERE p.managerAccountId = :accountId OR (pm.accountId = :accountId AND pm.status = com.iems.projectservice.entity.enums.MemberStatus.ACTIVE)")
+        Page<Project> findByOwnerOrMember(@Param("accountId") UUID accountId, Pageable pageable);
     
     boolean existsByName(String name);
+    
+    boolean existsByProjectKey(String projectKey);
+
+    /** Count projects where the given account is the manager (owner). */
+    long countByManagerAccountId(UUID managerAccountId);
+
+    /** Find locked projects owned by a given manager (for scheduled lock checks). */
+    List<Project> findByManagerAccountIdAndLocked(UUID managerAccountId, boolean locked);
 }

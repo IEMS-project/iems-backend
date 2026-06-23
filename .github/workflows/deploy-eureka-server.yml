@@ -1,0 +1,23 @@
+name: Deploy Eureka Server
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "eureka-server/**"
+      - "pom.xml"
+      - "mvnw"
+      - ".mvn/**"
+      - "deploy/compose-eureka-server.yml"
+      - ".github/workflows/_deploy-service.yml"
+      - ".github/workflows/deploy-eureka-server.yml"
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/_deploy-service.yml
+    with:
+      service: eureka-server
+      image: eureka-server
+      compose_file: compose-eureka-server.yml
+    secrets: inherit

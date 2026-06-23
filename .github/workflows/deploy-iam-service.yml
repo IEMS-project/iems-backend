@@ -1,0 +1,24 @@
+name: Deploy IAM Service
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "iam-service/**"
+      - "pom.xml"
+      - "mvnw"
+      - ".mvn/**"
+      - "deploy/compose-iam-service.yml"
+      - ".github/workflows/_deploy-service.yml"
+      - ".github/workflows/deploy-iam-service.yml"
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/_deploy-service.yml
+    with:
+      service: iam-service
+      image: iam-service
+      compose_file: compose-iam-service.yml
+      env_file: .env.iam
+    secrets: inherit

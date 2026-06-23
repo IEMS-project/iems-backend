@@ -8,7 +8,7 @@ import java.util.List;
 
 public interface ConversationRepository extends MongoRepository<Conversation, String> {
 
-    List<Conversation> findByMembersContaining(String userId);
+    List<Conversation> findByMembersContaining(String accountId);
 
     List<Conversation> findByTypeAndMembersIn(String type, List<String> members);
 

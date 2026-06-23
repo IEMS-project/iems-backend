@@ -34,7 +34,6 @@ public class LoginResponseDto {
         private String username;
         private String email;
         private Set<String> roles;
-        private Set<String> permissions;
         private Boolean enabled;
         private Instant lastLoginAt;
     }

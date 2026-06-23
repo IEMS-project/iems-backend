@@ -1,5 +1,6 @@
 package com.iems.iamservice.service;
 
+import com.iems.iamservice.entity.enums.SubscriptionType;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
@@ -96,15 +97,41 @@ public class JwtService {
     }
 
     /**
-     * Create access token with userId, roles and permissions
+     * Create access token with userId, roles
      */
-    public String generateTokenWithUserInfo(UUID userId, String username, String email, Set<String> roles, Set<String> permissions) {
+    public String generateTokenWithUserInfo(UUID userId, String username, String email, Set<String> roles) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("userId", userId.toString());
         claims.put("email", email);
         claims.put("roles", roles);
-        claims.put("permissions", permissions);
         claims.put("type", "access");
+
+        Instant now = Instant.now();
+        Instant expirationTime = now.plus(jwtExpiration, ChronoUnit.SECONDS);
+
+        return Jwts.builder()
+                .setClaims(claims)
+                .setSubject(username)
+                .setIssuedAt(Date.from(now))
+                .setExpiration(Date.from(expirationTime))
+                .signWith(getSignInKey(), SignatureAlgorithm.HS256)
+                .compact();
+    }
+
+    /**
+     * Create access token with userId, roles, and subscription info
+     */
+    public String generateTokenWithUserInfo(UUID userId, String username, String email,
+                                            Set<String> roles, SubscriptionType subscriptionType, Instant premiumUntil) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("userId", userId.toString());
+        claims.put("email", email);
+        claims.put("roles", roles);
+        claims.put("type", "access");
+        claims.put("subscriptionType", subscriptionType != null ? subscriptionType.name() : SubscriptionType.FREE.name());
+        if (premiumUntil != null) {
+            claims.put("premiumUntil", premiumUntil.toEpochMilli());
+        }
 
         Instant now = Instant.now();
         Instant expirationTime = now.plus(jwtExpiration, ChronoUnit.SECONDS);
@@ -181,13 +208,21 @@ public class JwtService {
     }
 
     /**
-     * Get permissions from token
+     * Get subscriptionType from token
      */
-    @SuppressWarnings("unchecked")
-    public Set<String> extractPermissions(String token) {
+    public String extractSubscriptionType(String token) {
         Claims claims = extractAllClaims(token);
-        List<String> permissionsList = claims.get("permissions", List.class);
-        return permissionsList != null ? Set.copyOf(permissionsList) : Set.of();
+        String sub = claims.get("subscriptionType", String.class);
+        return sub != null ? sub : SubscriptionType.FREE.name();
+    }
+
+    /**
+     * Get premiumUntil (epoch milli) from token, returns null if not present
+     */
+    public Instant extractPremiumUntil(String token) {
+        Claims claims = extractAllClaims(token);
+        Long epochMilli = claims.get("premiumUntil", Long.class);
+        return epochMilli != null ? Instant.ofEpochMilli(epochMilli) : null;
     }
 
     /**

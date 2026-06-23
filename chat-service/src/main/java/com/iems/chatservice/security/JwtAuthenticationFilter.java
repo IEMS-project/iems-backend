@@ -44,7 +44,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         final String authHeader = request.getHeader("Authorization");
         final String jwt;
         final String username;
-        final UUID userId;
+        final UUID accountId;
 
         // Check Authorization header
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
@@ -59,7 +59,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             // Get username from token
             username = jwtService.extractUsername(jwt);
 
-            userId = jwtService.extractUserId(jwt);
+            accountId = jwtService.extractAccountId(jwt);
 
             // Check if user is already authenticated
             if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
@@ -76,7 +76,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         authorities.add(new SimpleGrantedAuthority(perm))
                 );
 
-                UserDetails userDetails = new JwtUserDetails(userId,username, authorities);
+                UserDetails userDetails = new JwtUserDetails(accountId,username, authorities);
 
 
                 // Validate token

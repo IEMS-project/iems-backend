@@ -1,0 +1,24 @@
+name: Deploy AI Service
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "ai-service/**"
+      - "pom.xml"
+      - "mvnw"
+      - ".mvn/**"
+      - "deploy/compose-ai-service.yml"
+      - ".github/workflows/_deploy-service.yml"
+      - ".github/workflows/deploy-ai-service.yml"
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/_deploy-service.yml
+    with:
+      service: ai-service
+      image: ai-service
+      compose_file: compose-ai-service.yml
+      env_file: .env.ai
+    secrets: inherit

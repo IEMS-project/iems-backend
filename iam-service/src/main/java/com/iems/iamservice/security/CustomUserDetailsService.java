@@ -37,14 +37,14 @@ public class CustomUserDetailsService implements UserDetailsService {
                 .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
 
         // Create authorities from roles
-        Set<SimpleGrantedAuthority> authorities = userRolePermissionService.getUserRoles(user.getUserId()).stream()
-                .map(role -> new SimpleGrantedAuthority("ROLE_" + role.getCode()))
+        Set<SimpleGrantedAuthority> authorities = userRolePermissionService.getUserRoles(user.getId()).stream()
+                .map(roleCode -> new SimpleGrantedAuthority("ROLE_" + roleCode))
                 .collect(Collectors.toSet());
 
-        // Add direct permissions
-        userRolePermissionService.getAllUserPermissions(user.getUserId()).stream()
-                .map(permission -> new SimpleGrantedAuthority(permission.getCode()))
-                .forEach(authorities::add);
+        // Add direct permissions (commented out - permission system not implemented)
+        // userRolePermissionService.getAllUserPermissions(user.getId()).stream()
+        //         .map(permission -> new SimpleGrantedAuthority(permission.getCode()))
+        //         .forEach(authorities::add);
 
         log.debug("User {} loaded with {} authorities", username, authorities.size());
         

@@ -1,10 +1,8 @@
 package com.iems.projectservice.repository;
 
-import com.iems.projectservice.entity.Project;
 import com.iems.projectservice.entity.ProjectMember;
+import com.iems.projectservice.entity.enums.MemberStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -14,34 +12,24 @@ import java.util.UUID;
 @Repository
 public interface ProjectMemberRepository extends JpaRepository<ProjectMember, UUID> {
     
-    List<ProjectMember> findByProject(Project project);
+    List<ProjectMember> findByProjectId(UUID projectId);
     
-    Optional<ProjectMember> findByProjectAndUserId(Project project, UUID userId);
+    Optional<ProjectMember> findByProjectIdAndAccountId(UUID projectId, UUID accountId);
     
-    List<ProjectMember> findByUserId(UUID userId);
+    List<ProjectMember> findByAccountId(UUID accountId);
     
-    List<ProjectMember> findByProjectAndRoleId(Project project, UUID roleId);
+    List<ProjectMember> findByProjectIdAndRoleId(UUID projectId, UUID roleId);
     
-    @Query("SELECT pm FROM ProjectMember pm WHERE pm.project.id = :projectId AND pm.userId = :userId")
-    Optional<ProjectMember> findMemberByProjectAndUser(@Param("projectId") UUID projectId, 
-                                                       @Param("userId") UUID userId);
+    boolean existsByProjectIdAndAccountId(UUID projectId, UUID accountId);
+
+    boolean existsByProjectIdAndAccountIdAndStatus(UUID projectId, UUID accountId, MemberStatus status);
     
-    @Query("SELECT pm FROM ProjectMember pm WHERE pm.project.id = :projectId")
-    List<ProjectMember> findByProjectId(@Param("projectId") UUID projectId);
-    
-    @Query("SELECT pm FROM ProjectMember pm WHERE pm.project.id = :projectId AND pm.userId = :userId")
-    Optional<ProjectMember> findByProjectIdAndUserId(@Param("projectId") UUID projectId, 
-                                                     @Param("userId") UUID userId);
-    
-    @Query("SELECT pm FROM ProjectMember pm WHERE pm.project.id = :projectId AND pm.roleId = :roleId")
-    List<ProjectMember> findByProjectIdAndRoleId(@Param("projectId") UUID projectId, 
-                                                 @Param("roleId") UUID roleId);
-    
-    @Query("SELECT CASE WHEN COUNT(pm) > 0 THEN true ELSE false END FROM ProjectMember pm WHERE pm.project.id = :projectId AND pm.userId = :userId")
-    boolean existsByProjectIdAndUserId(@Param("projectId") UUID projectId, 
-                                       @Param("userId") UUID userId);
-    
-    @Query("DELETE FROM ProjectMember pm WHERE pm.project.id = :projectId AND pm.userId = :userId")
-    void deleteByProjectIdAndUserId(@Param("projectId") UUID projectId, 
-                                    @Param("userId") UUID userId);
+    void deleteByProjectIdAndAccountId(UUID projectId, UUID accountId);
+
+    void deleteByProjectId(UUID projectId);
+
+    /** Count how many members a project currently has. */
+    long countByProjectId(UUID projectId);
+
+    long countByProjectIdAndStatus(UUID projectId, MemberStatus status);
 }

@@ -1,13 +1,14 @@
 package com.iems.chatservice.controller;
 
+import com.iems.chatservice.service.IMessageService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import com.iems.chatservice.entity.Message;
-import com.iems.chatservice.service.MessageService;
 import com.iems.chatservice.entity.Conversation;
 import com.iems.chatservice.repository.ConversationRepository;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -26,11 +27,16 @@ import com.iems.chatservice.client.DocumentServiceFeignClient;
 @RequiredArgsConstructor
 public class MessageController {
 
-    private final MessageService messageService;
-    private final MongoTemplate mongoTemplate;
-    private final ConversationRepository conversationRepository;
-    private final SimpMessagingTemplate messagingTemplate;
-    private final DocumentServiceFeignClient documentServiceFeignClient;
+    @Autowired
+    private IMessageService messageService;
+    @Autowired
+    private MongoTemplate mongoTemplate;
+    @Autowired
+    private ConversationRepository conversationRepository;
+    @Autowired
+    private SimpMessagingTemplate messagingTemplate;
+    @Autowired
+    private DocumentServiceFeignClient documentServiceFeignClient;
 
     @GetMapping
     public ResponseEntity<Page<Message>> recent(

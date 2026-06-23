@@ -21,6 +21,9 @@ public class Share {
     @UuidGenerator(style = UuidGenerator.Style.RANDOM)
     private UUID id;
 
+    @Version
+    private Long version;
+
     @Column(name = "target_id", nullable = false)
     private UUID targetId;
 

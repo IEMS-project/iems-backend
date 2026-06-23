@@ -1,30 +1,42 @@
 package com.iems.iamservice.dto.request;
 
-import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
+import com.iems.iamservice.entity.enums.Gender;
+import jakarta.validation.constraints.*;
+import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
-import java.util.Set;
-import java.util.UUID;
+import java.util.Date;
 
 @Data
+@AllArgsConstructor
+@NoArgsConstructor
 public class CreateUserDto {
+    @NotBlank(message = "First name is required")
+    private String firstName;
     
-    @NotNull(message = "User ID cannot be null")
-    private UUID userId; // ID from user-service
+    @NotBlank(message = "Last name is required")
+    private String lastName;
     
-    @NotBlank(message = "Username cannot be blank")
-    private String username;
-    
-    @NotBlank(message = "Email cannot be blank")
-    @Email(message = "Email is not valid")
+    @Email(message = "Email should be valid")
     private String email;
     
-    @NotBlank(message = "Password cannot be blank")
-    private String password;
+    private String address;
     
-    private Set<String> roleCodes;
+    @Pattern(regexp = "^\\d{10,11}$", message = "Phone number must be 10-11 digits without spaces or special characters")
+    private String phone;
+    
+    @PastOrPresent(message = "Date of birth cannot be in the future")
+    private Date dob;
+    
+    private Gender gender;
+    
+    private String image;
+    
+    // Thêm các trường cho việc tạo account
+    private String username;
+    private String password;
+    private java.util.Set<String> roleCodes;
 }
 
 

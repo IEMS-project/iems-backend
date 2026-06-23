@@ -1,0 +1,24 @@
+name: Deploy Project Service
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "project-service/**"
+      - "pom.xml"
+      - "mvnw"
+      - ".mvn/**"
+      - "deploy/compose-project-service.yml"
+      - ".github/workflows/_deploy-service.yml"
+      - ".github/workflows/deploy-project-service.yml"
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/_deploy-service.yml
+    with:
+      service: project-service
+      image: project-service
+      compose_file: compose-project-service.yml
+      env_file: .env.project
+    secrets: inherit
