@@ -658,10 +658,11 @@ public class ProjectIssueToolService {
         int page = 0;
         int totalPages = 1;
         do {
+            int currentPage = page;
             Map<String, Object> response = restClient.get()
                     .uri(uriBuilder -> uriBuilder
                             .path("/projects/{projectId}/issues/paged")
-                            .queryParam("page", page)
+                            .queryParam("page", currentPage)
                             .queryParam("size", 200)
                             .build(projectId))
                     .header("Authorization", authorization)

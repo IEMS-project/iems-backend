@@ -1,0 +1,618 @@
+package com.iems.aiservice.service;
+
+import com.iems.aiservice.dto.IssueEstimateRequest;
+import com.iems.aiservice.dto.IssueEstimateResponse;
+import com.iems.aiservice.dto.SprintAssignmentRequest;
+import com.iems.aiservice.dto.SprintAssignmentResponse;
+import com.iems.aiservice.entity.IssueSuggestionVector;
+import com.iems.aiservice.repository.IssueSuggestionVectorRepository;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataAccessException;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClient;
+
+import java.text.Normalizer;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+@Service
+@Slf4j
+public class IssueSuggestionService {
+
+    private static final List<Integer> FIBONACCI_POINTS = List.of(0, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89);
+
+    private final RestClient projectClient;
+    private final OpenRouterEmbeddingService embeddingService;
+    private final IssueSuggestionVectorRepository vectorRepository;
+
+    public IssueSuggestionService(
+            @Value("${ai.agent.project-base-url:http://localhost:8080/project-service}") String projectBaseUrl,
+            OpenRouterEmbeddingService embeddingService,
+            IssueSuggestionVectorRepository vectorRepository) {
+        this.projectClient = RestClient.builder().baseUrl(projectBaseUrl).build();
+        this.embeddingService = embeddingService;
+        this.vectorRepository = vectorRepository;
+    }
+
+    public IssueEstimateResponse estimateIssue(UUID projectId, IssueEstimateRequest request, String authorization) {
+        List<Map<String, Object>> issues = fetchList("/projects/" + projectId + "/issues", authorization);
+        List<Map<String, Object>> members = fetchList("/projects/" + projectId + "/members", authorization);
+        List<Map<String, Object>> statuses = fetchWorkflowStatuses(projectId, authorization);
+        Map<String, String> issueTypeNames = nameById(fetchList("/projects/" + projectId + "/issue-types", authorization));
+        Map<String, String> priorityNames = nameById(fetchList("/projects/" + projectId + "/issue-priorities", authorization));
+
+        Set<String> doneStatusIds = statuses.stream()
+                .filter(status -> normalize(stringValue(status.get("category"))).contains("done"))
+                .map(status -> stringValue(status.get("id")))
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        String requestText = issueText(
+                request.title(),
+                request.description(),
+                stringValue(request.issueTypeId()),
+                firstNonBlank(request.issueTypeName(), issueTypeNames.get(stringValue(request.issueTypeId()))),
+                stringValue(request.priorityId()),
+                firstNonBlank(request.priorityName(), priorityNames.get(stringValue(request.priorityId()))),
+                null);
+        List<Double> requestEmbedding = safeEmbed(requestText);
+        List<Map<String, Object>> similarIssues = rankSimilarIssues(
+                projectId.toString(),
+                requestText,
+                requestEmbedding,
+                issues,
+                doneStatusIds,
+                issueTypeNames,
+                priorityNames)
+                .stream()
+                .limit(5)
+                .map(match -> compactIssue(match.issue(), match.score()))
+                .toList();
+
+        Integer point = suggestStoryPoints(similarIssues);
+        List<Map<String, Object>> workload = buildWorkloadSummary(members, issues, doneStatusIds);
+        Map<String, Object> assignee = chooseAssignee(workload, similarIssues, point);
+
+        List<String> reasons = new ArrayList<>();
+        if (!similarIssues.isEmpty()) {
+            reasons.add("Đề xuất " + point + " pts vì " + similarIssues.size()
+                    + " task Done tương đồng có median gần nhất là " + point + " pts; nổi bật: "
+                    + topSimilarIssueReason(similarIssues) + ".");
+        } else {
+            reasons.add("Đề xuất " + point
+                    + " pts bằng fallback heuristic vì project chưa đủ lịch sử task Done tương đồng.");
+        }
+        if (assignee != null) {
+            int similarCount = intValue(assignee.get("similarIssueCount"), 0);
+            int samePointCount = intValue(assignee.get("samePointHistoryCount"), 0);
+            int openStoryPoints = intValue(assignee.get("openStoryPoints"), 0);
+            int openIssueCount = intValue(assignee.get("openIssueCount"), 0);
+            int completedIssueCount = intValue(assignee.get("completedIssueCount"), 0);
+            String assigneeName = stringValue(assignee.get("name"));
+            if (similarCount > 0 || samePointCount > 0) {
+                reasons.add("Gợi ý " + assigneeName + " vì đang có " + openStoryPoints + " pts/"
+                        + openIssueCount + " task chưa Done, từng làm " + similarCount
+                        + " task tương đồng, " + samePointCount + " task cùng mức " + point
+                        + " pts và đã hoàn thành " + completedIssueCount + " task.");
+            } else {
+                reasons.add("Gợi ý " + assigneeName + " vì workload thấp nhất: "
+                        + openStoryPoints + " pts/" + openIssueCount
+                        + " task chưa Done; chưa có lịch sử task tương đồng đủ mạnh.");
+            }
+        }
+
+        return new IssueEstimateResponse(
+                point,
+                assignee == null ? null : stringValue(assignee.get("memberId")),
+                assignee == null ? null : stringValue(assignee.get("name")),
+                confidenceFor(similarIssues),
+                similarIssues,
+                workload,
+                reasons);
+    }
+
+    public SprintAssignmentResponse suggestSprintAssignments(UUID projectId, UUID sprintId,
+            SprintAssignmentRequest request, String authorization) {
+        List<Map<String, Object>> allIssues = fetchList("/projects/" + projectId + "/issues", authorization);
+        List<Map<String, Object>> members = fetchList("/projects/" + projectId + "/members", authorization);
+        List<Map<String, Object>> statuses = fetchWorkflowStatuses(projectId, authorization);
+
+        Set<String> doneStatusIds = statuses.stream()
+                .filter(status -> normalize(stringValue(status.get("category"))).contains("done"))
+                .map(status -> stringValue(status.get("id")))
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        List<Map<String, Object>> workload = buildWorkloadSummary(members, allIssues, doneStatusIds);
+
+        Set<String> requestedIssueIds = request == null || request.issueIds() == null
+                ? Set.of()
+                : request.issueIds().stream().filter(Objects::nonNull).collect(Collectors.toSet());
+        List<Map<String, Object>> targetIssues = allIssues.stream()
+                .filter(issue -> {
+                    String issueId = stringValue(issue.get("id"));
+                    String currentSprintId = stringValue(issue.get("sprintId"));
+                    if (!requestedIssueIds.isEmpty()) {
+                        return requestedIssueIds.contains(issueId);
+                    }
+                    return sprintId.toString().equals(currentSprintId);
+                })
+                .filter(issue -> !doneStatusIds.contains(stringValue(issue.get("statusId"))))
+                .sorted(Comparator.comparingInt(issue -> -intValue(issue.get("storyPoints"), 1)))
+                .toList();
+
+        Map<String, Map<String, Object>> mutableWorkload = workload.stream()
+                .filter(item -> stringValue(item.get("memberId")) != null)
+                .collect(Collectors.toMap(item -> stringValue(item.get("memberId")), LinkedHashMap::new,
+                        (first, second) -> first, LinkedHashMap::new));
+
+        List<Map<String, Object>> assignments = new ArrayList<>();
+        for (Map<String, Object> issue : targetIssues) {
+            Map<String, Object> assignee = chooseAssignee(new ArrayList<>(mutableWorkload.values()), List.of(),
+                    intValue(issue.get("storyPoints"), 1));
+            if (assignee == null) {
+                break;
+            }
+            int points = Math.max(1, intValue(issue.get("storyPoints"), 1));
+            String memberId = stringValue(assignee.get("memberId"));
+            assignee.put("openStoryPoints", intValue(assignee.get("openStoryPoints"), 0) + points);
+            assignee.put("openIssueCount", intValue(assignee.get("openIssueCount"), 0) + 1);
+            Map<String, Object> assignment = new LinkedHashMap<>();
+            assignment.put("issueId", stringValue(issue.get("id")));
+            assignment.put("issueKey", stringValue(issue.get("issueKey")));
+            assignment.put("title", stringValue(issue.get("title")));
+            assignment.put("suggestedAssigneeId", memberId);
+            assignment.put("suggestedAssigneeName", stringValue(assignee.get("name")));
+            assignment.put("storyPoints", points);
+            assignment.put("reason", "Người này đang có tổng point mở thấp nhất sau khi cân bằng sprint.");
+            assignments.add(assignment);
+        }
+
+        return new SprintAssignmentResponse(assignments, new ArrayList<>(mutableWorkload.values()), List.of(
+                "Không tự cập nhật task; chỉ trả danh sách đề xuất để người dùng áp dụng.",
+                "Task Done không được tính vào workload hiện tại."));
+    }
+
+    List<Map<String, Object>> buildWorkloadSummary(List<Map<String, Object>> members, List<Map<String, Object>> issues,
+            Set<String> doneStatusIds) {
+        Map<String, Map<String, Object>> summary = new LinkedHashMap<>();
+        for (Map<String, Object> member : members) {
+            String memberId = firstNonBlank(member, "userId", "accountId", "id");
+            if (memberId == null) {
+                continue;
+            }
+            summary.put(memberId, new LinkedHashMap<>(Map.of(
+                    "memberId", memberId,
+                    "name", displayName(member),
+                    "openIssueCount", 0,
+                    "openStoryPoints", 0,
+                    "completedIssueCount", 0)));
+        }
+
+        for (Map<String, Object> issue : issues) {
+            String assigneeId = stringValue(issue.get("assigneeId"));
+            if (assigneeId == null || !summary.containsKey(assigneeId)) {
+                continue;
+            }
+            Map<String, Object> item = summary.get(assigneeId);
+            if (doneStatusIds.contains(stringValue(issue.get("statusId")))) {
+                item.put("completedIssueCount", intValue(item.get("completedIssueCount"), 0) + 1);
+            } else {
+                item.put("openIssueCount", intValue(item.get("openIssueCount"), 0) + 1);
+                item.put("openStoryPoints", intValue(item.get("openStoryPoints"), 0)
+                        + Math.max(0, intValue(issue.get("storyPoints"), 0)));
+            }
+        }
+
+        return summary.values().stream()
+                .sorted(Comparator.comparingInt(item -> intValue(item.get("openStoryPoints"), 0)))
+                .toList();
+    }
+
+    Integer suggestStoryPoints(List<Map<String, Object>> similarIssues) {
+        List<Integer> points = similarIssues.stream()
+                .map(issue -> intValue(issue.get("storyPoints"), -1))
+                .filter(point -> point >= 0)
+                .toList();
+        if (points.isEmpty()) {
+            return 3;
+        }
+        double average = points.stream().mapToInt(Integer::intValue).average().orElse(3);
+        return nearestFibonacci((int) Math.round(average));
+    }
+
+    private List<Map<String, Object>> fetchList(String path, String authorization) {
+        try {
+            Map<?, ?> response = projectClient.get()
+                    .uri(path)
+                    .header(HttpHeaders.AUTHORIZATION, authorization)
+                    .accept(MediaType.APPLICATION_JSON)
+                    .retrieve()
+                    .body(Map.class);
+            Object data = response == null ? null : response.get("data");
+            if (data instanceof List<?> list) {
+                return list.stream()
+                        .filter(Map.class::isInstance)
+                        .map(item -> (Map<String, Object>) item)
+                        .toList();
+            }
+        } catch (RestClientException ex) {
+            log.warn("Unable to fetch project data from {}. Continuing with empty data: {}", path, ex.getMessage());
+        } catch (RuntimeException ex) {
+            log.warn("Unable to parse project data from {}. Continuing with empty data: {}", path, ex.getMessage());
+        }
+        return List.of();
+    }
+
+    private List<Map<String, Object>> fetchWorkflowStatuses(UUID projectId, String authorization) {
+        List<Map<String, Object>> workflows = fetchList("/projects/" + projectId + "/workflows", authorization);
+        List<Map<String, Object>> statuses = new ArrayList<>();
+        for (Map<String, Object> workflow : workflows) {
+            String workflowId = stringValue(workflow.get("id"));
+            if (workflowId != null) {
+                statuses.addAll(fetchList("/projects/" + projectId + "/workflows/" + workflowId + "/statuses",
+                        authorization));
+            }
+        }
+        return statuses;
+    }
+
+    private List<SimilarIssue> rankSimilarIssues(String projectId,
+            String requestText,
+            List<Double> requestEmbedding,
+            List<Map<String, Object>> issues,
+            Set<String> doneStatusIds,
+            Map<String, String> issueTypeNames,
+            Map<String, String> priorityNames) {
+        return issues.stream()
+                .filter(issue -> isDoneIssue(issue, doneStatusIds))
+                .filter(issue -> issue.get("storyPoints") != null)
+                .map(issue -> {
+                    String issueId = stringValue(issue.get("id"));
+                    String issueTypeId = stringValue(issue.get("issueTypeId"));
+                    String priorityId = stringValue(issue.get("priorityId"));
+                    String text = issueText(
+                            stringValue(issue.get("title")),
+                            stringValue(issue.get("description")),
+                            issueTypeId,
+                            firstNonBlank(firstNonBlank(issue, "issueTypeName", "typeName", "type"),
+                                    issueTypeNames.get(issueTypeId)),
+                            priorityId,
+                            firstNonBlank(firstNonBlank(issue, "priorityName", "priority"),
+                                    priorityNames.get(priorityId)),
+                            labelsText(issue.get("labels")));
+                    double vectorScore = 0;
+                    if (requestEmbedding != null && issueId != null) {
+                        List<Double> issueEmbedding = cachedEmbedding(projectId, issueId, text);
+                        vectorScore = cosine(requestEmbedding, issueEmbedding);
+                    }
+                    double lexicalScore = lexicalSimilarity(requestText, text);
+                    return new SimilarIssue(issue, Math.max(vectorScore, lexicalScore));
+                })
+                .filter(match -> match.score() > 0.08)
+                .sorted(Comparator.comparingDouble(SimilarIssue::score).reversed())
+                .toList();
+    }
+
+    private List<Double> cachedEmbedding(String projectId, String issueId, String text) {
+        Optional<IssueSuggestionVector> existing;
+        try {
+            existing = vectorRepository.findByProjectIdAndIssueId(projectId, issueId);
+        } catch (DataAccessException ex) {
+            log.warn("Issue suggestion vector cache unavailable, continuing without Mongo cache: {}", ex.getMessage());
+            return safeEmbed(text);
+        } catch (RuntimeException ex) {
+            log.warn("Issue suggestion vector cache unavailable, continuing without Mongo cache: {}", ex.getMessage());
+            return safeEmbed(text);
+        }
+        if (existing.isPresent() && Objects.equals(existing.get().getText(), text)
+                && existing.get().getEmbedding() != null) {
+            return existing.get().getEmbedding();
+        }
+        List<Double> embedding = safeEmbed(text);
+        if (embedding != null) {
+            try {
+                IssueSuggestionVector vector = existing.orElseGet(IssueSuggestionVector::new);
+                vector.setProjectId(projectId);
+                vector.setIssueId(issueId);
+                vector.setText(text);
+                vector.setEmbedding(embedding);
+                vector.setUpdatedAt(Instant.now());
+                vectorRepository.save(vector);
+            } catch (DataAccessException ex) {
+                log.warn("Unable to save issue suggestion vector cache, continuing: {}", ex.getMessage());
+            } catch (RuntimeException ex) {
+                log.warn("Unable to save issue suggestion vector cache, continuing: {}", ex.getMessage());
+            }
+        }
+        return embedding;
+    }
+
+    private List<Double> safeEmbed(String text) {
+        try {
+            return embeddingService.embed(text);
+        } catch (Exception ex) {
+            log.debug("Embedding unavailable, falling back to lexical similarity: {}", ex.getMessage());
+            return null;
+        }
+    }
+
+    private Map<String, Object> chooseAssignee(List<Map<String, Object>> workload,
+            List<Map<String, Object>> similarIssues,
+            Integer suggestedStoryPoints) {
+        Map<String, Integer> similarCountByAssignee = new HashMap<>();
+        Map<String, Integer> samePointCountByAssignee = new HashMap<>();
+        Map<String, Double> similarityScoreByAssignee = new HashMap<>();
+        for (Map<String, Object> issue : similarIssues) {
+            String assigneeId = stringValue(issue.get("assigneeId"));
+            if (assigneeId == null || assigneeId.isBlank()) {
+                continue;
+            }
+            similarCountByAssignee.merge(assigneeId, 1, Integer::sum);
+            similarityScoreByAssignee.merge(assigneeId, doubleValue(issue.get("similarity"), 0), Double::sum);
+            if (suggestedStoryPoints != null
+                    && intValue(issue.get("storyPoints"), -1) == suggestedStoryPoints) {
+                samePointCountByAssignee.merge(assigneeId, 1, Integer::sum);
+            }
+        }
+
+        return workload.stream()
+                .filter(item -> stringValue(item.get("memberId")) != null)
+                .map(item -> {
+                    Map<String, Object> enriched = new LinkedHashMap<>(item);
+                    String memberId = stringValue(enriched.get("memberId"));
+                    int similarCount = similarCountByAssignee.getOrDefault(memberId, 0);
+                    int samePointCount = samePointCountByAssignee.getOrDefault(memberId, 0);
+                    double similarityScore = similarityScoreByAssignee.getOrDefault(memberId, 0D);
+                    int workloadPenalty = intValue(enriched.get("openStoryPoints"), 0) * 2
+                            + intValue(enriched.get("openIssueCount"), 0) * 2
+                            + Math.max(0, intValue(enriched.get("openStoryPoints"), 0) - 21) * 2;
+                    int historyBonus = similarCount * 12
+                            + samePointCount * 8
+                            + (int) Math.round(similarityScore * 20)
+                            + Math.min(5, intValue(enriched.get("completedIssueCount"), 0));
+                    int score = workloadPenalty - historyBonus;
+                    enriched.put("similarIssueCount", similarCount);
+                    enriched.put("samePointHistoryCount", samePointCount);
+                    enriched.put("similarityHistoryScore", Math.round(similarityScore * 100D) / 100D);
+                    enriched.put("assignmentScore", score);
+                    return enriched;
+                })
+                .min(Comparator
+                        .comparingInt((Map<String, Object> item) -> intValue(item.get("assignmentScore"), 0))
+                        .thenComparingInt(item -> intValue(item.get("openStoryPoints"), 0))
+                        .thenComparingInt(item -> intValue(item.get("openIssueCount"), 0))
+                        .thenComparing(item -> stringValue(item.get("name")), Comparator.nullsLast(String::compareTo)))
+                .orElse(null);
+    }
+
+    private Map<String, Object> compactIssue(Map<String, Object> issue, double score) {
+        Map<String, Object> compact = new LinkedHashMap<>();
+        compact.put("id", issue.get("id"));
+        compact.put("issueKey", issue.get("issueKey"));
+        compact.put("title", issue.get("title"));
+        compact.put("storyPoints", issue.get("storyPoints"));
+        compact.put("assigneeId", issue.get("assigneeId"));
+        compact.put("similarity", Math.round(score * 100.0) / 100.0);
+        return compact;
+    }
+
+    private String topSimilarIssueReason(List<Map<String, Object>> similarIssues) {
+        Map<String, Object> topIssue = similarIssues.getFirst();
+        String issueKey = stringValue(topIssue.get("issueKey"));
+        String title = stringValue(topIssue.get("title"));
+        int storyPoints = intValue(topIssue.get("storyPoints"), 0);
+        int similarityPercent = (int) Math.round(doubleValue(topIssue.get("similarity"), 0) * 100);
+        String label = issueKey == null || issueKey.isBlank() ? title : issueKey + " · " + title;
+        return label + " (" + storyPoints + " pts, similarity " + similarityPercent + "%)";
+    }
+
+    private double confidenceFor(List<Map<String, Object>> similarIssues) {
+        if (similarIssues.isEmpty()) {
+            return 0.35;
+        }
+        double topScore = ((Number) similarIssues.getFirst().getOrDefault("similarity", 0)).doubleValue();
+        return Math.min(0.9, Math.max(0.45, topScore));
+    }
+
+    private static String issueText(String title,
+            String description,
+            String issueTypeId,
+            String issueTypeName,
+            String priorityId,
+            String priorityName,
+            String labels) {
+        String typeText = firstNonBlank(issueTypeName, issueTypeId);
+        String priorityText = firstNonBlank(priorityName, priorityId);
+        return String.join(" ", List.of(
+                repeatField("title", title, 3),
+                repeatField("description", description, 2),
+                repeatField("type", typeText, 2),
+                repeatField("priority", priorityText, 2),
+                repeatField("labels", labels, 1))).trim();
+    }
+
+    private static String repeatField(String field, String value, int weight) {
+        if (value == null || value.isBlank()) {
+            return "";
+        }
+        String token = field + " " + value;
+        return String.join(" ", java.util.Collections.nCopies(weight, token));
+    }
+
+    private static boolean isDoneIssue(Map<String, Object> issue, Set<String> doneStatusIds) {
+        String statusId = stringValue(issue.get("statusId"));
+        if (statusId != null && doneStatusIds.contains(statusId)) {
+            return true;
+        }
+        String statusCategory = normalize(stringValue(issue.get("statusCategory")));
+        String statusName = normalize(stringValue(issue.get("statusName")));
+        return isDoneText(statusCategory) || isDoneText(statusName);
+    }
+
+    private static boolean isDoneText(String value) {
+        return value.contains("done")
+                || value.contains("completed")
+                || value.contains("complete")
+                || value.contains("hoan thanh");
+    }
+
+    private static String labelsText(Object labels) {
+        if (labels instanceof Iterable<?> iterable) {
+            List<String> names = new ArrayList<>();
+            for (Object label : iterable) {
+                if (label instanceof Map<?, ?> map) {
+                    Object name = map.get("name");
+                    if (name != null) {
+                        names.add(String.valueOf(name));
+                    }
+                } else if (label != null) {
+                    names.add(String.valueOf(label));
+                }
+            }
+            return String.join(" ", names);
+        }
+        return stringValue(labels);
+    }
+
+    private static Map<String, String> nameById(List<Map<String, Object>> items) {
+        Map<String, String> names = new HashMap<>();
+        for (Map<String, Object> item : items) {
+            String id = stringValue(item.get("id"));
+            String name = stringValue(item.get("name"));
+            if (id != null && name != null && !name.isBlank()) {
+                names.put(id, name);
+            }
+        }
+        return names;
+    }
+
+    private static double cosine(List<Double> left, List<Double> right) {
+        if (left == null || right == null || left.isEmpty() || left.size() != right.size()) {
+            return 0;
+        }
+        double dot = 0;
+        double leftNorm = 0;
+        double rightNorm = 0;
+        for (int i = 0; i < left.size(); i++) {
+            dot += left.get(i) * right.get(i);
+            leftNorm += left.get(i) * left.get(i);
+            rightNorm += right.get(i) * right.get(i);
+        }
+        if (leftNorm == 0 || rightNorm == 0) {
+            return 0;
+        }
+        return dot / (Math.sqrt(leftNorm) * Math.sqrt(rightNorm));
+    }
+
+    private static double lexicalSimilarity(String left, String right) {
+        Set<String> leftWords = words(left);
+        Set<String> rightWords = words(right);
+        if (leftWords.isEmpty() || rightWords.isEmpty()) {
+            return 0;
+        }
+        long intersection = leftWords.stream().filter(rightWords::contains).count();
+        java.util.HashSet<String> unionWords = new java.util.HashSet<>(leftWords);
+        unionWords.addAll(rightWords);
+        long union = unionWords.size();
+        return union == 0 ? 0 : (double) intersection / union;
+    }
+
+    private static Set<String> words(String value) {
+        return java.util.Arrays.stream(normalize(value).split("\\s+"))
+                .filter(word -> word.length() > 2)
+                .collect(Collectors.toSet());
+    }
+
+    private static int nearestFibonacci(int value) {
+        return FIBONACCI_POINTS.stream()
+                .min(Comparator.comparingInt(point -> Math.abs(point - value)))
+                .orElse(3);
+    }
+
+    private static String normalize(String value) {
+        if (value == null) {
+            return "";
+        }
+        String noMarks = Normalizer.normalize(value, Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "");
+        return noMarks.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", " ").trim();
+    }
+
+    private static int intValue(Object value, int fallback) {
+        if (value instanceof Number number) {
+            return number.intValue();
+        }
+        if (value instanceof String string && !string.isBlank()) {
+            try {
+                return Integer.parseInt(string);
+            } catch (NumberFormatException ignored) {
+                return fallback;
+            }
+        }
+        return fallback;
+    }
+
+    private static double doubleValue(Object value, double fallback) {
+        if (value instanceof Number number) {
+            return number.doubleValue();
+        }
+        if (value instanceof String string && !string.isBlank()) {
+            try {
+                return Double.parseDouble(string);
+            } catch (NumberFormatException ignored) {
+                return fallback;
+            }
+        }
+        return fallback;
+    }
+
+    private static String stringValue(Object value) {
+        return value == null ? null : String.valueOf(value);
+    }
+
+    private static String stringValue(UUID value) {
+        return value == null ? null : value.toString();
+    }
+
+    private static String firstNonBlank(String... values) {
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+        return null;
+    }
+
+    private static String firstNonBlank(Map<String, Object> map, String... keys) {
+        for (String key : keys) {
+            String value = stringValue(map.get(key));
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+        return null;
+    }
+
+    private static String displayName(Map<String, Object> member) {
+        String name = firstNonBlank(member, "userName", "fullName", "name", "userEmail", "email");
+        return name == null ? "Team member" : name;
+    }
+
+    private record SimilarIssue(Map<String, Object> issue, double score) {
+    }
+}

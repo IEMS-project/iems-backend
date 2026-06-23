@@ -15,10 +15,66 @@ on:
 
 jobs:
   deploy:
-    uses: ./.github/workflows/_deploy-service.yml
-    with:
-      service: iam-service
-      image: iam-service
-      compose_file: compose-iam-service.yml
-      env_file: .env.iam
-    secrets: inherit
+    name: Deploy to EC2
+    runs-on: ubuntu-latest
+    needs: build
+    environment: aws_deploy
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Copy compose.yml to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "compose.yml"
+          target: "~/iems/iam-service"
+
+      - name: Execute remote ssh commands
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            mkdir -p ~/iems/iam-service
+
+            cat > ~/iems/iam-service/.env << EOF
+            SERVICE_NAME=iam-service
+            IMAGE_NAME=${{ vars.DOCKER_USERNAME }}/iam-service:latest
+            HOST_PORT=8086
+            CONTAINER_PORT=8086
+            EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+            DB_URL=${{ secrets.IAM_DB_URL }}
+            DB_USERNAME=${{ secrets.IAM_DB_USERNAME }}
+            DB_PASSWORD=${{ secrets.IAM_DB_PASSWORD }}
+            JWT_SECRET=${{ secrets.JWT_SECRET }}
+            JWT_EXPIRATION=${{ secrets.JWT_EXPIRATION }}
+            JWT_REFRESH_EXPIRATION=${{ secrets.JWT_REFRESH_EXPIRATION }}
+            GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
+            GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
+            GOOGLE_REDIRECT_URI=${{ secrets.GOOGLE_REDIRECT_URI }}
+            GITHUB_CLIENT_ID=${{ secrets.OAUTH_GITHUB_CLIENT_ID }}
+            GITHUB_CLIENT_SECRET=${{ secrets.OAUTH_GITHUB_CLIENT_SECRET }}
+            GITHUB_REDIRECT_URI=${{ secrets.OAUTH_GITHUB_REDIRECT_URI }}
+            PAYOS_CLIENT_ID=${{ secrets.PAYOS_CLIENT_ID }}
+            PAYOS_API_KEY=${{ secrets.PAYOS_API_KEY }}
+            PAYOS_CHECKSUM_KEY=${{ secrets.PAYOS_CHECKSUM_KEY }}
+            PAYOS_BANK_NAME=${{ secrets.PAYOS_BANK_NAME }}
+            PAYOS_ACCOUNT_NAME=${{ secrets.PAYOS_ACCOUNT_NAME }}
+            PAYOS_ACCOUNT_NUMBER=${{ secrets.PAYOS_ACCOUNT_NUMBER }}
+            APP_FRONTEND_URL=${{ vars.APP_FRONTEND_URL }}
+            APP_BACKEND_URL=${{ vars.APP_BACKEND_URL }}
+            EOF
+
+            chmod 600 ~/iems/iam-service/.env
+            cd ~/iems/iam-service
+
+            docker network create iems-network || true
+            docker compose pull
+            docker compose up -d --remove-orphans
+
+            docker image prune -f
+            echo "IAM service deployment completed!"
