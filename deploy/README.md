@@ -1,5 +1,45 @@
 # Deploy backend services
 
+## GitHub Actions CI/CD
+
+Each backend service has its own workflow in `.github/workflows` and can be run independently from the GitHub Actions UI:
+
+```text
+Deploy Eureka Server
+Deploy IAM Service
+Deploy Notification Service
+Deploy Document Service
+Deploy Project Service
+Deploy Chat Service
+Deploy AI Service
+Deploy API Gateway
+```
+
+Required repository secrets:
+
+```text
+DOCKER_USERNAME=pthngws
+DOCKER_PASSWORD=<Docker Hub token or password>
+EC2_HOST=ec2-32-236-226-233.ap-southeast-2.compute.amazonaws.com
+EC2_USER=ec2-user
+EC2_SSH_KEY=<private key content>
+```
+
+The workflows build the selected Maven module, push `pthngws/<service>:latest` and `pthngws/<service>:<commit-sha>`, copy the service compose file to `~/iems-backend/deploy`, then recreate only that service on EC2.
+
+Keep real env files on EC2 at `~/iems-backend/deploy`:
+
+```text
+.env.iam
+.env.project
+.env.document
+.env.notification
+.env.chat
+.env.ai
+```
+
+Do not commit production secrets to this repository.
+
 Run services in this order:
 
 ```bash

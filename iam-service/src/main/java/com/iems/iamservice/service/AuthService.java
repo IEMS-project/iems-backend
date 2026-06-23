@@ -18,6 +18,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.AuthenticationServiceException;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.DisabledException;
+import org.springframework.security.authentication.LockedException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -118,8 +122,19 @@ public class AuthService {
 
                 return buildLoginResponse(user, roles, accessToken, refreshToken);
 
+        } catch (BadCredentialsException e) {
+            log.warn("Bad credentials for user: {}", loginRequest.getUsernameOrEmail());
+            throw new AppException(ErrorCode.LOGIN_FAILED);
+        } catch (DisabledException | LockedException e) {
+            log.warn("Locked/disabled account login attempt for user: {}", loginRequest.getUsernameOrEmail());
+            throw new AppException(ErrorCode.ACCOUNT_LOCKED);
+        } catch (AuthenticationServiceException e) {
+            log.error("Authentication backend error for user {}: {}", loginRequest.getUsernameOrEmail(), e.getMessage(), e);
+            throw new AppException(ErrorCode.LOGIN_FAILED);
+        } catch (AppException e) {
+            throw e;
         } catch (Exception e) {
-            log.warn("Authentication failed for user: {}", loginRequest.getUsernameOrEmail());
+            log.error("Unexpected login error for user {}: {}", loginRequest.getUsernameOrEmail(), e.getMessage(), e);
             throw new AppException(ErrorCode.LOGIN_FAILED);
         }
     }

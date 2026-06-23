@@ -18,8 +18,10 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.LockedException;
+import lombok.extern.slf4j.Slf4j;
 
 @ControllerAdvice
+@Slf4j
 public class GlobalExceptionHandler {
     //Xử lý ngoại lệ Custom
     @ExceptionHandler(AppException.class)
@@ -103,6 +105,8 @@ public class GlobalExceptionHandler {
         if (path.contains("/api-docs") || path.contains("/swagger-ui")) {
             throw ex;
         }
+
+        log.error("Unhandled IAM exception at {}: {}", path, ex.getMessage(), ex);
 
         ApiResponseDto<String> response = new ApiResponseDto<>(
                 ErrorCode.INTERNAL_SERVER_ERROR.getHttpStatus().name(),
