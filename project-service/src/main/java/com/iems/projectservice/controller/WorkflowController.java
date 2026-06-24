@@ -5,6 +5,8 @@ import com.iems.projectservice.dto.request.BatchWorkflowStatusSyncRequest;
 import com.iems.projectservice.dto.request.CreateWorkflowDto;
 import com.iems.projectservice.dto.request.CreateWorkflowStatusDto;
 import com.iems.projectservice.dto.request.CreateWorkflowTransitionDto;
+import com.iems.projectservice.dto.request.UpdateWorkflowDto;
+import com.iems.projectservice.dto.request.UpdateWorkflowStatusDto;
 import com.iems.projectservice.dto.response.ApiResponseDto;
 import com.iems.projectservice.entity.Workflow;
 import com.iems.projectservice.entity.WorkflowStatus;
@@ -54,7 +56,7 @@ public class WorkflowController {
     public ResponseEntity<ApiResponseDto<Workflow>> updateWorkflow(
             @PathVariable UUID projectId,
             @PathVariable UUID workflowId,
-            @Valid @RequestBody CreateWorkflowDto dto) throws AppException {
+            @RequestBody UpdateWorkflowDto dto) throws AppException {
         UUID userId = projectService.getUserIdFromRequest();
         Workflow wf = workflowService.updateWorkflow(workflowId, dto, userId);
         return ResponseEntity.ok(new ApiResponseDto<>("success", "Workflow updated successfully", wf));
@@ -110,7 +112,7 @@ public class WorkflowController {
             @PathVariable UUID projectId,
             @PathVariable UUID workflowId,
             @PathVariable UUID statusId,
-            @Valid @RequestBody CreateWorkflowStatusDto dto) throws AppException {
+            @RequestBody UpdateWorkflowStatusDto dto) throws AppException {
         UUID userId = projectService.getUserIdFromRequest();
         WorkflowStatus status = workflowService.updateStatus(statusId, dto, userId);
         return ResponseEntity.ok(new ApiResponseDto<>("success", "Status updated successfully", status));

@@ -3,6 +3,8 @@ package com.iems.projectservice.service;
 import com.iems.projectservice.dto.request.CreateWorkflowDto;
 import com.iems.projectservice.dto.request.CreateWorkflowStatusDto;
 import com.iems.projectservice.dto.request.CreateWorkflowTransitionDto;
+import com.iems.projectservice.dto.request.UpdateWorkflowDto;
+import com.iems.projectservice.dto.request.UpdateWorkflowStatusDto;
 import com.iems.projectservice.dto.request.WorkflowStatusSyncItemDto;
 import com.iems.projectservice.entity.Workflow;
 import com.iems.projectservice.entity.WorkflowStatus;
@@ -52,7 +54,7 @@ public class WorkflowService {
         return saved;
     }
 
-    public Workflow updateWorkflow(UUID workflowId, CreateWorkflowDto dto, UUID userId) {
+    public Workflow updateWorkflow(UUID workflowId, UpdateWorkflowDto dto, UUID userId) {
         Workflow wf = workflowRepository.findById(workflowId)
                 .orElseThrow(() -> new AppException(ProjectErrorCode.WORKFLOW_NOT_FOUND));
         String ownerSub = projectRepository.findById(wf.getProjectId())
@@ -127,7 +129,7 @@ public class WorkflowService {
         return saved;
     }
 
-    public WorkflowStatus updateStatus(UUID statusId, CreateWorkflowStatusDto dto, UUID userId) {
+    public WorkflowStatus updateStatus(UUID statusId, UpdateWorkflowStatusDto dto, UUID userId) {
         WorkflowStatus status = workflowStatusRepository.findById(statusId)
                 .orElseThrow(() -> new AppException(ProjectErrorCode.WORKFLOW_STATUS_NOT_FOUND));
         Workflow wf = workflowRepository.findById(status.getWorkflowId())
