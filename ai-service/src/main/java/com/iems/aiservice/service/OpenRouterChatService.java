@@ -3,6 +3,7 @@ package com.iems.aiservice.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.iems.aiservice.config.AiProperties;
+import com.iems.aiservice.service.agent.AgentMarkdownNormalizer;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.ResourceLoader;
@@ -43,7 +44,7 @@ public class OpenRouterChatService {
             String documentContext,
             String conversationContext) {
         if (isSimpleGreeting(question, documentContext)) {
-            return "Xin chào! Mình là Project Copilot của IEMS. Bạn muốn mình tóm tắt dự án, lập kế hoạch hôm nay hay phân tích rủi ro?";
+            return "Xin chÃ o! MÃ¬nh lÃ  Project Copilot cá»§a IEMS. Báº¡n muá»‘n mÃ¬nh tÃ³m táº¯t dá»± Ã¡n, láº­p káº¿ hoáº¡ch hÃ´m nay hay phÃ¢n tÃ­ch rá»§i ro?";
         }
         ensureApiKeyConfigured();
 
@@ -86,7 +87,7 @@ public class OpenRouterChatService {
             String conversationContext,
             Consumer<String> onChunk) {
         if (isSimpleGreeting(question, documentContext)) {
-            onChunk.accept("Xin chào! Mình là Project Copilot của IEMS. Bạn muốn mình tóm tắt dự án, lập kế hoạch hôm nay hay phân tích rủi ro?");
+            onChunk.accept("Xin chÃ o! MÃ¬nh lÃ  Project Copilot cá»§a IEMS. Báº¡n muá»‘n mÃ¬nh tÃ³m táº¯t dá»± Ã¡n, láº­p káº¿ hoáº¡ch hÃ´m nay hay phÃ¢n tÃ­ch rá»§i ro?");
             return;
         }
         ensureApiKeyConfigured();
@@ -145,16 +146,16 @@ public class OpenRouterChatService {
 
         String mimeType = contentType == null || contentType.isBlank() ? "image/png" : contentType;
         String dataUrl = "data:" + mimeType + ";base64," + Base64.getEncoder().encodeToString(imageBytes);
-        String prompt = "Hay doc va mo ta noi dung anh nay bang tieng Viet. "
-                + "Neu anh co chu, bang bieu, giao dien, loi, so lieu hoac thong tin quan trong, hay trich xuat ro. "
-                + "Ten file: " + (fileName == null ? "image" : fileName);
+        String prompt = "HÃ£y Ä‘á»c vÃ  mÃ´ táº£ ná»™i dung áº£nh nÃ y báº±ng tiáº¿ng Viá»‡t. "
+                + "Náº¿u áº£nh cÃ³ chá»¯, báº£ng biá»ƒu, giao diá»‡n, lá»—i, sá»‘ liá»‡u hoáº·c thÃ´ng tin quan trá»ng, hÃ£y trÃ­ch xuáº¥t rÃµ. "
+                + "TÃªn file: " + (fileName == null ? "image" : fileName);
 
         Map<String, Object> payload = Map.of(
                 "model", aiProperties.getVisionModel(),
                 "stream", false,
                 "messages", List.of(
                         Map.of("role", "system", "content",
-                                "Ban la tro ly doc hinh anh va trich xuat thong tin de dung cho RAG."),
+                                "Báº¡n lÃ  trá»£ lÃ½ Ä‘á»c hÃ¬nh áº£nh vÃ  trÃ­ch xuáº¥t thÃ´ng tin Ä‘á»ƒ dÃ¹ng cho RAG."),
                         Map.of("role", "user", "content", List.of(
                                 Map.of("type", "text", "text", prompt),
                                 Map.of("type", "image_url", "image_url", Map.of("url", dataUrl))))),
@@ -200,11 +201,11 @@ public class OpenRouterChatService {
                 "stream", false,
                 "messages", List.of(
                         Map.of("role", "system", "content",
-                                "Ban chuyen cau tra loi sang tieng Viet tu nhien, dung Markdown, giu dung noi dung va cite neu co."),
+                                "Báº¡n chuyá»ƒn cÃ¢u tráº£ lá»i sang tiáº¿ng Viá»‡t tá»± nhiÃªn, dÃ¹ng Markdown, giá»¯ Ä‘Ãºng ná»™i dung vÃ  citation náº¿u cÃ³."),
                         Map.of("role", "user", "content",
-                                "Ngu canh yeu cau ban dau:\n" + originalPrompt
-                                        + "\n\nCau tra loi can sua:\n" + answer
-                                        + "\n\nHay viet lai bang tieng Viet, Markdown de doc, khong them thong tin khong co.")),
+                                "Ngá»¯ cáº£nh yÃªu cáº§u ban Ä‘áº§u:\n" + originalPrompt
+                                        + "\n\nCÃ¢u tráº£ lá»i cáº§n sá»­a:\n" + answer
+                                        + "\n\nHÃ£y viáº¿t láº¡i báº±ng tiáº¿ng Viá»‡t, Markdown dá»… Ä‘á»c, khÃ´ng thÃªm thÃ´ng tin khÃ´ng cÃ³.")),
                 "temperature", 0.1);
 
         Map<?, ?> response = openRouterRestClient.post()
@@ -226,23 +227,11 @@ public class OpenRouterChatService {
             return false;
         }
         String normalized = question.toLowerCase().trim();
-        return normalized.matches("^(hi|hello|hey|xin chao|xin chào|chao|chào|alo|yo)[!.\\s]*$");
+        return normalized.matches("^(hi|hello|hey|xin chao|xin chÃ o|chao|chÃ o|alo|yo)[!.\\s]*$");
     }
 
     private String normalizeMarkdown(String text) {
-        if (text == null || text.isBlank()) {
-            return text;
-        }
-        return text
-                .replaceAll("(?<!\\n)(#{2,6}\\s+)", "\n\n$1")
-                .replaceAll("(?<!\\n)(-\\s+)", "\n- ")
-                .replaceAll("(?i)Tom tat ngan", "Tóm tắt ngắn")
-                .replaceAll("(?i)Giai thich chi tiet", "Giải thích chi tiết")
-                .replaceAll("(?i)Giai thiet chi tiet", "Giải thích chi tiết")
-                .replaceAll("(?i)Vi du de hieu", "Ví dụ dễ hiểu")
-                .replaceAll("(?i)Ket luan", "Kết luận")
-                .replaceAll("\\n{3,}", "\n\n")
-                .trim();
+        return AgentMarkdownNormalizer.normalize(text);
     }
 
     private boolean looksMostlyEnglish(String text) {
@@ -254,8 +243,8 @@ public class OpenRouterChatService {
                 "the ", "and ", "to ", "of ", "with ", "this ", "that ", "document ", "workflow ",
                 "approach ", "ensure ", "guidelines ", "based on ");
         int vietnameseHits = countContains(lower,
-                " va ", " la ", " cua ", " trong ", " nguoi ", " tai lieu ", " du an ", " can ", " khong ",
-                " file ", " giai thich ");
+                " vÃ  ", " lÃ  ", " cá»§a ", " trong ", " ngÆ°á»i ", " tÃ i liá»‡u ", " dá»± Ã¡n ", " cáº§n ", " khÃ´ng ",
+                " file ", " giáº£i thÃ­ch ");
         return englishHits >= 3 && englishHits > vietnameseHits;
     }
 
@@ -287,31 +276,21 @@ public class OpenRouterChatService {
         prompt.append("User question: ").append(question)
                 .append("\n\nSelected document scope IDs: ").append(scopeIds)
                 .append("\n\nInstruction:")
-                .append("\n- BAT BUOC tra loi bang tieng Viet. Khong dung tieng Anh tru khi nguoi dung yeu cau.")
-                .append("\n- Dinh dang cau tra loi bang Markdown de de doc.")
-                .append("\n- Khong viet lien mot doan dai. Hay dung heading ngan, bullet points, va danh sach so neu phu hop.")
-                .append("\n- Neu nguoi dung yeu cau 'dai ra', 'cu the hon', 'giai thich them', hay tra loi dai hon cau truoc it nhat 2-3 lan.")
-                .append("\n- Neu co Document context, hay uu tien noi dung tai lieu va KHONG tra loi chung chung.")
-                .append("\n- Neu cau hoi la follow-up ngan nhu 'cu the hon', 'noi dai ra', 'giai thich them', hay tiep tuc giai thich chu de dang noi trong Recent conversation memory.")
-                .append("\n- Neu nguoi dung hoi 'file nay co gi', hay tom tat chi tiet theo cac muc: tong quan, cac y chinh, quy trinh/khai niem quan trong, vi du de hieu.")
-                .append("\n- Neu tai lieu co it thong tin, noi ro phan nao suy luan tu ngu canh va phan nao lay tu tai lieu.")
-                .append("\n- Khi dung noi dung tai lieu, cite marker dung dang [fileName #chunkIndex], vi du [git.docx #2].")
-                .append("\n- Neu cau hoi mo ho nhung da co tai lieu/memory, tu chon cach giai thich huu ich nhat thay vi hoi lai ngay.")
-                .append("\n- Neu chi la cau chao/cau xa giao, tra loi ngan gon trong 1-2 cau, khong tao cac muc giai thich.");
+                .append("\n- Báº¯t buá»™c tráº£ lá»i báº±ng tiáº¿ng Viá»‡t tá»± nhiÃªn, cÃ³ dáº¥u.")
+                .append("\n- Tráº£ lá»i Ä‘Ãºng cÃ¢u há»i, khÃ´ng Ã©p má»™t template cá»‘ Ä‘á»‹nh cho má»i tÃ¬nh huá»‘ng.")
+                .append("\n- CÃ¢u há»i Ä‘Æ¡n giáº£n thÃ¬ tráº£ lá»i ngáº¯n; cÃ¢u há»i phÃ¢n tÃ­ch hoáº·c yÃªu cáº§u chi tiáº¿t thÃ¬ dÃ¹ng Markdown rÃµ rÃ ng.")
+                .append("\n- Náº¿u ngÆ°á»i dÃ¹ng yÃªu cáº§u má»Ÿ rá»™ng nhÆ° 'dÃ i ra', 'cá»¥ thá»ƒ hÆ¡n', 'giáº£i thÃ­ch thÃªm', hÃ£y má»Ÿ rá»™ng dá»±a trÃªn cÃ¢u tráº£ lá»i trÆ°á»›c trong Recent conversation memory.")
+                .append("\n- Náº¿u cÃ³ Document context, hÃ£y Æ°u tiÃªn ná»™i dung tÃ i liá»‡u vÃ  khÃ´ng tráº£ lá»i chung chung.")
+                .append("\n- Náº¿u tÃ i liá»‡u cÃ³ Ã­t thÃ´ng tin, nÃ³i rÃµ pháº§n nÃ o láº¥y tá»« tÃ i liá»‡u vÃ  pháº§n nÃ o lÃ  suy luáº­n.")
+                .append("\n- Khi dÃ¹ng ná»™i dung tÃ i liá»‡u, cite marker Ä‘Ãºng dáº¡ng [fileName #chunkIndex] náº¿u context cÃ³ marker.")
+                .append("\n- Náº¿u cÃ¢u há»i mÆ¡ há»“ nhÆ°ng Ä‘Ã£ cÃ³ tÃ i liá»‡u/memory, tá»± chá»n cÃ¡ch giáº£i thÃ­ch há»¯u Ã­ch nháº¥t thay vÃ¬ há»i láº¡i ngay.")
+                .append("\n- Náº¿u chá»‰ lÃ  cÃ¢u chÃ o/cÃ¢u xÃ£ giao, tráº£ lá»i ngáº¯n trong 1-2 cÃ¢u.");
 
         if (documentContext != null && !documentContext.isBlank()) {
-            prompt.append("\n\nOutput format khi tra loi ve tai lieu:")
-                    .append("\n- Moi heading phai bat dau bang '## ' va phai co dong trong truoc/sau heading.")
-                    .append("\n- Moi bullet phai bat dau bang '- ' tren dong rieng.")
-                    .append("\n- Code lenh Git phai nam trong fenced code block ```bash.")
-                    .append("\n\n## Tóm tắt ngắn\n")
-                    .append("\n- 2-4 ý ngắn gọn.\n")
-                    .append("\n## Giải thích chi tiết\n")
-                    .append("\n- Giải thích từng ý theo ngôn ngữ dễ hiểu.\n")
-                    .append("\n## Ví dụ dễ hiểu\n")
-                    .append("\n- Nếu phù hợp, đưa ví dụ gần với dự án/lập trình.\n")
-                    .append("\n## Kết luận\n")
-                    .append("\n- 1-2 câu chốt lại.\n");
+            prompt.append("\n\nDocument answer guidance:")
+                    .append("\n- DÃ¹ng heading ngáº¯n khi cáº§n, khÃ´ng báº¯t buá»™c Ä‘á»§ bá»‘n má»¥c náº¿u cÃ¢u há»i khÃ´ng cáº§n.")
+                    .append("\n- Vá»›i cÃ¢u há»i 'file nÃ y cÃ³ gÃ¬', nÃªn gá»“m: tá»•ng quan, Ã½ chÃ­nh, Ä‘iá»ƒm quan trá»ng, vÃ­ dá»¥ náº¿u phÃ¹ há»£p.")
+                    .append("\n- Code hoáº·c lá»‡nh nÃªn Ä‘áº·t trong fenced code block.");
         }
 
         if (documentContext != null && !documentContext.isBlank()) {

@@ -232,7 +232,11 @@ public class AiChatController {
                     return;
                 }
 
-                AgentDecision decision = agentIntentRouterService.route(request.question());
+                AgentDecision decision = agentIntentRouterService.route(
+                        request.question(),
+                        request.projectId(),
+                        request.selectedDocumentIds(),
+                        conversationContext);
                 if (decision.intent() == AgentIntent.ISSUE_QUERY
                         || decision.intent() == AgentIntent.ISSUE_ACTION
                         || decision.intent() == AgentIntent.ISSUE_ANALYSIS
@@ -243,7 +247,9 @@ public class AiChatController {
                         || decision.intent() == AgentIntent.ISSUE_SEARCH
                         || decision.intent() == AgentIntent.ISSUE_UPDATE
                         || decision.intent() == AgentIntent.MEMBER_WORKLOAD
-                        || decision.intent() == AgentIntent.DEADLINE_CHECK) {
+                        || decision.intent() == AgentIntent.DEADLINE_CHECK
+                        || decision.intent() == AgentIntent.CONTEXTUAL_PROJECT_CHAT
+                        || decision.intent() == AgentIntent.DOCUMENT_QA) {
                     AgentChatRequest agentRequest = new AgentChatRequest(
                             request.question(),
                             conversationId,
@@ -268,7 +274,10 @@ public class AiChatController {
                     emitter.send(SseEmitter.event().data(Map.of(
                             "type", "end",
                             "conversationId", conversationId,
-                            "sources", documentContextResult.sources())));
+                            "intent", agentResponse.intent(),
+                            "confidence", agentResponse.confidence(),
+                            "sources", agentResponse.sources(),
+                            "proposedActions", agentResponse.proposedActions())));
                     emitter.complete();
                     return;
                 }
@@ -299,7 +308,7 @@ public class AiChatController {
                 try {
                     emitter.send(SseEmitter.event().data(Map.of(
                             "type", "error",
-                            "error", "MÃ¬nh chÆ°a thá»ƒ láº¥y dá»¯ liá»‡u dá»± Ã¡n lÃºc nÃ y. Báº¡n thá»­ láº¡i sau vÃ i giÃ¢y nhÃ©.")));
+                            "error", "Mình chưa thể lấy dữ liệu dự án lúc này. Bạn thử lại sau vài giây nhé.")));
                 } catch (Exception ignored) {
                 }
                 emitter.completeWithError(e);

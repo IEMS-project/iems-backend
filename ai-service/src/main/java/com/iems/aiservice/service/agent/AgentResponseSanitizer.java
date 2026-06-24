@@ -17,25 +17,26 @@ public class AgentResponseSanitizer {
 
     public String sanitize(String answer) {
         if (answer == null || answer.isBlank()) {
-            return "Mình chưa có đủ dữ liệu để trả lời. Bạn thử lại sau vài giây nhé.";
+            return "M\u00ecnh ch\u01b0a c\u00f3 \u0111\u1ee7 d\u1eef li\u1ec7u \u0111\u1ec3 tr\u1ea3 l\u1eddi. B\u1ea1n th\u1eed l\u1ea1i sau v\u00e0i gi\u00e2y nh\u00e9.";
         }
 
         String sanitized = answer;
         sanitized = JSON_BLOCK_PATTERN.matcher(sanitized).replaceAll("");
         sanitized = TECHNICAL_FIELD_LINE_PATTERN.matcher(sanitized).replaceAll("");
         sanitized = INLINE_TECHNICAL_FIELD_PATTERN.matcher(sanitized).replaceAll("");
-        sanitized = UUID_PATTERN.matcher(sanitized).replaceAll("[đã ẩn]");
+        sanitized = UUID_PATTERN.matcher(sanitized).replaceAll("[\u0111\u00e3 \u1ea9n]");
         sanitized = sanitized
-                .replace("unknown", "Chưa phân loại")
-                .replace("Unknown", "Chưa phân loại")
-                .replace("null", "Chưa có dữ liệu")
-                .replace("undefined", "Chưa có dữ liệu")
+                .replace("unknown", "Ch\u01b0a ph\u00e2n lo\u1ea1i")
+                .replace("Unknown", "Ch\u01b0a ph\u00e2n lo\u1ea1i")
+                .replace("null", "Ch\u01b0a c\u00f3 d\u1eef li\u1ec7u")
+                .replace("undefined", "Ch\u01b0a c\u00f3 d\u1eef li\u1ec7u")
                 .replaceAll("(?m)^User\\s+.*?->\\s*ISSUE_UPDATE\\s*", "")
                 .replaceAll("\\n{3,}", "\n\n")
                 .trim();
+        sanitized = AgentMarkdownNormalizer.normalize(sanitized);
 
         return sanitized.isBlank()
-                ? "Mình đã xử lý xong, nhưng không có nội dung phù hợp để hiển thị."
+                ? "M\u00ecnh \u0111\u00e3 x\u1eed l\u00fd xong, nh\u01b0ng kh\u00f4ng c\u00f3 n\u1ed9i dung ph\u00f9 h\u1ee3p \u0111\u1ec3 hi\u1ec3n th\u1ecb."
                 : sanitized;
     }
 }

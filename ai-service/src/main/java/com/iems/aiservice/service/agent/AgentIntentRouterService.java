@@ -5,6 +5,7 @@ import com.iems.aiservice.model.agent.AgentIntent;
 import org.springframework.stereotype.Service;
 
 import java.text.Normalizer;
+import java.util.List;
 import java.util.Set;
 import java.util.regex.Pattern;
 
@@ -39,17 +40,42 @@ public class AgentIntentRouterService {
 
     private static final Set<String> ISSUE_QUERY_TERMS = Set.of(
             "issue", "task", "cong viec", "my issues", "danh sach", "status", "assignee", "reporter",
-            "hom nay", "quan trong", "uu tien", "important", "today", "viec nao", "can lam gi");
+            "quan trong", "uu tien", "important");
+
+    private static final Set<String> FOLLOW_UP_TERMS = Set.of(
+            "noi ro hon", "noi ro", "cu the hon", "giai thich them", "phan tich tiep", "tiep di",
+            "vay sao", "tai sao", "cai nao", "uu tien cai nao", "lam gi tiep", "next", "more",
+            "explain more", "what next");
 
     public AgentDecision route(String question) {
+        return route(question, null, null, null);
+    }
+
+    public AgentDecision route(String question,
+            String projectId,
+            List<String> selectedDocumentIds,
+            String conversationContext) {
         if (question == null || question.isBlank()) {
             return new AgentDecision(AgentIntent.GENERAL_CHAT, 0.5, "empty_question");
         }
 
         String normalized = normalize(question);
+        boolean hasProjectContext = projectId != null && !projectId.isBlank();
+        boolean hasSelectedDocuments = selectedDocumentIds != null && !selectedDocumentIds.isEmpty();
+        boolean hasMemory = conversationContext != null && !conversationContext.isBlank();
 
         if (isExplicitIssueUpdate(question, normalized)) {
             return new AgentDecision(AgentIntent.ISSUE_UPDATE, 0.88, "matched_issue_action_terms");
+        }
+
+        if (hasSelectedDocuments) {
+            return new AgentDecision(AgentIntent.DOCUMENT_QA, 0.88, "selected_document_context");
+        }
+
+        if (hasMemory && containsAnyFuzzy(normalized, FOLLOW_UP_TERMS)) {
+            return new AgentDecision(hasProjectContext ? AgentIntent.CONTEXTUAL_PROJECT_CHAT : AgentIntent.GENERAL_CHAT,
+                    0.82,
+                    "follow_up_with_memory");
         }
 
         if (containsAnyFuzzy(normalized, REPORT_TERMS)) {
@@ -90,7 +116,18 @@ public class AgentIntentRouterService {
             return new AgentDecision(AgentIntent.ISSUE_SEARCH, 0.75, "matched_issue_query_terms");
         }
 
+        if (hasProjectContext && looksProjectRelated(normalized)) {
+            return new AgentDecision(AgentIntent.CONTEXTUAL_PROJECT_CHAT, 0.74, "project_context_available");
+        }
+
         return new AgentDecision(AgentIntent.GENERAL_CHAT, 0.68, "fallback_general_chat");
+    }
+
+    private static boolean looksProjectRelated(String normalized) {
+        return containsAnyFuzzy(normalized, Set.of(
+                "du an", "project", "sprint", "backlog", "team", "member", "cong viec", "tien do",
+                "ke hoach", "hom nay", "ngay mai", "can lam", "nen lam", "dang sao", "on khong",
+                "review", "bao cao", "tong quan"));
     }
 
     private static boolean isExplicitIssueUpdate(String original, String normalized) {

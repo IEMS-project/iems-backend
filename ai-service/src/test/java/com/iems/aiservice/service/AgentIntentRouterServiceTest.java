@@ -4,6 +4,8 @@ import com.iems.aiservice.model.agent.AgentIntent;
 import com.iems.aiservice.service.agent.AgentIntentRouterService;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class AgentIntentRouterServiceTest {
@@ -25,6 +27,16 @@ class AgentIntentRouterServiceTest {
         assertEquals(AgentIntent.DAILY_PLAN, service.route("lập kế hoạch hôm nay với 5 việc ưu tiên").intent());
         assertEquals(AgentIntent.MEMBER_WORKLOAD, service.route("Ai đang quá tải?").intent());
         assertEquals(AgentIntent.ISSUE_SEARCH, service.route("danh sách issue hôm nay").intent());
+    }
+
+    @Test
+    void routeShouldUseContextForFollowUpsAndProjectQuestions() {
+        assertEquals(AgentIntent.CONTEXTUAL_PROJECT_CHAT,
+                service.route("nói rõ hơn", "project-1", List.of(), "Assistant: Dự án có rủi ro deadline.").intent());
+        assertEquals(AgentIntent.CONTEXTUAL_PROJECT_CHAT,
+                service.route("hôm nay nên làm gì?", "project-1", List.of(), "").intent());
+        assertEquals(AgentIntent.DOCUMENT_QA,
+                service.route("file này có gì?", "project-1", List.of("doc-1"), "").intent());
     }
 
     @Test
