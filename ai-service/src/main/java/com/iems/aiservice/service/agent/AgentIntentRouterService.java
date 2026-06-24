@@ -24,7 +24,8 @@ public class AgentIntentRouterService {
             "tom tat tien do", "dem so issue", "thong ke", "thong ke theo status", "thong ke theo priority",
             "phan tich rui ro", "lap ke hoach hom nay", "de xuat viec can lam", "bao nhieu issue",
             "tinh trang du an", "tom tat tinh trang", "suc khoe du an", "bao cao", "report", "summary",
-            "count issue", "status va priority", "ai dang qua tai", "qua tai", "deadline", "han chot");
+            "count issue", "status va priority", "ai dang qua tai", "qua tai", "deadline", "han chot",
+            "hom nay can lam gi", "can lam gi hom nay", "viec cua toi hom nay", "uu tien hom nay");
 
     private static final Set<String> ISSUE_ANALYSIS_TERMS = Set.of(
             "phan tich", "root cause", "nguyen nhan", "rui ro", "risk", "duplicate", "trung lap", "blocker",
@@ -78,8 +79,18 @@ public class AgentIntentRouterService {
                     "follow_up_with_memory");
         }
 
+        if (isMyIssueListQuestion(normalized)) {
+            return new AgentDecision(AgentIntent.ISSUE_SEARCH, 0.86, "matched_my_issue_terms");
+        }
+
+        if (isDirectSprintQuestion(normalized)) {
+            return new AgentDecision(AgentIntent.SPRINT_REPORT, 0.86, "matched_sprint_terms");
+        }
+
         if (containsAnyFuzzy(normalized, REPORT_TERMS)) {
-            if (containsAnyFuzzy(normalized, Set.of("lap ke hoach hom nay", "ke hoach hom nay", "5 viec uu tien", "top 5"))) {
+            if (containsAnyFuzzy(normalized, Set.of("lap ke hoach hom nay", "ke hoach hom nay", "5 viec uu tien",
+                    "top 5", "hom nay can lam gi", "can lam gi hom nay", "viec cua toi hom nay",
+                    "uu tien hom nay"))) {
                 return new AgentDecision(AgentIntent.DAILY_PLAN, 0.92, "matched_daily_plan_terms");
             }
             if (containsAnyFuzzy(normalized, Set.of("rui ro", "risk", "blocker"))) {
@@ -109,9 +120,6 @@ public class AgentIntentRouterService {
             }
             return new AgentDecision(AgentIntent.PROJECT_SUMMARY, 0.82, "matched_issue_analysis_terms");
         }
-        if (containsAnyFuzzy(normalized, SPRINT_TERMS)) {
-            return new AgentDecision(AgentIntent.SPRINT_REPORT, 0.8, "matched_sprint_terms");
-        }
         if (containsAnyFuzzy(normalized, ISSUE_QUERY_TERMS)) {
             return new AgentDecision(AgentIntent.ISSUE_SEARCH, 0.75, "matched_issue_query_terms");
         }
@@ -128,6 +136,26 @@ public class AgentIntentRouterService {
                 "du an", "project", "sprint", "backlog", "team", "member", "cong viec", "tien do",
                 "ke hoach", "hom nay", "ngay mai", "can lam", "nen lam", "dang sao", "on khong",
                 "review", "bao cao", "tong quan"));
+    }
+
+    private static boolean isMyIssueListQuestion(String normalized) {
+        boolean mentionsWork = normalized.contains("task") || normalized.contains("issue")
+                || normalized.contains("cong viec") || normalized.contains("viec");
+        boolean mentionsMe = normalized.contains("cua toi") || normalized.contains("cua minh")
+                || normalized.contains("my") || normalized.contains("toi") || normalized.contains("minh");
+        boolean asksTodayPlan = normalized.contains("hom nay");
+        return mentionsWork && mentionsMe && !asksTodayPlan;
+    }
+
+    private static boolean isDirectSprintQuestion(String normalized) {
+        if (normalized.contains("rui ro") || normalized.contains("risk") || normalized.contains("blocker")) {
+            return false;
+        }
+        return normalized.contains("sprint")
+                || normalized.contains("burndown")
+                || normalized.contains("velocity")
+                || normalized.contains("worklog")
+                || normalized.contains("backlog");
     }
 
     private static boolean isExplicitIssueUpdate(String original, String normalized) {

@@ -21,17 +21,20 @@ public class AgentOrchestratorService {
 
     private final AgentIntentRouterService intentRouterService;
     private final OpenRouterChatService openRouterChatService;
+    private final ProjectAgentFactsService projectAgentFactsService;
     private final ProjectIssueToolService projectIssueToolService;
     private final AgentResponseSanitizer responseSanitizer;
     private final ObjectMapper objectMapper;
 
     public AgentOrchestratorService(AgentIntentRouterService intentRouterService,
             OpenRouterChatService openRouterChatService,
+            ProjectAgentFactsService projectAgentFactsService,
             ProjectIssueToolService projectIssueToolService,
             AgentResponseSanitizer responseSanitizer,
             ObjectMapper objectMapper) {
         this.intentRouterService = intentRouterService;
         this.openRouterChatService = openRouterChatService;
+        this.projectAgentFactsService = projectAgentFactsService;
         this.projectIssueToolService = projectIssueToolService;
         this.responseSanitizer = responseSanitizer;
         this.objectMapper = objectMapper;
@@ -116,7 +119,7 @@ public class AgentOrchestratorService {
             AgentDecision decision,
             String documentContext,
             String conversationContext) {
-        Map<String, Object> projectFacts = resolveProjectFacts(request, authorization, decision);
+        Map<String, Object> projectFacts = projectAgentFactsService.resolveFacts(request, authorization, decision.intent());
 
         StringBuilder prompt = new StringBuilder();
         prompt.append("Bạn là Project Copilot của IEMS, trả lời như một teammate PM/dev đang hỗ trợ thật.\n")

@@ -30,6 +30,15 @@ class AgentIntentRouterServiceTest {
     }
 
     @Test
+    void routeShouldDetectNaturalVietnameseProjectQuestions() {
+        assertEquals(AgentIntent.DAILY_PLAN, service.route("hom nay toi can lam gi").intent());
+        assertEquals(AgentIntent.DAILY_PLAN, service.route("viec cua toi hom nay").intent());
+        assertEquals(AgentIntent.ISSUE_SEARCH, service.route("task cua toi").intent());
+        assertEquals(AgentIntent.SPRINT_REPORT, service.route("sprint nay the nao").intent());
+        assertEquals(AgentIntent.ISSUE_UPDATE, service.route("chuyen IEMS-1 sang Done").intent());
+    }
+
+    @Test
     void routeShouldUseContextForFollowUpsAndProjectQuestions() {
         assertEquals(AgentIntent.CONTEXTUAL_PROJECT_CHAT,
                 service.route("nói rõ hơn", "project-1", List.of(), "Assistant: Dự án có rủi ro deadline.").intent());

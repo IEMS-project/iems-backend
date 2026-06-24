@@ -1,6 +1,7 @@
 package com.iems.aiservice.service.agent;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
@@ -40,12 +41,17 @@ public class ProjectIssueToolService {
     }
 
     private final RestClient restClient;
+    private final ProjectApiClient projectApiClient;
 
+    @Autowired
     public ProjectIssueToolService(
             @Value("${ai.agent.project-base-url:http://localhost:8080/project-service}") String baseUrl) {
-        this.restClient = RestClient.builder()
-                .baseUrl(baseUrl)
-                .build();
+        this(RestClient.builder().baseUrl(baseUrl).build(), new ProjectApiClient(baseUrl));
+    }
+
+    ProjectIssueToolService(RestClient restClient, ProjectApiClient projectApiClient) {
+        this.restClient = restClient;
+        this.projectApiClient = projectApiClient;
     }
 
     public String handleIssueQuery(String question, String projectId, String authorization) {
@@ -357,6 +363,12 @@ public class ProjectIssueToolService {
                 getWorkflowStatuses(projectId, authorization), LocalDate.now());
     }
 
+    public List<Map<String, Object>> getMyProjectIssues(String projectId, String authorization) {
+        List<Map<String, Object>> issues = getScopedIssues(projectId, authorization, true);
+        return normalizeIssuesForPrompt(issues, getIssuePriorities(projectId, authorization),
+                getWorkflowStatuses(projectId, authorization), LocalDate.now());
+    }
+
     public Map<String, Object> getSprintStatus(String projectId, String authorization) {
         return getProjectOverview(projectId, authorization);
     }
@@ -615,14 +627,13 @@ public class ProjectIssueToolService {
 
     @SuppressWarnings("unchecked")
     private List<Map<String, Object>> getIssues(String projectId, String authorization, boolean myIssues) {
-        String path = myIssues
-                ? "/projects/{projectId}/issues/my-issues"
-                : "/projects/{projectId}/issues";
         List<Map<String, Object>> result = new ArrayList<>();
-        mergeIssues(result, readIssueList(path, projectId, authorization));
+        mergeIssues(result, myIssues
+                ? projectApiClient.listMyIssues(projectId, authorization)
+                : projectApiClient.listProjectIssues(projectId, authorization));
 
         if (!myIssues) {
-            mergeIssues(result, readPagedIssues(projectId, authorization));
+            mergeIssues(result, projectApiClient.listProjectIssuesPaged(projectId, authorization, 200));
         }
 
         return result;
@@ -719,67 +730,37 @@ public class ProjectIssueToolService {
 
     @SuppressWarnings("unchecked")
     private Map<String, String> getIssueTypes(String projectId, String authorization) {
-        Map<String, Object> response = restClient.get()
-                .uri("/projects/{projectId}/issue-types", projectId)
-                .header("Authorization", authorization)
-                .retrieve()
-                .body(Map.class);
-        return mapIdToNameFromDataArray(response);
+        return mapIdToName(projectApiClient.listIssueTypes(projectId, authorization));
     }
 
     @SuppressWarnings("unchecked")
     private Map<String, String> getIssuePriorities(String projectId, String authorization) {
-        Map<String, Object> response = restClient.get()
-                .uri("/projects/{projectId}/issue-priorities", projectId)
-                .header("Authorization", authorization)
-                .retrieve()
-                .body(Map.class);
-        return mapIdToNameFromDataArray(response);
+        return mapIdToName(projectApiClient.listIssuePriorities(projectId, authorization));
     }
 
     @SuppressWarnings("unchecked")
     private Map<String, String> getWorkflowStatuses(String projectId, String authorization) {
-        Map<String, Object> workflowResponse = restClient.get()
-                .uri("/projects/{projectId}/workflows", projectId)
-                .header("Authorization", authorization)
-                .retrieve()
-                .body(Map.class);
-        if (workflowResponse == null) {
-            return Map.of();
-        }
-
-        Object workflowData = workflowResponse.get("data");
-        if (!(workflowData instanceof List<?> workflows) || workflows.isEmpty()) {
+        List<Map<String, Object>> workflows = projectApiClient.listWorkflows(projectId, authorization);
+        if (workflows.isEmpty()) {
             return Map.of();
         }
 
         String workflowId = null;
-        for (Object workflow : workflows) {
-            if (workflow instanceof Map<?, ?> map) {
-                Object isDefault = map.get("isDefault");
-                if (Boolean.TRUE.equals(isDefault)) {
-                    workflowId = stringValue(map.get("id"));
-                    break;
-                }
+        for (Map<String, Object> workflow : workflows) {
+            Object isDefault = workflow.get("isDefault");
+            if (Boolean.TRUE.equals(isDefault)) {
+                workflowId = stringValue(workflow.get("id"));
+                break;
             }
         }
         if (workflowId == null) {
-            Object first = workflows.get(0);
-            if (first instanceof Map<?, ?> firstMap) {
-                workflowId = stringValue(firstMap.get("id"));
-            }
+            workflowId = stringValue(workflows.get(0).get("id"));
         }
         if (workflowId == null || workflowId.isBlank()) {
             return Map.of();
         }
 
-        Map<String, Object> statusResponse = restClient.get()
-                .uri("/projects/{projectId}/workflows/{workflowId}/statuses", projectId, workflowId)
-                .header("Authorization", authorization)
-                .retrieve()
-                .body(Map.class);
-
-        return mapIdToNameFromDataArray(statusResponse);
+        return mapIdToName(projectApiClient.listWorkflowStatuses(projectId, workflowId, authorization));
     }
 
     @SuppressWarnings("unchecked")
@@ -800,6 +781,18 @@ public class ProjectIssueToolService {
                 if (id != null && name != null) {
                     byId.put(id, name);
                 }
+            }
+        }
+        return byId;
+    }
+
+    private Map<String, String> mapIdToName(List<Map<String, Object>> items) {
+        Map<String, String> byId = new LinkedHashMap<>();
+        for (Map<String, Object> item : items) {
+            String id = stringValue(item.get("id"));
+            String name = stringValue(item.get("name"));
+            if (id != null && name != null) {
+                byId.put(id, name);
             }
         }
         return byId;
