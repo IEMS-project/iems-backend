@@ -6,13 +6,19 @@ import com.iems.projectservice.dto.request.AccountIdsDto;
 import com.iems.projectservice.dto.response.ActivityLogResponseDto;
 import com.iems.projectservice.dto.response.UserDetailDto;
 import com.iems.projectservice.entity.ActivityLog;
+import com.iems.projectservice.entity.Project;
 import com.iems.projectservice.repository.ActivityLogRepository;
+import com.iems.projectservice.repository.ProjectRepository;
+import com.iems.projectservice.security.JwtUserDetails;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import com.iems.projectservice.dto.response.PagedResponseDto;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -24,6 +30,7 @@ import java.util.stream.Collectors;
 public class ActivityLogService {
 
     private final ActivityLogRepository activityLogRepository;
+    private final ProjectRepository projectRepository;
     private final UserServiceFeignClient userServiceFeignClient;
     private final ObjectMapper objectMapper;
 
@@ -39,6 +46,17 @@ public class ActivityLogService {
 
     public PagedResponseDto<ActivityLogResponseDto> getProjectActivities(UUID projectId, Pageable pageable) {
         Page<ActivityLog> page = activityLogRepository.findByProjectIdOrderByCreatedAtDesc(projectId, pageable);
+        return toPagedResponse(page);
+    }
+
+    public PagedResponseDto<ActivityLogResponseDto> getMyProjectActivities(Pageable pageable) {
+        UUID accountId = getUserIdFromRequest();
+        List<UUID> projectIds = projectRepository.findIdsByOwnerOrMember(accountId);
+        if (projectIds.isEmpty()) {
+            return toPagedResponse(new PageImpl<>(List.of(), pageable, 0));
+        }
+
+        Page<ActivityLog> page = activityLogRepository.findByProjectIdInOrderByCreatedAtDesc(projectIds, pageable);
         return toPagedResponse(page);
     }
 
@@ -83,12 +101,19 @@ public class ActivityLogService {
         }
 
         final Map<UUID, UserDetailDto> finalUserMap = userMap;
+        Set<UUID> projectIds = logs.stream()
+                .map(ActivityLog::getProjectId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        Map<UUID, String> projectNames = projectRepository.findAllById(projectIds).stream()
+                .collect(Collectors.toMap(Project::getId, Project::getName));
+
         return logs.stream().map(l -> {
             UserDetailDto user = finalUserMap.get(l.getUserId());
             String name = user != null
                     ? (trim(user.getFirstName()) + " " + trim(user.getLastName())).trim()
                     : null;
-            return new ActivityLogResponseDto(
+            ActivityLogResponseDto dto = new ActivityLogResponseDto(
                     l.getId(),
                     l.getProjectId(),
                     l.getIssueId(),
@@ -98,7 +123,15 @@ public class ActivityLogService {
                     l.getAction(),
                     l.getDetails(),
                     l.getCreatedAt());
+            dto.setProjectName(projectNames.get(l.getProjectId()));
+            return dto;
         }).collect(Collectors.toList());
+    }
+
+    private UUID getUserIdFromRequest() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        JwtUserDetails userDetails = (JwtUserDetails) authentication.getPrincipal();
+        return userDetails.getUserId();
     }
 
     private String trim(String s) {

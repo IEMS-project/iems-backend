@@ -32,11 +32,15 @@ public interface ProjectRepository extends JpaRepository<Project, UUID> {
     @Query("SELECT DISTINCT p FROM Project p JOIN ProjectMember pm ON pm.projectId = p.id WHERE pm.accountId = :accountId AND pm.status = com.iems.projectservice.entity.enums.MemberStatus.ACTIVE")
     List<Project> findByMemberAccountId(@Param("accountId") UUID accountId);
 
-        @Query(value = "SELECT DISTINCT p FROM Project p LEFT JOIN ProjectMember pm ON pm.projectId = p.id " +
+    @Query(value = "SELECT DISTINCT p FROM Project p LEFT JOIN ProjectMember pm ON pm.projectId = p.id " +
             "WHERE p.managerAccountId = :accountId OR (pm.accountId = :accountId AND pm.status = com.iems.projectservice.entity.enums.MemberStatus.ACTIVE)",
             countQuery = "SELECT COUNT(DISTINCT p.id) FROM Project p LEFT JOIN ProjectMember pm ON pm.projectId = p.id " +
                 "WHERE p.managerAccountId = :accountId OR (pm.accountId = :accountId AND pm.status = com.iems.projectservice.entity.enums.MemberStatus.ACTIVE)")
         Page<Project> findByOwnerOrMember(@Param("accountId") UUID accountId, Pageable pageable);
+
+    @Query("SELECT DISTINCT p.id FROM Project p LEFT JOIN ProjectMember pm ON pm.projectId = p.id " +
+            "WHERE p.managerAccountId = :accountId OR (pm.accountId = :accountId AND pm.status = com.iems.projectservice.entity.enums.MemberStatus.ACTIVE)")
+    List<UUID> findIdsByOwnerOrMember(@Param("accountId") UUID accountId);
     
     boolean existsByName(String name);
     

@@ -4,6 +4,7 @@ import com.iems.projectservice.annotation.RequireProjectPermission;
 import com.iems.projectservice.dto.request.CreateProjectDto;
 import com.iems.projectservice.dto.request.UpdateProjectAvatarDto;
 import com.iems.projectservice.dto.request.UpdateProjectDto;
+import com.iems.projectservice.dto.response.ActivityLogResponseDto;
 import com.iems.projectservice.dto.response.ApiResponseDto;
 import com.iems.projectservice.dto.response.MyProjectResponseDto;
 import com.iems.projectservice.dto.response.PagedResponseDto;
@@ -11,12 +12,15 @@ import com.iems.projectservice.dto.response.ProjectTableDto;
 import com.iems.projectservice.entity.Project;
 import com.iems.projectservice.entity.enums.ProjectPermission;
 import com.iems.projectservice.exception.AppException;
+import com.iems.projectservice.service.ActivityLogService;
 import com.iems.projectservice.service.ProjectService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -32,6 +36,7 @@ import java.util.UUID;
 public class ProjectController {
 
     private final ProjectService projectService;
+    private final ActivityLogService activityLogService;
 
     @PostMapping
     @Operation(summary = "Create a new project")
@@ -91,6 +96,16 @@ public class ProjectController {
             @RequestParam(defaultValue = "10") int size) throws AppException {
         PagedResponseDto<MyProjectResponseDto> projects = projectService.getMyProjects(page, size);
         return ResponseEntity.ok(new ApiResponseDto<>("success", "User projects retrieved successfully", projects));
+    }
+
+    @GetMapping("/activities/recent")
+    @Operation(summary = "Get recent activity log across my projects")
+    public ResponseEntity<ApiResponseDto<PagedResponseDto<ActivityLogResponseDto>>> getMyRecentActivities(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        PagedResponseDto<ActivityLogResponseDto> result = activityLogService.getMyProjectActivities(
+                PageRequest.of(page, size, Sort.by("createdAt").descending()));
+        return ResponseEntity.ok(new ApiResponseDto<>("success", "Recent activities retrieved successfully", result));
     }
 
 }
