@@ -15,6 +15,8 @@ public interface ActivityLogRepository extends JpaRepository<ActivityLog, UUID> 
 
     Page<ActivityLog> findByProjectIdInOrderByCreatedAtDesc(Collection<UUID> projectIds, Pageable pageable);
 
+    Page<ActivityLog> findByProjectIdInAndUserIdOrderByCreatedAtDesc(Collection<UUID> projectIds, UUID userId, Pageable pageable);
+
     Page<ActivityLog> findByIssueIdOrderByCreatedAtDesc(UUID issueId, Pageable pageable);
 
     void deleteByProjectId(UUID projectId);

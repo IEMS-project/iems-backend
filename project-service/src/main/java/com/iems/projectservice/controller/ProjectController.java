@@ -99,11 +99,11 @@ public class ProjectController {
     }
 
     @GetMapping("/activities/recent")
-    @Operation(summary = "Get recent activity log across my projects")
+    @Operation(summary = "Get my recent activity log")
     public ResponseEntity<ApiResponseDto<PagedResponseDto<ActivityLogResponseDto>>> getMyRecentActivities(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
-        PagedResponseDto<ActivityLogResponseDto> result = activityLogService.getMyProjectActivities(
+        PagedResponseDto<ActivityLogResponseDto> result = activityLogService.getMyRecentActivities(
                 PageRequest.of(page, size, Sort.by("createdAt").descending()));
         return ResponseEntity.ok(new ApiResponseDto<>("success", "Recent activities retrieved successfully", result));
     }

@@ -49,14 +49,15 @@ public class ActivityLogService {
         return toPagedResponse(page);
     }
 
-    public PagedResponseDto<ActivityLogResponseDto> getMyProjectActivities(Pageable pageable) {
+    public PagedResponseDto<ActivityLogResponseDto> getMyRecentActivities(Pageable pageable) {
         UUID accountId = getUserIdFromRequest();
         List<UUID> projectIds = projectRepository.findIdsByOwnerOrMember(accountId);
         if (projectIds.isEmpty()) {
             return toPagedResponse(new PageImpl<>(List.of(), pageable, 0));
         }
 
-        Page<ActivityLog> page = activityLogRepository.findByProjectIdInOrderByCreatedAtDesc(projectIds, pageable);
+        Page<ActivityLog> page = activityLogRepository.findByProjectIdInAndUserIdOrderByCreatedAtDesc(
+                projectIds, accountId, pageable);
         return toPagedResponse(page);
     }
 
