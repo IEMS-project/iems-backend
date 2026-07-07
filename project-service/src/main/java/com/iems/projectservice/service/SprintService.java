@@ -60,6 +60,7 @@ public class SprintService {
     public Sprint updateSprint(UUID sprintId, UpdateSprintDto dto) {
         Sprint sprint = sprintRepository.findById(sprintId)
                 .orElseThrow(() -> new AppException(ProjectErrorCode.SPRINT_NOT_FOUND));
+        ensureSprintNotCompleted(sprint);
         if (dto.getName() != null) sprint.setName(dto.getName());
         if (dto.getGoal() != null) sprint.setGoal(dto.getGoal());
         if (dto.getStartDate() != null) sprint.setStartDate(dto.getStartDate());
@@ -70,6 +71,7 @@ public class SprintService {
     public void deleteSprint(UUID sprintId) {
         Sprint sprint = sprintRepository.findById(sprintId)
                 .orElseThrow(() -> new AppException(ProjectErrorCode.SPRINT_NOT_FOUND));
+        ensureSprintNotCompleted(sprint);
         // Move all issues back to backlog before deleting
         List<Issue> sprintIssues = issueRepository.findBySprintIdOrderBySortOrderAsc(sprintId);
         for (Issue issue : sprintIssues) {
@@ -161,6 +163,7 @@ public class SprintService {
     public Sprint cancelSprint(UUID sprintId, UUID userId) {
         Sprint sprint = sprintRepository.findById(sprintId)
                 .orElseThrow(() -> new AppException(ProjectErrorCode.SPRINT_NOT_FOUND));
+        ensureSprintNotCompleted(sprint);
 
         // Move all issues back to backlog
         List<Issue> sprintIssues = issueRepository.findBySprintIdOrderBySortOrderAsc(sprintId);
@@ -183,5 +186,11 @@ public class SprintService {
 
     public List<Sprint> getSprintsByProject(UUID projectId) {
         return sprintRepository.findByProjectIdOrderBySortOrderAsc(projectId);
+    }
+
+    private void ensureSprintNotCompleted(Sprint sprint) {
+        if (sprint.getStatus() == SprintStatus.COMPLETED) {
+            throw new AppException(ProjectErrorCode.SPRINT_ALREADY_COMPLETED);
+        }
     }
 }

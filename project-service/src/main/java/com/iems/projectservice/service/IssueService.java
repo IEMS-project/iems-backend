@@ -15,6 +15,7 @@ import com.iems.projectservice.dto.response.AttachmentResponseDto;
 import com.iems.projectservice.dto.response.UserDetailDto;
 import com.iems.projectservice.dto.response.UserInfoDto;
 import com.iems.projectservice.entity.*;
+import com.iems.projectservice.entity.enums.SprintStatus;
 import com.iems.projectservice.exception.AppException;
 import com.iems.projectservice.exception.ProjectErrorCode;
 import com.iems.projectservice.repository.*;
@@ -228,6 +229,7 @@ public class IssueService {
         String issueKey = buildIssueKey(project, nextIssueNumber(project));
 
         UUID defaultStatusId = resolveDefaultStatusId(projectId);
+        ensureTargetSprintAcceptsIssues(projectId, dto.getSprintId());
 
         int nextSortOrder = issueRepository.findMaxSortOrderByProjectId(projectId).orElse(0) + 1;
 
@@ -312,6 +314,7 @@ public class IssueService {
     public IssueResponseDto updateIssue(UUID issueId, UpdateIssueDto dto, UUID userId) {
         Issue issue = issueRepository.findById(issueId)
                 .orElseThrow(() -> new AppException(ProjectErrorCode.ISSUE_NOT_FOUND));
+        ensureIssueEditable(issue);
 
         List<String> changedFields = new ArrayList<>();
 
@@ -365,6 +368,7 @@ public class IssueService {
             }
         }
         if (dto.isSprintIdSet() && !Objects.equals(issue.getSprintId(), dto.getSprintId())) {
+            ensureTargetSprintAcceptsIssues(issue.getProjectId(), dto.getSprintId());
             issue.setSprintId(dto.getSprintId());
             changedFields.add("sprint");
         }
@@ -476,6 +480,7 @@ public class IssueService {
     public void deleteIssue(UUID issueId, UUID userId) {
         Issue issue = issueRepository.findById(issueId)
                 .orElseThrow(() -> new AppException(ProjectErrorCode.ISSUE_NOT_FOUND));
+        ensureIssueEditable(issue);
         activityLogService.log(issue.getProjectId(), issueId, userId, "ISSUE_DELETED",
                 "Deleted issue " + issue.getIssueKey() + ": " + issue.getTitle());
         issueRepository.delete(issue);
@@ -526,6 +531,8 @@ public class IssueService {
     public IssueResponseDto addToSprint(UUID issueId, UUID sprintId, UUID userId) {
         Issue issue = issueRepository.findById(issueId)
                 .orElseThrow(() -> new AppException(ProjectErrorCode.ISSUE_NOT_FOUND));
+        ensureIssueEditable(issue);
+        ensureTargetSprintAcceptsIssues(issue.getProjectId(), sprintId);
         issue.setSprintId(sprintId);
         activityLogService.log(issue.getProjectId(), issueId, userId, "ISSUE_MOVED_TO_SPRINT",
                 "Moved issue " + issue.getIssueKey() + " to sprint");
@@ -536,6 +543,7 @@ public class IssueService {
     public IssueResponseDto removeFromSprint(UUID issueId, UUID userId) {
         Issue issue = issueRepository.findById(issueId)
                 .orElseThrow(() -> new AppException(ProjectErrorCode.ISSUE_NOT_FOUND));
+        ensureIssueEditable(issue);
         issue.setSprintId(null);
         activityLogService.log(issue.getProjectId(), issueId, userId, "ISSUE_REMOVED_FROM_SPRINT",
                 "Removed issue " + issue.getIssueKey() + " from sprint");
@@ -557,8 +565,8 @@ public class IssueService {
         Map<String, UUID> priorityByName = priorities.stream()
                 .collect(Collectors.toMap(i -> normalizeKey(i.getName()), IssuePriority::getId, (a, b) -> a));
 
-        Map<String, UUID> sprintByName = sprintRepository.findByProjectIdOrderBySortOrderAsc(projectId).stream()
-                .collect(Collectors.toMap(s -> normalizeKey(s.getName()), Sprint::getId, (a, b) -> a));
+        Map<String, Sprint> sprintByName = sprintRepository.findByProjectIdOrderBySortOrderAsc(projectId).stream()
+                .collect(Collectors.toMap(s -> normalizeKey(s.getName()), s -> s, (a, b) -> a));
 
         Map<String, UUID> assigneeByEmail = resolveAssigneeByEmail(projectId);
 
@@ -583,6 +591,7 @@ public class IssueService {
                 Optional<Issue> existingOpt = issueRepository.findByProjectIdAndIssueKey(projectId, issueKey);
                 if (existingOpt.isPresent()) {
                     Issue existing = existingOpt.get();
+                    ensureIssueEditable(existing);
                     if (applyImportedChanges(existing, row.createDto(), reporterId)) {
                         issueRepository.save(existing);
                         updatedCount++;
@@ -781,7 +790,7 @@ public class IssueService {
             Map<String, UUID> issueTypeByName,
             Map<String, UUID> priorityByName,
             Map<String, UUID> assigneeByEmail,
-            Map<String, UUID> sprintByName) {
+            Map<String, Sprint> sprintByName) {
         try (Workbook workbook = WorkbookFactory.create(file.getInputStream())) {
             Sheet sheet = workbook.getSheetAt(0);
             validateHeader(sheet);
@@ -839,7 +848,7 @@ public class IssueService {
             Map<String, UUID> issueTypeByName,
             Map<String, UUID> priorityByName,
             Map<String, UUID> assigneeByEmail,
-            Map<String, UUID> sprintByName) {
+            Map<String, Sprint> sprintByName) {
         String issueKey = getStringCellValue(row, 0);
         String issueTypeName = getStringCellValue(row, 1);
         String title = getStringCellValue(row, 2);
@@ -885,11 +894,16 @@ public class IssueService {
 
         UUID sprintId = null;
         if (!sprintName.isBlank()) {
-            sprintId = sprintByName.get(normalizeKey(sprintName));
-            if (sprintId == null) {
+            Sprint sprint = sprintByName.get(normalizeKey(sprintName));
+            if (sprint == null) {
                 throw new AppException(ProjectErrorCode.ISSUE_IMPORT_ROW_INVALID,
                         "Row " + rowNumber + ": Sprint not found: '" + sprintName + "'");
             }
+            if (sprint.getStatus() == SprintStatus.COMPLETED) {
+                throw new AppException(ProjectErrorCode.SPRINT_ALREADY_COMPLETED,
+                        "Row " + rowNumber + ": Cannot add issue to completed sprint '" + sprintName + "'");
+            }
+            sprintId = sprint.getId();
         }
 
         Integer storyPoints = null;
@@ -948,6 +962,7 @@ public class IssueService {
             changed = true;
         }
         if (!Objects.equals(issue.getSprintId(), dto.getSprintId())) {
+            ensureTargetSprintAcceptsIssues(issue.getProjectId(), dto.getSprintId());
             issue.setSprintId(dto.getSprintId());
             changed = true;
         }
@@ -964,6 +979,34 @@ public class IssueService {
             issue.setReporterId(userId);
         }
         return changed;
+    }
+
+    private void ensureIssueEditable(Issue issue) {
+        if (issue == null || issue.getSprintId() == null) {
+            return;
+        }
+
+        Sprint sprint = sprintRepository.findById(issue.getSprintId()).orElse(null);
+        if (sprint != null && sprint.getStatus() == SprintStatus.COMPLETED) {
+            throw new AppException(ProjectErrorCode.ISSUE_LOCKED_IN_COMPLETED_SPRINT,
+                    "Issue " + issue.getIssueKey() + " belongs to a completed sprint and cannot be changed");
+        }
+    }
+
+    private void ensureTargetSprintAcceptsIssues(UUID projectId, UUID sprintId) {
+        if (sprintId == null) {
+            return;
+        }
+
+        Sprint sprint = sprintRepository.findById(sprintId)
+                .orElseThrow(() -> new AppException(ProjectErrorCode.SPRINT_NOT_FOUND));
+        if (!Objects.equals(sprint.getProjectId(), projectId)) {
+            throw new AppException(ProjectErrorCode.INVALID_REQUEST, "Sprint belongs to another project");
+        }
+        if (sprint.getStatus() == SprintStatus.COMPLETED) {
+            throw new AppException(ProjectErrorCode.SPRINT_ALREADY_COMPLETED,
+                    "Cannot add or move issues to a completed sprint");
+        }
     }
 
     private String getStringCellValue(Row row, int col) {

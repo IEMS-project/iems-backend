@@ -44,6 +44,8 @@ public enum ProjectErrorCode {
     SPRINT_NOT_FOUND("Sprint not found", HttpStatus.NOT_FOUND),
     SPRINT_ALREADY_ACTIVE("A sprint is already active in this project", HttpStatus.CONFLICT),
     SPRINT_NOT_ACTIVE("Sprint is not active", HttpStatus.BAD_REQUEST),
+    SPRINT_ALREADY_COMPLETED("Sprint is already completed", HttpStatus.CONFLICT),
+    ISSUE_LOCKED_IN_COMPLETED_SPRINT("Issue is locked because it belongs to a completed sprint", HttpStatus.CONFLICT),
 
     COMMENT_NOT_FOUND("Comment not found", HttpStatus.NOT_FOUND),
     ATTACHMENT_NOT_FOUND("Attachment not found", HttpStatus.NOT_FOUND),
