@@ -543,7 +543,6 @@ public class IssueService {
     public IssueResponseDto removeFromSprint(UUID issueId, UUID userId) {
         Issue issue = issueRepository.findById(issueId)
                 .orElseThrow(() -> new AppException(ProjectErrorCode.ISSUE_NOT_FOUND));
-        ensureIssueEditable(issue);
         issue.setSprintId(null);
         activityLogService.log(issue.getProjectId(), issueId, userId, "ISSUE_REMOVED_FROM_SPRINT",
                 "Removed issue " + issue.getIssueKey() + " from sprint");
