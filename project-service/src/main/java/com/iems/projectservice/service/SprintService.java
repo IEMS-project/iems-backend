@@ -129,9 +129,8 @@ public class SprintService {
             throw new AppException(ProjectErrorCode.SPRINT_NOT_ACTIVE);
         }
 
-        // Once a sprint is completed, all of its issues return to the backlog.
-        List<Issue> sprintIssues = issueRepository.findBySprintIdOrderBySortOrderAsc(sprintId);
-        for (Issue issue : sprintIssues) {
+        List<Issue> incompleteIssues = issueRepository.findIncompleteIssuesInSprint(sprintId, sprint.getProjectId());
+        for (Issue issue : incompleteIssues) {
             issue.setSprintId(null);
             issueRepository.save(issue);
         }
@@ -141,7 +140,7 @@ public class SprintService {
 
         Sprint saved = sprintRepository.save(sprint);
         activityLogService.log(sprint.getProjectId(), null, userId, "SPRINT_COMPLETED",
-                "Completed sprint: " + sprint.getName() + ". " + sprintIssues.size() + " issues moved to backlog.");
+                "Completed sprint: " + sprint.getName() + ". " + incompleteIssues.size() + " incomplete issues moved to backlog.");
 
         // Notify all project members
         try {

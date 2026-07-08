@@ -58,9 +58,9 @@ public interface IssueRepository extends JpaRepository<Issue, UUID> {
             nativeQuery = true)
     void deleteIssueLabelsByProjectId(@Param("projectId") UUID projectId);
 
-    @Query("SELECT i FROM Issue i WHERE i.sprintId = :sprintId AND i.statusId NOT IN " +
+    @Query("SELECT i FROM Issue i WHERE i.sprintId = :sprintId AND (i.statusId IS NULL OR i.statusId NOT IN " +
             "(SELECT ws.id FROM WorkflowStatus ws WHERE ws.workflowId IN " +
-            "(SELECT w.id FROM Workflow w WHERE w.projectId = :projectId) AND ws.category = 'DONE')")
+            "(SELECT w.id FROM Workflow w WHERE w.projectId = :projectId) AND ws.category = 'DONE'))")
     List<Issue> findIncompleteIssuesInSprint(@Param("sprintId") UUID sprintId, @Param("projectId") UUID projectId);
 
     /**
