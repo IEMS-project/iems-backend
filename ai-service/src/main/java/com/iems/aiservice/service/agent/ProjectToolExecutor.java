@@ -368,13 +368,55 @@ public class ProjectToolExecutor {
         String projectId = request.projectId();
         List<Map<String, Object>> issues = cachedProjectIssues(projectId, authorization);
         Map<String, String> statuses = cachedWorkflowStatuses(projectId, authorization);
-        long done = issues.stream().filter(issue -> isDone(issue, statuses)).count();
-        long open = issues.size() - done;
-        return "Tổng quan dự án\n\n"
-                + "- Tổng issue: " + issues.size() + "\n"
-                + "- Issue đang mở: " + open + "\n"
-                + "- Issue đã xong: " + done + "\n"
-                + "- Gợi ý: ưu tiên xử lý issue quá hạn, priority cao hoặc đang ở review.";
+        Map<String, String> priorities = cachedPriorities(projectId, authorization);
+        LocalDate today = LocalDate.now();
+        List<Map<String, Object>> openIssues = issues.stream().filter(issue -> !isDone(issue, statuses)).toList();
+        List<Map<String, Object>> doneIssues = issues.stream().filter(issue -> isDone(issue, statuses)).toList();
+        List<Map<String, Object>> doingIssues = openIssues.stream()
+                .filter(issue -> {
+                    String status = normalize(displayStatus(issue, statuses));
+                    return status.contains("progress") || status.contains("doing") || status.contains("review")
+                            || status.contains("dang");
+                })
+                .sorted(Comparator.comparingInt(issue -> -importanceScore(issue, statuses, priorities, today)))
+                .limit(5)
+                .toList();
+        List<Map<String, Object>> risks = openIssues.stream()
+                .filter(issue -> isOverdue(issue, today) || priorityWeight(displayPriority(issue, priorities)) >= 80
+                        || normalize(displayStatus(issue, statuses)).contains("review"))
+                .sorted(Comparator.comparingInt(issue -> -importanceScore(issue, statuses, priorities, today)))
+                .limit(5)
+                .toList();
+        Map<String, Long> byStatus = issues.stream()
+                .collect(Collectors.groupingBy(issue -> displayStatus(issue, statuses), LinkedHashMap::new, Collectors.counting()));
+        String health = risks.stream().anyMatch(issue -> isOverdue(issue, today))
+                ? "Cần chú ý"
+                : risks.size() >= 5 ? "Trung bình" : "Ổn";
+
+        StringBuilder out = new StringBuilder();
+        out.append("## Tổng quan\n\n")
+                .append("- Tổng issue: ").append(issues.size()).append("\n")
+                .append("- Issue đang mở: ").append(openIssues.size()).append("\n")
+                .append("- Issue đã xong: ").append(doneIssues.size()).append("\n")
+                .append("- Sức khỏe hiện tại: ").append(health).append("\n\n");
+
+        out.append("## Thống kê theo trạng thái\n\n");
+        byStatus.forEach((status, count) -> out.append("- ").append(status).append(": ").append(count).append("\n"));
+
+        out.append("\n## Việc đang làm\n\n");
+        appendIssueBullets(out, doingIssues, statuses, priorities, today);
+
+        out.append("\n## Việc đã xong\n\n");
+        appendIssueBullets(out, doneIssues.stream().limit(5).toList(), statuses, priorities, today);
+
+        out.append("\n## Việc quá hạn/rủi ro\n\n");
+        appendIssueBullets(out, risks, statuses, priorities, today);
+
+        out.append("\n## Nhận xét sức khỏe dự án\n\n")
+                .append("- ").append(health.equals("Cần chú ý")
+                        ? "Dự án có issue quá hạn hoặc priority cao, nên chốt owner/ETA và xử lý trước khi nhận thêm việc."
+                        : "Dự án chưa có tín hiệu quá hạn nổi bật, tiếp tục giữ nhịp review và cập nhật trạng thái.");
+        return out.toString().trim();
     }
 
     private String buildRiskSignals(AgentChatRequest request, String authorization) {
@@ -392,7 +434,12 @@ public class ProjectToolExecutor {
         if (risks.isEmpty()) {
             return "Chưa thấy tín hiệu rủi ro nổi bật trong các issue đang mở.";
         }
-        StringBuilder out = new StringBuilder("Các issue rủi ro chính\n");
+        String riskLevel = risks.stream().anyMatch(issue -> isOverdue(issue, today))
+                ? "Cao"
+                : risks.size() >= 4 ? "Trung bình" : "Thấp";
+        StringBuilder out = new StringBuilder("## Mức rủi ro\n\n")
+                .append(riskLevel)
+                .append("\n\n## Issue rủi ro chính\n\n");
         risks.forEach(issue -> out.append("- ")
                 .append(cleanDisplay(stringValue(issue.get("issueKey")), "Chưa có key"))
                 .append(" - ")
@@ -400,6 +447,13 @@ public class ProjectToolExecutor {
                 .append(": ")
                 .append(priorityReason(issue, statuses, priorities, today))
                 .append("\n"));
+        out.append("\n## Tác động\n\n")
+                .append("- Có thể kéo dài review, trễ deadline hoặc làm chậm các task phụ thuộc.\n")
+                .append("- Các issue priority cao nếu không chốt sớm sẽ làm lệch kế hoạch sprint.\n\n")
+                .append("## Hành động đề xuất\n\n")
+                .append("- Chốt ETA cho issue quá hạn trong hôm nay.\n")
+                .append("- Ưu tiên xử lý issue Highest/High trước các task medium.\n")
+                .append("- Với issue đang Review, gán người chịu trách nhiệm approve hoặc trả feedback rõ ràng.");
         return out.toString().trim();
     }
 
@@ -412,19 +466,42 @@ public class ProjectToolExecutor {
         if (workload.isEmpty()) {
             return "Chưa có issue mở để đánh giá workload.";
         }
-        StringBuilder out = new StringBuilder("Workload hiện tại\n");
-        workload.entrySet().stream()
+        List<Map.Entry<String, Long>> ranked = workload.entrySet().stream()
                 .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
                 .limit(7)
-                .forEach(entry -> out.append("- ")
+                .toList();
+        long max = ranked.getFirst().getValue();
+        StringBuilder out = new StringBuilder("## Ai đang quá tải\n\n");
+        ranked.forEach(entry -> out.append("- ")
                         .append(entry.getKey())
                         .append(": ")
                         .append(entry.getValue())
-                        .append(" issue đang mở\n"));
+                        .append(" issue đang mở")
+                        .append(entry.getValue() == max && max >= 3 ? " - cần theo dõi" : "")
+                        .append("\n"));
+        out.append("\n## Ai cần hỗ trợ\n\n");
+        ranked.stream()
+                .filter(entry -> entry.getValue() == max && max >= 3)
+                .forEach(entry -> out.append("- ").append(entry.getKey())
+                        .append(" nên được giảm bớt issue priority cao hoặc issue quá hạn.\n"));
+        if (max < 3) {
+            out.append("- Chưa thấy thành viên nào quá tải rõ ràng theo số issue mở.\n");
+        }
+        out.append("\n## Nên phân bổ lại việc nào\n\n");
+        Map<String, String> priorities = cachedPriorities(request.projectId(), authorization);
+        appendIssueBullets(out, issues.stream()
+                .filter(issue -> !isDone(issue, statuses))
+                .sorted(Comparator.comparingInt(issue -> -importanceScore(issue, statuses, priorities, LocalDate.now())))
+                .limit(5)
+                .toList(), statuses, priorities, LocalDate.now());
         return out.toString().trim();
     }
 
     private String buildSprintReport(AgentChatRequest request, String authorization) {
+        String normalizedQuestion = normalize(request.question());
+        if (normalizedQuestion.contains("standup") || normalizedQuestion.contains("blocker")) {
+            return buildStandupReport(request, authorization);
+        }
         List<Map<String, Object>> sprints = projectApiClient.listSprints(request.projectId(), authorization);
         if (sprints.isEmpty()) {
             return "Dự án chưa có sprint để báo cáo.";
@@ -442,6 +519,67 @@ public class ProjectToolExecutor {
                 + "- Sprint: " + cleanDisplay(stringValue(sprint.get("name")), "Chưa có tên") + "\n"
                 + "- Status: " + cleanDisplay(stringValue(sprint.get("status")), "Chưa phân loại") + "\n"
                 + "- Số issue: " + sprintIssues.size();
+    }
+
+    private String buildStandupReport(AgentChatRequest request, String authorization) {
+        String projectId = request.projectId();
+        List<Map<String, Object>> issues = cachedProjectIssues(projectId, authorization);
+        Map<String, String> statuses = cachedWorkflowStatuses(projectId, authorization);
+        Map<String, String> priorities = cachedPriorities(projectId, authorization);
+        LocalDate today = LocalDate.now();
+        List<Map<String, Object>> done = issues.stream().filter(issue -> isDone(issue, statuses)).limit(5).toList();
+        List<Map<String, Object>> doing = issues.stream()
+                .filter(issue -> !isDone(issue, statuses))
+                .filter(issue -> normalize(displayStatus(issue, statuses)).contains("progress")
+                        || normalize(displayStatus(issue, statuses)).contains("review"))
+                .limit(5)
+                .toList();
+        List<Map<String, Object>> risks = issues.stream()
+                .filter(issue -> !isDone(issue, statuses))
+                .filter(issue -> isOverdue(issue, today) || priorityWeight(displayPriority(issue, priorities)) >= 80)
+                .sorted(Comparator.comparingInt(issue -> -importanceScore(issue, statuses, priorities, today)))
+                .limit(5)
+                .toList();
+
+        StringBuilder out = new StringBuilder("## Đã xong\n\n");
+        appendIssueBullets(out, done, statuses, priorities, today);
+        out.append("\n## Đang làm\n\n");
+        appendIssueBullets(out, doing, statuses, priorities, today);
+        out.append("\n## Blocker\n\n");
+        List<Map<String, Object>> blockers = risks.stream()
+                .filter(issue -> normalize(displayStatus(issue, statuses)).contains("block")
+                        || isOverdue(issue, today))
+                .toList();
+        appendIssueBullets(out, blockers, statuses, priorities, today);
+        out.append("\n## Rủi ro\n\n");
+        appendIssueBullets(out, risks, statuses, priorities, today);
+        out.append("\n## Việc ưu tiên tiếp theo\n\n");
+        appendIssueBullets(out, issues.stream()
+                .filter(issue -> !isDone(issue, statuses))
+                .sorted(Comparator.comparingInt(issue -> -importanceScore(issue, statuses, priorities, today)))
+                .limit(5)
+                .toList(), statuses, priorities, today);
+        return out.toString().trim();
+    }
+
+    private void appendIssueBullets(StringBuilder out,
+            List<Map<String, Object>> issues,
+            Map<String, String> statuses,
+            Map<String, String> priorities,
+            LocalDate today) {
+        if (issues == null || issues.isEmpty()) {
+            out.append("- Chưa có issue phù hợp.\n");
+            return;
+        }
+        issues.forEach(issue -> out.append("- ")
+                .append(cleanDisplay(stringValue(issue.get("issueKey")), "Chưa có key"))
+                .append(" - ")
+                .append(cleanDisplay(stringValue(issue.get("title")), "Chưa có tiêu đề"))
+                .append(" | status=").append(displayStatus(issue, statuses))
+                .append(" | priority=").append(displayPriority(issue, priorities))
+                .append(" | due=").append(cleanDisplay(stringValue(issue.get("dueDate")), "Chưa có hạn chót"))
+                .append(" | ").append(priorityReason(issue, statuses, priorities, today))
+                .append("\n"));
     }
 
     private Optional<Map<String, Object>> findIssueByKey(String projectId, String issueKey, String authorization) {

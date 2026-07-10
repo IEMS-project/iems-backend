@@ -72,6 +72,7 @@ public class AgentPlannerService {
                 request.projectId(),
                 request.selectedDocumentIds(),
                 conversationContext).intent();
+        intent = refineProjectIntent(intent, normalized);
 
         if (intent == AgentIntent.ISSUE_ACTION || intent == AgentIntent.ISSUE_UPDATE) {
             return planIssueWrite(intent, question, normalized, request.projectId());
@@ -206,6 +207,22 @@ public class AgentPlannerService {
             case SPRINT_REPORT, SPRINT_SUMMARY -> "sprint_report";
             default -> "project_overview";
         };
+    }
+
+    private static AgentIntent refineProjectIntent(AgentIntent intent, String normalized) {
+        if (containsAny(normalized, "workload", "qua tai", "phan bo lai", "can ho tro")) {
+            return AgentIntent.MEMBER_WORKLOAD;
+        }
+        if (containsAny(normalized, "standup", "blocker", "da xong", "dang lam")) {
+            return AgentIntent.SPRINT_REPORT;
+        }
+        if (containsAny(normalized, "suc khoe", "thong ke theo trang thai", "tong quan")) {
+            return AgentIntent.PROJECT_SUMMARY;
+        }
+        if (containsAny(normalized, "rui ro", "qua han", "tac dong", "hanh dong de xuat")) {
+            return AgentIntent.RISK_ANALYSIS;
+        }
+        return intent;
     }
 
     private static String extractIssueKey(String question) {

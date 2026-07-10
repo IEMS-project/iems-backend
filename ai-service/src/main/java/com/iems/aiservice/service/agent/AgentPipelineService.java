@@ -68,6 +68,46 @@ public class AgentPipelineService {
         };
     }
 
+    public AgentChatResponse confirmAction(String userId,
+            String conversationId,
+            String actionId,
+            String projectId,
+            String authorization,
+            String model) {
+        Optional<PendingAgentAction> pendingAction = pendingActionStore.find(conversationId, userId);
+        if (pendingAction.isEmpty()) {
+            AgentPlan clarify = AgentPlan.clarify(
+                    com.iems.aiservice.model.agent.AgentIntent.ISSUE_UPDATE,
+                    "Mình chưa thấy thao tác nào đang chờ xác nhận. Bạn gửi lại yêu cầu cập nhật cụ thể nhé.",
+                    List.of("pendingAction"));
+            return response(conversationId, model, clarify, clarify.naturalLanguageHint(), List.of());
+        }
+
+        PendingAgentAction action = pendingAction.get();
+        if (!action.actionId().equals(actionId)) {
+            AgentPlan clarify = AgentPlan.clarify(
+                    com.iems.aiservice.model.agent.AgentIntent.ISSUE_UPDATE,
+                    "Mã xác nhận không khớp với thao tác đang chờ. Bạn thử tạo lại yêu cầu cập nhật nhé.",
+                    List.of("actionId"));
+            return response(conversationId, model, clarify, clarify.naturalLanguageHint(), List.of());
+        }
+
+        pendingActionStore.consume(conversationId, userId);
+        AgentToolResult result = projectToolExecutor.executeConfirmedWrite(action, authorization);
+        AgentPlan plan = new AgentPlan(
+                AgentAction.EXECUTE_CONFIRMED_WRITE,
+                com.iems.aiservice.model.agent.AgentIntent.ISSUE_UPDATE,
+                result.success() ? 0.98 : 0.75,
+                action.toolName(),
+                List.of("actionId"),
+                java.util.Map.of("projectId", projectId == null ? "" : projectId),
+                List.of(),
+                "Execute explicitly allowed action.",
+                false,
+                "");
+        return response(conversationId, model, plan, result.answer(), result.proposedActions());
+    }
+
     private AgentChatResponse answerWithOpenRouter(String conversationId,
             AgentChatRequest request,
             String documentContext,

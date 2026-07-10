@@ -80,13 +80,12 @@ class AgentPipelineServiceTest {
         assertEquals("done", action.payload().get("targetStatusId"));
         verify(projectApiClient, never()).changeIssueStatus("project-1", "issue-8", "done", "Bearer token");
 
-        AgentChatResponse executed = service.handle(
+        AgentChatResponse executed = service.confirmAction(
                 "user-1",
                 "conv-1",
-                new AgentChatRequest("dung roi", "conv-1", "project-1", List.of()),
+                String.valueOf(action.payload().get("actionId")),
+                "project-1",
                 "Bearer token",
-                "",
-                "",
                 "test-model");
 
         assertTrue(executed.answer().contains("Đã cập nhật IEMS2-8"));

@@ -1,6 +1,7 @@
 package com.iems.aiservice.controller;
 
 import com.iems.aiservice.config.AiProperties;
+import com.iems.aiservice.dto.AgentActionConfirmRequest;
 import com.iems.aiservice.dto.AgentChatRequest;
 import com.iems.aiservice.dto.AgentChatResponse;
 import com.iems.aiservice.dto.ChatRequest;
@@ -96,6 +97,26 @@ public class AiChatController {
 
         chatHistoryService.saveMessage(conversationId, "assistant", response.answer());
         chatHistoryService.updateTimestamp(conversationId);
+
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/actions/confirm")
+    public ResponseEntity<AgentChatResponse> confirmAction(
+            @Valid @RequestBody AgentActionConfirmRequest request,
+            @RequestHeader("Authorization") String authorization) {
+        String userId = extractUserIdFromAuthorization(authorization);
+
+        AgentChatResponse response = agentOrchestratorService.confirmAction(
+                userId,
+                request.conversationId(),
+                request.actionId(),
+                request.projectId(),
+                authorization,
+                aiProperties.getModel());
+
+        chatHistoryService.saveMessage(request.conversationId(), "assistant", response.answer());
+        chatHistoryService.updateTimestamp(request.conversationId());
 
         return ResponseEntity.ok(response);
     }

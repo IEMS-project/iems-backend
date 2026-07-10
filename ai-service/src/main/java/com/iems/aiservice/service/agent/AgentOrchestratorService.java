@@ -29,4 +29,19 @@ public class AgentOrchestratorService {
                 conversationContext,
                 model);
     }
+
+    public AgentChatResponse confirmAction(String userId,
+            String conversationId,
+            String actionId,
+            String projectId,
+            String authorization,
+            String model) {
+        return agentPipelineService.confirmAction(
+                userId,
+                conversationId,
+                actionId,
+                projectId,
+                authorization,
+                model);
+    }
 }
