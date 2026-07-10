@@ -50,7 +50,7 @@ class AgentPlannerServiceTest {
     }
 
     @Test
-    void confirmationWithPendingActionShouldExecute() {
+    void confirmationWithPendingActionShouldAskForAllowButton() {
         Instant now = Instant.now();
         pendingActionStore.save(new PendingAgentAction(
                 "action-1",
@@ -69,7 +69,8 @@ class AgentPlannerServiceTest {
                 new AgentChatRequest("ok cap nhat di", "conv-1", "project-1", List.of()),
                 "");
 
-        assertEquals(AgentAction.EXECUTE_CONFIRMED_WRITE, plan.action());
+        assertEquals(AgentAction.CLARIFY, plan.action());
+        assertEquals(List.of("allowAction"), plan.missingInputs());
     }
 
     @Test

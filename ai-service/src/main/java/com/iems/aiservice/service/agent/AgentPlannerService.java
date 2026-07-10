@@ -42,17 +42,10 @@ public class AgentPlannerService {
         if (isConfirmation(normalized)) {
             Optional<?> pending = pendingActionStore.find(conversationId, userId);
             if (pending.isPresent()) {
-                return new AgentPlan(
-                        AgentAction.EXECUTE_CONFIRMED_WRITE,
+                return AgentPlan.clarify(
                         AgentIntent.ISSUE_UPDATE,
-                        0.95,
-                        "",
-                        List.of("pendingAction"),
-                        Map.of("confirmation", question),
-                        List.of(),
-                        "Execute the pending confirmed action.",
-                        false,
-                        "Dang thuc hien hanh dong da xac nhan.");
+                        "Minh da chuan bi thao tac nay. Ban bam nut Allow ben duoi tin nhan xac nhan de thuc hien cap nhat nhe.",
+                        List.of("allowAction"));
             }
             return AgentPlan.clarify(
                     AgentIntent.ISSUE_UPDATE,
