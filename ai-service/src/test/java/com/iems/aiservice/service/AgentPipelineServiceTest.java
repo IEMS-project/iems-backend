@@ -14,6 +14,8 @@ import com.iems.aiservice.service.agent.ProjectApiClient;
 import com.iems.aiservice.service.agent.ProjectApiToolRegistry;
 import com.iems.aiservice.service.agent.ProjectToolExecutor;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.client.HttpClientErrorException;
 
 import java.util.List;
 import java.util.Map;
@@ -90,6 +92,43 @@ class AgentPipelineServiceTest {
 
         assertTrue(executed.answer().contains("Đã cập nhật IEMS2-8"));
         verify(projectApiClient).changeIssueStatus("project-1", "issue-8", "done", "Bearer token");
+    }
+
+    @Test
+    void forbiddenStatusUpdateShouldReturnPermissionMessageAndKeepActionRetryable() {
+        when(projectApiClient.listProjectIssues("project-1", "Bearer token"))
+                .thenReturn(List.of(issue("issue-8", "IEMS2-8", "User Login", "review", "high")));
+        when(projectApiClient.listProjectIssuesPaged("project-1", "Bearer token", 200))
+                .thenReturn(List.of());
+        when(projectApiClient.listWorkflows("project-1", "Bearer token"))
+                .thenReturn(List.of(Map.of("id", "workflow-1", "isDefault", true)));
+        when(projectApiClient.listWorkflowStatuses("project-1", "workflow-1", "Bearer token"))
+                .thenReturn(List.of(
+                        Map.of("id", "review", "name", "Review"),
+                        Map.of("id", "done", "name", "Done")));
+        when(projectApiClient.changeIssueStatus("project-1", "issue-8", "done", "Bearer token"))
+                .thenThrow(new HttpClientErrorException(HttpStatus.FORBIDDEN));
+
+        AgentChatResponse proposed = service.handle(
+                "user-1",
+                "conv-1",
+                new AgentChatRequest("Chuyen IEMS2-8 sang Done", "conv-1", "project-1", List.of()),
+                "Bearer token",
+                "",
+                "",
+                "test-model");
+        AgentProposedAction action = proposed.proposedActions().getFirst();
+
+        AgentChatResponse failed = service.confirmAction(
+                "user-1",
+                "conv-1",
+                String.valueOf(action.payload().get("actionId")),
+                "project-1",
+                "Bearer token",
+                "test-model");
+
+        assertTrue(failed.answer().contains("ISSUE_UPDATE"));
+        assertFalse(failed.proposedActions().isEmpty());
     }
 
     @Test

@@ -6,6 +6,8 @@ import com.iems.aiservice.model.agent.AgentPlan;
 import com.iems.aiservice.model.agent.AgentProposedAction;
 import com.iems.aiservice.model.agent.PendingAgentAction;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClientResponseException;
 
 import java.text.Normalizer;
 import java.time.Instant;
@@ -81,6 +83,8 @@ public class ProjectToolExecutor {
                 case "create_issue" -> executeCreateIssue(pendingAction, authorization);
                 default -> AgentToolResult.error("Mình chưa hỗ trợ thực thi thao tác này.");
             };
+        } catch (AgentWriteException ex) {
+            return AgentToolResult.error(ex.getMessage());
         } catch (Exception ex) {
             return AgentToolResult.error("Mình chưa cập nhật được dữ liệu project lúc này. Bạn thử lại sau vài giây nhé.");
         }
@@ -268,7 +272,7 @@ public class ProjectToolExecutor {
             return AgentToolResult.error("Mình thiếu dữ liệu để cập nhật issue. Bạn gửi lại yêu cầu giúp mình nhé.");
         }
 
-        Map<String, Object> updated = projectApiClient.changeIssueStatus(projectId, issueId, statusId, authorization);
+        Map<String, Object> updated = changeIssueStatusSafely(projectId, issueId, statusId, authorization);
         cache.evictProjectWriteData(projectId);
         String title = cleanDisplay(stringValue(updated.get("title")), stringValue(pendingAction.payload().get("title")));
         return AgentToolResult.answer("Đã cập nhật " + issueKey + " - " + title + " sang " + targetStatus + ".");
@@ -285,7 +289,7 @@ public class ProjectToolExecutor {
             return AgentToolResult.error("Mình thiếu dữ liệu để gán issue. Bạn gửi lại yêu cầu giúp mình nhé.");
         }
 
-        projectApiClient.assignIssue(projectId, issueId, assigneeId, authorization);
+        assignIssueSafely(projectId, issueId, assigneeId, authorization);
         cache.evictProjectWriteData(projectId);
         return AgentToolResult.answer("Đã gán " + issueKey + " cho " + assigneeName + ".");
     }
@@ -297,9 +301,61 @@ public class ProjectToolExecutor {
         if (projectId == null || !(body instanceof Map<?, ?> rawBody)) {
             return AgentToolResult.error("Mình thiếu dữ liệu để tạo issue. Bạn gửi lại yêu cầu giúp mình nhé.");
         }
-        Map<String, Object> created = projectApiClient.createIssue(projectId, new LinkedHashMap<>((Map<String, Object>) rawBody), authorization);
+        Map<String, Object> created = createIssueSafely(projectId, new LinkedHashMap<>((Map<String, Object>) rawBody), authorization);
         cache.evictProjectWriteData(projectId);
         return AgentToolResult.answer("Đã tạo issue " + cleanDisplay(stringValue(created.get("issueKey")), "mới") + ".");
+    }
+
+    private Map<String, Object> changeIssueStatusSafely(String projectId, String issueId, String statusId, String authorization) {
+        try {
+            return projectApiClient.changeIssueStatus(projectId, issueId, statusId, authorization);
+        } catch (RestClientResponseException ex) {
+            throw new AgentWriteException(writeFailureMessage(ex.getStatusCode().value(), "cap nhat trang thai issue"), ex);
+        } catch (RestClientException ex) {
+            throw new AgentWriteException("Chua ket noi duoc project-service de cap nhat issue. Ban kiem tra service/gateway roi thu lai nhe.", ex);
+        }
+    }
+
+    private void assignIssueSafely(String projectId, String issueId, String assigneeId, String authorization) {
+        try {
+            projectApiClient.assignIssue(projectId, issueId, assigneeId, authorization);
+        } catch (RestClientResponseException ex) {
+            throw new AgentWriteException(writeFailureMessage(ex.getStatusCode().value(), "gan issue"), ex);
+        } catch (RestClientException ex) {
+            throw new AgentWriteException("Chua ket noi duoc project-service de gan issue. Ban kiem tra service/gateway roi thu lai nhe.", ex);
+        }
+    }
+
+    private Map<String, Object> createIssueSafely(String projectId, Map<String, Object> body, String authorization) {
+        try {
+            return projectApiClient.createIssue(projectId, body, authorization);
+        } catch (RestClientResponseException ex) {
+            throw new AgentWriteException(writeFailureMessage(ex.getStatusCode().value(), "tao issue"), ex);
+        } catch (RestClientException ex) {
+            throw new AgentWriteException("Chua ket noi duoc project-service de tao issue. Ban kiem tra service/gateway roi thu lai nhe.", ex);
+        }
+    }
+
+    private String writeFailureMessage(int statusCode, String actionLabel) {
+        if (statusCode == 401) {
+            return "Phien dang nhap da het han nen minh chua the " + actionLabel + ". Ban dang nhap lai roi bam Allow them lan nua nhe.";
+        }
+        if (statusCode == 403) {
+            return "Tai khoan hien tai chua co quyen ISSUE_UPDATE trong project nay, nen minh khong the " + actionLabel + ".";
+        }
+        if (statusCode == 404) {
+            return "Khong tim thay project, issue hoac trang thai can cap nhat. Ban refresh du lieu roi thu lai nhe.";
+        }
+        if (statusCode == 400 || statusCode == 409) {
+            return "Project-service tu choi thao tac nay vi du lieu khong hop le hoac workflow khong cho phep chuyen trang thai.";
+        }
+        return "Project-service dang tu choi thao tac nay. Ban thu lai sau vai giay hoac kiem tra log cua project-service.";
+    }
+
+    static class AgentWriteException extends RuntimeException {
+        AgentWriteException(String message, Throwable cause) {
+            super(message, cause);
+        }
     }
 
     private String buildDailyPlan(AgentChatRequest request, String userId, String authorization) {

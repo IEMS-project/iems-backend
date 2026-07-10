@@ -108,4 +108,15 @@ class AgentPlannerServiceTest {
         assertEquals(AgentAction.ANSWER, plan.action());
         assertEquals(AgentIntent.GENERAL_CHAT, plan.intent());
     }
+
+    @Test
+    void contextQuestionShouldAnswerInsteadOfForcingProjectOverview() {
+        AgentPlan plan = service.plan(
+                "user-1",
+                "conv-1",
+                new AgentChatRequest("ban vua moi nhan gi vay", "conv-1", "project-1", List.of()),
+                "User: cap nhat IEMS2-2 sang Review\nAssistant: Ban bam Allow de xac nhan");
+
+        assertEquals(AgentAction.ANSWER, plan.action());
+    }
 }

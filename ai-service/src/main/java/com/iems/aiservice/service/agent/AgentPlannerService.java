@@ -187,8 +187,7 @@ public class AgentPlannerService {
                 || intent == AgentIntent.SPRINT_SUMMARY
                 || intent == AgentIntent.ISSUE_SEARCH
                 || intent == AgentIntent.MEMBER_WORKLOAD
-                || intent == AgentIntent.DEADLINE_CHECK
-                || intent == AgentIntent.CONTEXTUAL_PROJECT_CHAT;
+                || intent == AgentIntent.DEADLINE_CHECK;
     }
 
     private static String readToolFor(AgentIntent intent) {
