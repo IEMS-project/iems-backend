@@ -197,12 +197,15 @@ public class ProjectIssueToolService {
         }
         List<Map<String, Object>> issueCards = targets.stream()
                 .limit(5)
-                .map(issue -> normalizeIssueForPrompt(issue, Map.of(), Map.of(), Map.of()))
+                .map(issue -> issueActionPayload(issue, statuses))
                 .collect(Collectors.toList());
         return buildConfirmation("update_issue_status", "Xác nhận đổi trạng thái issue",
                 "Bạn xác nhận chuyển " + issueCards.size() + " issue sang \"" + matchedStatus.getValue()
                         + "\"? Mình chưa thực hiện thay đổi nào.",
-                Map.of("targetStatus", matchedStatus.getValue(), "issues", issueCards));
+                Map.of(
+                        "targetStatusId", matchedStatus.getKey(),
+                        "targetStatus", matchedStatus.getValue(),
+                        "issues", issueCards));
     }
 
     public String handleIssueAnalysis(String question, String projectId, String authorization) {
@@ -464,6 +467,16 @@ public class ProjectIssueToolService {
                 .contentType(MediaType.APPLICATION_JSON)
                 .retrieve()
                 .body(Map.class);
+    }
+
+    private Map<String, Object> issueActionPayload(Map<String, Object> issue, Map<String, String> statusById) {
+        String statusId = stringValue(issue.get("statusId"));
+        return Map.of(
+                "issueId", cardValue(stringValue(issue.get("id")), ""),
+                "issueKey", cardValue(stringValue(issue.get("issueKey")), "Issue chua co key"),
+                "title", cardValue(stringValue(issue.get("title")), "Chua co tieu de"),
+                "currentStatusId", cardValue(statusId, ""),
+                "currentStatus", cleanDisplay(statusById.get(statusId), "Chua phan loai"));
     }
 
     private Map.Entry<String, String> findStatusByPhrase(Map<String, String> statusById, String phrase) {

@@ -11,6 +11,7 @@ import com.iems.aiservice.service.OpenRouterChatService;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -54,7 +55,7 @@ public class AgentOrchestratorService {
                 conversationContext);
 
         if (decision.intent() == AgentIntent.ISSUE_ACTION || decision.intent() == AgentIntent.ISSUE_UPDATE) {
-            return executeAction(conversationId, request, decision, model);
+            return executeAction(conversationId, request, decision, model, authorization);
         }
 
         String groundedQuestion = buildGroundedAgentPrompt(request, authorization, decision, documentContext,
@@ -74,6 +75,86 @@ public class AgentOrchestratorService {
                 decision.confidence(),
                 Collections.emptyList(),
                 buildSources(request.selectedDocumentIds(), request.projectId()));
+    }
+
+    private AgentChatResponse executeAction(String conversationId,
+            AgentChatRequest request,
+            AgentDecision decision,
+            String model,
+            String authorization) {
+        String structuredResponse = projectIssueToolService.handleIssueAction(
+                request.question(),
+                request.projectId(),
+                authorization);
+        Map<String, Object> parsedResponse = parseStructuredResponse(structuredResponse);
+        List<AgentProposedAction> proposedActions = extractProposedActions(parsedResponse);
+
+        return new AgentChatResponse(
+                buildActionAnswer(parsedResponse, structuredResponse),
+                model,
+                conversationId,
+                Instant.now(),
+                decision.intent().name(),
+                decision.confidence(),
+                proposedActions,
+                buildSources(request.selectedDocumentIds(), request.projectId()));
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> parseStructuredResponse(String response) {
+        if (response == null || response.isBlank()) {
+            return Map.of();
+        }
+        try {
+            Object parsed = objectMapper.readValue(response, Object.class);
+            if (parsed instanceof Map<?, ?> map) {
+                return new LinkedHashMap<>((Map<String, Object>) map);
+            }
+        } catch (JsonProcessingException ignored) {
+            return Map.of();
+        }
+        return Map.of();
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<AgentProposedAction> extractProposedActions(Map<String, Object> response) {
+        if (!"confirmation".equals(String.valueOf(response.get("type")))
+                || !(response.get("actions") instanceof List<?> actions)) {
+            return Collections.emptyList();
+        }
+
+        List<AgentProposedAction> proposedActions = new ArrayList<>();
+        for (Object item : actions) {
+            if (!(item instanceof Map<?, ?> rawAction)) {
+                continue;
+            }
+            Map<String, Object> action = new LinkedHashMap<>((Map<String, Object>) rawAction);
+            Object payload = action.get("payload");
+            Map<String, Object> payloadMap = payload instanceof Map<?, ?> rawPayload
+                    ? new LinkedHashMap<>((Map<String, Object>) rawPayload)
+                    : Map.of();
+            proposedActions.add(new AgentProposedAction(
+                    String.valueOf(action.getOrDefault("type", "issue_action")),
+                    String.valueOf(action.getOrDefault("label", response.getOrDefault("title", "Confirm"))),
+                    payloadMap));
+        }
+        return proposedActions;
+    }
+
+    private String buildActionAnswer(Map<String, Object> response, String fallback) {
+        if (response.isEmpty()) {
+            return responseSanitizer.sanitize(fallback);
+        }
+
+        String title = String.valueOf(response.getOrDefault("title", ""));
+        String summary = String.valueOf(response.getOrDefault("summary", ""));
+        if (title.isBlank()) {
+            return responseSanitizer.sanitize(summary);
+        }
+        if (summary.isBlank()) {
+            return responseSanitizer.sanitize(title);
+        }
+        return responseSanitizer.sanitize(title + "\n\n" + summary);
     }
 
     private AgentChatResponse executeAction(String conversationId,
