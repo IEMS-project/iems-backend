@@ -2,6 +2,7 @@ package com.iems.aiservice.service.agent;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
@@ -101,6 +102,51 @@ public class ProjectApiClient {
                 authorization, projectId, workflowId);
     }
 
+    public Map<String, Object> changeIssueStatus(String projectId,
+            String issueId,
+            String statusId,
+            String authorization) {
+        Map<String, Object> response = restClient.patch()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/projects/{projectId}/issues/{issueId}/status")
+                        .queryParam("statusId", statusId)
+                        .build(projectId, issueId))
+                .header("Authorization", authorization)
+                .contentType(MediaType.APPLICATION_JSON)
+                .retrieve()
+                .body(Map.class);
+        return response == null ? Map.of() : copyResponseDataMap(response);
+    }
+
+    public Map<String, Object> assignIssue(String projectId,
+            String issueId,
+            String assigneeId,
+            String authorization) {
+        Map<String, Object> response = restClient.patch()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/projects/{projectId}/issues/{issueId}/assign")
+                        .queryParam("assigneeId", assigneeId)
+                        .build(projectId, issueId))
+                .header("Authorization", authorization)
+                .contentType(MediaType.APPLICATION_JSON)
+                .retrieve()
+                .body(Map.class);
+        return response == null ? Map.of() : copyResponseDataMap(response);
+    }
+
+    public Map<String, Object> createIssue(String projectId,
+            Map<String, Object> body,
+            String authorization) {
+        Map<String, Object> response = restClient.post()
+                .uri("/projects/{projectId}/issues", projectId)
+                .header("Authorization", authorization)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(body == null ? Map.of() : body)
+                .retrieve()
+                .body(Map.class);
+        return response == null ? Map.of() : copyResponseDataMap(response);
+    }
+
     @SuppressWarnings("unchecked")
     private List<Map<String, Object>> readDataList(String path, String authorization, Object... uriVariables) {
         Map<String, Object> response = restClient.get()
@@ -118,6 +164,10 @@ public class ProjectApiClient {
                 .header("Authorization", authorization)
                 .retrieve()
                 .body(Map.class);
+        return response == null ? Map.of() : copyResponseDataMap(response);
+    }
+
+    private Map<String, Object> copyResponseDataMap(Map<String, Object> response) {
         if (response == null || !(response.get("data") instanceof Map<?, ?> data)) {
             return Map.of();
         }

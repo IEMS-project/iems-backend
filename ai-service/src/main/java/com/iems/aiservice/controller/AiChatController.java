@@ -9,13 +9,10 @@ import com.iems.aiservice.dto.DocumentContextResult;
 import com.iems.aiservice.dto.HealthResponse;
 import com.iems.aiservice.entity.ChatMessage;
 import com.iems.aiservice.entity.Conversation;
-import com.iems.aiservice.model.agent.AgentDecision;
-import com.iems.aiservice.model.agent.AgentIntent;
 import com.iems.aiservice.service.ChatHistoryService;
 import com.iems.aiservice.service.DocumentContextService;
 import com.iems.aiservice.service.JwtService;
 import com.iems.aiservice.service.OpenRouterChatService;
-import com.iems.aiservice.service.agent.AgentIntentRouterService;
 import com.iems.aiservice.service.agent.AgentOrchestratorService;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
@@ -58,13 +55,11 @@ public class AiChatController {
     private final ChatHistoryService chatHistoryService;
     private final DocumentContextService documentContextService;
     private final AgentOrchestratorService agentOrchestratorService;
-    private final AgentIntentRouterService agentIntentRouterService;
     private final MongoTemplate mongoTemplate;
 
     public AiChatController(OpenRouterChatService openRouterChatService, AiProperties aiProperties, JwtService jwtService,
             ChatHistoryService chatHistoryService, DocumentContextService documentContextService,
             AgentOrchestratorService agentOrchestratorService,
-            AgentIntentRouterService agentIntentRouterService,
             MongoTemplate mongoTemplate) {
         this.openRouterChatService = openRouterChatService;
         this.aiProperties = aiProperties;
@@ -72,7 +67,6 @@ public class AiChatController {
         this.chatHistoryService = chatHistoryService;
         this.documentContextService = documentContextService;
         this.agentOrchestratorService = agentOrchestratorService;
-        this.agentIntentRouterService = agentIntentRouterService;
         this.mongoTemplate = mongoTemplate;
     }
 
@@ -128,42 +122,21 @@ public class AiChatController {
                 conversationId);
         log.info("Chat memory conversationId={} memoryChars={}", conversationId, conversationContext.length());
 
-        AgentChatResponse agentResponse;
-        String answer;
-        if (!documentContextResult.sources().isEmpty()) {
-            answer = openRouterChatService.ask(
-                    request.question(),
-                    request.selectedDocumentIds(),
-                    documentContext,
-                    conversationContext);
-            agentResponse = new AgentChatResponse(
-                    answer,
-                    aiProperties.getModel(),
-                    conversationId,
-                    Instant.now(),
-                    "DOCUMENT_CHAT",
-                    0.95,
-                    List.of(),
-                    documentContextResult.sources().stream()
-                            .map(source -> source.fileName() + " #" + source.chunkIndex())
-                            .toList());
-        } else {
-            AgentChatRequest agentRequest = new AgentChatRequest(
-                    request.question(),
-                    conversationId,
-                    request.projectId(),
-                    request.selectedDocumentIds());
+        AgentChatRequest agentRequest = new AgentChatRequest(
+                request.question(),
+                conversationId,
+                request.projectId(),
+                request.selectedDocumentIds());
 
-            agentResponse = agentOrchestratorService.handle(
-                    userId,
-                    conversationId,
-                    agentRequest,
-                    authorization,
-                    documentContext,
-                    conversationContext,
-                    aiProperties.getModel());
-            answer = agentResponse.answer();
-        }
+        AgentChatResponse agentResponse = agentOrchestratorService.handle(
+                userId,
+                conversationId,
+                agentRequest,
+                authorization,
+                documentContext,
+                conversationContext,
+                aiProperties.getModel());
+        String answer = agentResponse.answer();
         chatHistoryService.saveMessage(conversationId, "assistant", answer);
         chatHistoryService.updateTimestamp(conversationId);
 
@@ -206,103 +179,36 @@ public class AiChatController {
 
         CompletableFuture.runAsync(() -> {
             try {
-                if (!documentContextResult.sources().isEmpty()) {
-                    openRouterChatService.streamAsk(request.question(), request.selectedDocumentIds(), documentContext,
-                            conversationContext,
-                            chunk -> {
-                                try {
-                                    fullAnswer.append(chunk);
-                                    emitter.send(SseEmitter.event().data(Map.of(
-                                            "type", "chunk",
-                                            "content", chunk)));
-                                } catch (Exception sendException) {
-                                    throw new RuntimeException(sendException);
-                                }
-                            });
-
-                    chatHistoryService.saveMessage(conversationId, "assistant", fullAnswer.toString());
-                    chatHistoryService.updateTimestamp(conversationId);
-
-                    emitter.send(SseEmitter.event().data(Map.of(
-                            "type", "end",
-                            "conversationId", conversationId,
-                            "intent", "DOCUMENT_CHAT",
-                            "sources", documentContextResult.sources())));
-                    emitter.complete();
-                    return;
-                }
-
-                AgentDecision decision = agentIntentRouterService.route(
+                AgentChatRequest agentRequest = new AgentChatRequest(
                         request.question(),
+                        conversationId,
                         request.projectId(),
-                        request.selectedDocumentIds(),
-                        conversationContext);
-                if (decision.intent() == AgentIntent.ISSUE_QUERY
-                        || decision.intent() == AgentIntent.ISSUE_ACTION
-                        || decision.intent() == AgentIntent.ISSUE_ANALYSIS
-                        || decision.intent() == AgentIntent.PROJECT_SUMMARY
-                        || decision.intent() == AgentIntent.DAILY_PLAN
-                        || decision.intent() == AgentIntent.RISK_ANALYSIS
-                        || decision.intent() == AgentIntent.SPRINT_REPORT
-                        || decision.intent() == AgentIntent.ISSUE_SEARCH
-                        || decision.intent() == AgentIntent.ISSUE_UPDATE
-                        || decision.intent() == AgentIntent.MEMBER_WORKLOAD
-                        || decision.intent() == AgentIntent.DEADLINE_CHECK
-                        || decision.intent() == AgentIntent.CONTEXTUAL_PROJECT_CHAT
-                        || decision.intent() == AgentIntent.DOCUMENT_QA) {
-                    AgentChatRequest agentRequest = new AgentChatRequest(
-                            request.question(),
-                            conversationId,
-                            request.projectId(),
-                            request.selectedDocumentIds());
-                    AgentChatResponse agentResponse = agentOrchestratorService.handle(
-                            userId,
-                            conversationId,
-                            agentRequest,
-                            authorization,
-                            documentContext,
-                            conversationContext,
-                            aiProperties.getModel());
-
-                    String answer = agentResponse.answer() == null ? "" : agentResponse.answer();
-                    fullAnswer.append(answer);
-                    emitter.send(SseEmitter.event().data(Map.of(
-                            "type", "chunk",
-                            "content", answer)));
-                    chatHistoryService.saveMessage(conversationId, "assistant", fullAnswer.toString());
-                    chatHistoryService.updateTimestamp(conversationId);
-                    emitter.send(SseEmitter.event().data(Map.of(
-                            "type", "end",
-                            "conversationId", conversationId,
-                            "intent", agentResponse.intent(),
-                            "confidence", agentResponse.confidence(),
-                            "sources", agentResponse.sources(),
-                            "proposedActions", agentResponse.proposedActions())));
-                    emitter.complete();
-                    return;
-                }
-
-                openRouterChatService.streamAsk(request.question(), request.selectedDocumentIds(), documentContext,
+                        request.selectedDocumentIds());
+                AgentChatResponse agentResponse = agentOrchestratorService.handle(
+                        userId,
+                        conversationId,
+                        agentRequest,
+                        authorization,
+                        documentContext,
                         conversationContext,
-                        chunk -> {
-                            try {
-                                fullAnswer.append(chunk);
-                                emitter.send(SseEmitter.event().data(Map.of(
-                                        "type", "chunk",
-                                        "content", chunk)));
-                            } catch (Exception sendException) {
-                                throw new RuntimeException(sendException);
-                            }
-                        });
+                        aiProperties.getModel());
 
-                // End of stream, save assistant message
+                String answer = agentResponse.answer() == null ? "" : agentResponse.answer();
+                fullAnswer.append(answer);
+                emitter.send(SseEmitter.event().data(Map.of(
+                        "type", "chunk",
+                        "content", answer)));
                 chatHistoryService.saveMessage(conversationId, "assistant", fullAnswer.toString());
                 chatHistoryService.updateTimestamp(conversationId);
-
                 emitter.send(SseEmitter.event().data(Map.of(
                         "type", "end",
                         "conversationId", conversationId,
-                        "sources", documentContextResult.sources())));
+                        "intent", agentResponse.intent(),
+                        "confidence", agentResponse.confidence(),
+                        "sources", documentContextResult.sources().isEmpty()
+                                ? agentResponse.sources()
+                                : documentContextResult.sources(),
+                        "proposedActions", agentResponse.proposedActions())));
                 emitter.complete();
             } catch (Exception e) {
                 try {
