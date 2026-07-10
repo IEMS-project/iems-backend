@@ -43,8 +43,8 @@ public class OpenRouterChatService {
             List<String> selectedDocumentIds,
             String documentContext,
             String conversationContext) {
-        if (isSimpleGreeting(question, documentContext)) {
-            return "Xin chÃ o! MÃ¬nh lÃ  Project Copilot cá»§a IEMS. Báº¡n muá»‘n mÃ¬nh tÃ³m táº¯t dá»± Ã¡n, láº­p káº¿ hoáº¡ch hÃ´m nay hay phÃ¢n tÃ­ch rá»§i ro?";
+        if (isSmallTalkOrCapabilityQuestion(question, documentContext)) {
+            return capabilityAnswer();
         }
         ensureApiKeyConfigured();
 
@@ -86,8 +86,8 @@ public class OpenRouterChatService {
             String documentContext,
             String conversationContext,
             Consumer<String> onChunk) {
-        if (isSimpleGreeting(question, documentContext)) {
-            onChunk.accept("Xin chÃ o! MÃ¬nh lÃ  Project Copilot cá»§a IEMS. Báº¡n muá»‘n mÃ¬nh tÃ³m táº¯t dá»± Ã¡n, láº­p káº¿ hoáº¡ch hÃ´m nay hay phÃ¢n tÃ­ch rá»§i ro?");
+        if (isSmallTalkOrCapabilityQuestion(question, documentContext)) {
+            onChunk.accept(capabilityAnswer());
             return;
         }
         ensureApiKeyConfigured();
@@ -219,15 +219,43 @@ public class OpenRouterChatService {
         return repaired == null || repaired.isBlank() ? answer : normalizeMarkdown(repaired.trim());
     }
 
-    private boolean isSimpleGreeting(String question, String documentContext) {
+    private boolean isSmallTalkOrCapabilityQuestion(String question, String documentContext) {
         if (documentContext != null && !documentContext.isBlank()) {
             return false;
         }
         if (question == null) {
             return false;
         }
-        String normalized = question.toLowerCase().trim();
-        return normalized.matches("^(hi|hello|hey|xin chao|xin chÃ o|chao|chÃ o|alo|yo)[!.\\s]*$");
+        String normalized = normalizeForIntent(question);
+        boolean greeting = normalized.matches("^(hi|hello|hey|xin chao|chao|alo|yo)(\\b|[!.?,\\s]).*")
+                || normalized.matches(".*\\b(chao ban|xin chao ban)\\b.*");
+        boolean asksCapability = normalized.contains("ban co the giup gi")
+                || normalized.contains("co the giup gi")
+                || normalized.contains("ban lam duoc gi")
+                || normalized.contains("ban giup duoc gi")
+                || normalized.contains("giup gi cho minh")
+                || normalized.contains("help me with")
+                || normalized.contains("what can you do");
+        boolean explicitProjectRequest = normalized.contains("issue")
+                || normalized.contains("task")
+                || normalized.contains("sprint")
+                || normalized.contains("rui ro")
+                || normalized.contains("workload")
+                || normalized.contains("bao cao")
+                || normalized.contains("lap ke hoach")
+                || normalized.contains("cap nhat")
+                || normalized.contains("chuyen trang thai");
+        return (greeting || asksCapability) && !explicitProjectRequest;
+    }
+
+    private String capabilityAnswer() {
+        return "Xin chao! Minh co the giup ban hoi dap binh thuong, tom tat tinh hinh project, lap top viec uu tien, phan tich rui ro/workload, va chuan bi thao tac cap nhat issue qua nut Allow khi can.";
+    }
+
+    private String normalizeForIntent(String text) {
+        String lowered = text.toLowerCase().trim();
+        String decomposed = java.text.Normalizer.normalize(lowered, java.text.Normalizer.Form.NFD);
+        return decomposed.replaceAll("\\p{M}+", "");
     }
 
     private String normalizeMarkdown(String text) {

@@ -59,5 +59,7 @@ class AgentIntentRouterServiceTest {
     @Test
     void routeShouldFallbackToGeneralChat() {
         assertEquals(AgentIntent.GENERAL_CHAT, service.route("hello there").intent());
+        assertEquals(AgentIntent.GENERAL_CHAT,
+                service.route("hello ban co the giup gi cho minh vay?", "project-1", List.of(), "Assistant: phan tich rui ro sprint").intent());
     }
 }

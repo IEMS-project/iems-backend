@@ -65,6 +65,10 @@ public class AgentIntentRouterService {
         boolean hasSelectedDocuments = selectedDocumentIds != null && !selectedDocumentIds.isEmpty();
         boolean hasMemory = conversationContext != null && !conversationContext.isBlank();
 
+        if (isSmallTalkOrCapabilityQuestion(normalized)) {
+            return new AgentDecision(AgentIntent.GENERAL_CHAT, 0.9, "small_talk_or_capability_question");
+        }
+
         if (isExplicitIssueUpdate(question, normalized)) {
             return new AgentDecision(AgentIntent.ISSUE_UPDATE, 0.88, "matched_issue_action_terms");
         }
@@ -136,6 +140,29 @@ public class AgentIntentRouterService {
                 "du an", "project", "sprint", "backlog", "team", "member", "cong viec", "tien do",
                 "ke hoach", "hom nay", "ngay mai", "can lam", "nen lam", "dang sao", "on khong",
                 "review", "bao cao", "tong quan"));
+    }
+
+    private static boolean isSmallTalkOrCapabilityQuestion(String normalized) {
+        boolean greeting = normalized.matches("^(hi|hello|hey|xin chao|chao|alo|yo)(\\b|[!.?,\\s]).*")
+                || normalized.matches(".*\\b(chao ban|xin chao ban)\\b.*");
+        boolean asksCapability = normalized.contains("ban co the giup gi")
+                || normalized.contains("co the giup gi")
+                || normalized.contains("ban lam duoc gi")
+                || normalized.contains("ban giup duoc gi")
+                || normalized.contains("giup gi cho minh")
+                || normalized.contains("help me with")
+                || normalized.contains("what can you do");
+        boolean explicitProjectRequest = ISSUE_KEY_PATTERN.matcher(normalized).find()
+                || normalized.contains("issue")
+                || normalized.contains("task")
+                || normalized.contains("sprint")
+                || normalized.contains("rui ro")
+                || normalized.contains("workload")
+                || normalized.contains("bao cao")
+                || normalized.contains("lap ke hoach")
+                || normalized.contains("cap nhat")
+                || normalized.contains("chuyen trang thai");
+        return (greeting || asksCapability) && !explicitProjectRequest;
     }
 
     private static boolean isMyIssueListQuestion(String normalized) {
