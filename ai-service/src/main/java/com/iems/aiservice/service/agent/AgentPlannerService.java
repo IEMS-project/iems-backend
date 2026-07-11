@@ -53,10 +53,10 @@ public class AgentPlannerService {
                     List.of("pendingAction"));
         }
 
-        if (looksLikeIssueWrite(normalized)) {
+        if (looksLikeCreateIssue(normalized)) {
             return planIssueWrite(AgentIntent.ISSUE_UPDATE, question, normalized, request.projectId());
         }
-        if (looksLikeCreateIssue(normalized)) {
+        if (looksLikeExplicitIssueWrite(question, normalized)) {
             return planIssueWrite(AgentIntent.ISSUE_UPDATE, question, normalized, request.projectId());
         }
 
@@ -202,6 +202,9 @@ public class AgentPlannerService {
     }
 
     private static AgentIntent refineProjectIntent(AgentIntent intent, String normalized) {
+        if (intent == AgentIntent.DAILY_PLAN) {
+            return intent;
+        }
         if (containsAny(normalized, "workload", "qua tai", "phan bo lai", "can ho tro")) {
             return AgentIntent.MEMBER_WORKLOAD;
         }
@@ -279,6 +282,20 @@ public class AgentPlannerService {
                 "done", "hoan thanh", "in progress", "dang lam", "todo", "to do");
     }
 
+    private static boolean looksLikeExplicitIssueWrite(String question, String normalized) {
+        if (!looksLikeIssueWrite(normalized)) {
+            return false;
+        }
+        if (extractIssueKey(question) != null) {
+            return true;
+        }
+        if (containsAny(normalized, "task nay", "issue nay", "cong viec nay")) {
+            return true;
+        }
+        return STATUS_AFTER_PATTERN.matcher(question == null ? "" : question).find()
+                && containsAny(normalized, "sang", "to", "thanh", "status", "trang thai");
+    }
+
     private static boolean looksLikeCreateIssue(String normalized) {
         return containsAny(normalized, "tao issue", "create issue", "tao task", "them issue");
     }
@@ -299,6 +316,7 @@ public class AgentPlannerService {
         String lowered = value.toLowerCase(Locale.ROOT).trim();
         String decomposed = Normalizer.normalize(lowered, Normalizer.Form.NFD);
         return decomposed.replaceAll("\\p{M}", "")
+                .replace('đ', 'd')
                 .replace('đ', 'd')
                 .replaceAll("\\s+", " ");
     }

@@ -57,6 +57,14 @@ class AgentIntentRouterServiceTest {
     }
 
     @Test
+    void routeShouldHandleAccentedVietnameseManagementQuestions() {
+        assertEquals(AgentIntent.PROJECT_SUMMARY,
+                service.route("Tóm tắt tình trạng dự án này bằng tiếng Việt tự nhiên, nêu rõ số lượng task theo trạng thái nếu có.").intent());
+        assertEquals(AgentIntent.DAILY_PLAN,
+                service.route("Hôm nay team nên ưu tiên 5 việc nào để giảm rủi ro nhất? Giải thích ngắn gọn.").intent());
+    }
+
+    @Test
     void routeShouldFallbackToGeneralChat() {
         assertEquals(AgentIntent.GENERAL_CHAT, service.route("hello there").intent());
         assertEquals(AgentIntent.GENERAL_CHAT,

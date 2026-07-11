@@ -110,6 +110,30 @@ class AgentPlannerServiceTest {
     }
 
     @Test
+    void accentedProjectSummaryShouldReadProjectData() {
+        AgentPlan plan = service.plan(
+                "user-1",
+                "conv-1",
+                new AgentChatRequest("Tóm tắt tình trạng dự án này bằng tiếng Việt tự nhiên, nêu rõ số lượng task theo trạng thái nếu có.", "conv-1", "project-1", List.of()),
+                "");
+
+        assertEquals(AgentAction.READ_PROJECT, plan.action());
+        assertEquals(AgentIntent.PROJECT_SUMMARY, plan.intent());
+    }
+
+    @Test
+    void riskPriorityQuestionShouldReadProjectDataInsteadOfAskingForIssueKey() {
+        AgentPlan plan = service.plan(
+                "user-1",
+                "conv-1",
+                new AgentChatRequest("Hôm nay team nên ưu tiên 5 việc nào để giảm rủi ro nhất? Giải thích ngắn gọn.", "conv-1", "project-1", List.of()),
+                "");
+
+        assertEquals(AgentAction.READ_PROJECT, plan.action());
+        assertEquals(AgentIntent.DAILY_PLAN, plan.intent());
+    }
+
+    @Test
     void updateWithoutIssueKeyShouldClarify() {
         AgentPlan plan = service.plan(
                 "user-1",

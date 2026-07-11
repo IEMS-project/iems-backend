@@ -93,6 +93,10 @@ public class AgentIntentRouterService {
         }
 
         if (containsAnyFuzzy(normalized, REPORT_TERMS)) {
+            if (containsAnyExact(normalized, "tom tat", "tinh trang", "suc khoe", "thong ke",
+                    "so task theo trang thai", "task theo trang thai", "issue theo trang thai")) {
+                return new AgentDecision(AgentIntent.PROJECT_SUMMARY, 0.94, "matched_project_summary_terms");
+            }
             if (containsAnyFuzzy(normalized, Set.of("lap ke hoach hom nay", "ke hoach hom nay", "5 viec uu tien",
                     "top 5", "hom nay can lam gi", "can lam gi hom nay", "viec cua toi hom nay",
                     "uu tien hom nay"))) {
@@ -209,12 +213,22 @@ public class AgentIntentRouterService {
     private static String normalize(String text) {
         String lowered = text.toLowerCase().trim();
         String decomposed = Normalizer.normalize(lowered, Normalizer.Form.NFD);
-        return decomposed.replaceAll("\\p{M}+", "");
+        return decomposed.replaceAll("\\p{M}+", "")
+                .replace('đ', 'd');
     }
 
     private static boolean containsAnyFuzzy(String text, Set<String> terms) {
         for (String term : terms) {
             if (matchesTermFuzzy(text, term)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean containsAnyExact(String text, String... terms) {
+        for (String term : terms) {
+            if (text.contains(term)) {
                 return true;
             }
         }

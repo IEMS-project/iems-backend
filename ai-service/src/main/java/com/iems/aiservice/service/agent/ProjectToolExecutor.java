@@ -932,6 +932,7 @@ public class ProjectToolExecutor {
         String decomposed = Normalizer.normalize(lowered, Normalizer.Form.NFD);
         return decomposed.replaceAll("\\p{M}", "")
                 .replace('đ', 'd')
+                .replace('đ', 'd')
                 .replaceAll("\\s+", " ");
     }
 }

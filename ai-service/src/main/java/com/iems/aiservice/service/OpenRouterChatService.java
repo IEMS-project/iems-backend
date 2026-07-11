@@ -275,7 +275,8 @@ public class OpenRouterChatService {
     private String normalizeForIntent(String text) {
         String lowered = text.toLowerCase().trim();
         String decomposed = java.text.Normalizer.normalize(lowered, java.text.Normalizer.Form.NFD);
-        return decomposed.replaceAll("\\p{M}+", "");
+        return decomposed.replaceAll("\\p{M}+", "")
+                .replace('đ', 'd');
     }
 
     private String normalizeMarkdown(String text) {
