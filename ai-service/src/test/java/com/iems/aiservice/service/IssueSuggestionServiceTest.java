@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class IssueSuggestionServiceTest {
 
@@ -48,5 +49,31 @@ class IssueSuggestionServiceTest {
         assertEquals(1, summary.getFirst().get("openStoryPoints"));
         assertEquals(5, summary.get(1).get("openStoryPoints"));
         assertEquals(1, summary.get(1).get("completedIssueCount"));
+    }
+
+    @Test
+    void textSimilarityMatchesRelatedAuthTasksWithDifferentWords() {
+        double score = IssueSuggestionService.textSimilarity(
+                "Tich hop OAuth cho dang nhap Google",
+                "Xu ly authentication login bang JWT");
+
+        assertTrue(score > 0.08);
+    }
+
+    @Test
+    void chooseAssigneeUsesSimilarHistoryWhenWorkloadIsReasonable() {
+        List<Map<String, Object>> workload = List.of(
+                Map.of("memberId", "u1", "name", "A", "openStoryPoints", 4, "openIssueCount", 1,
+                        "completedIssueCount", 5),
+                Map.of("memberId", "u2", "name", "B", "openStoryPoints", 0, "openIssueCount", 0,
+                        "completedIssueCount", 1));
+        List<Map<String, Object>> similarIssues = List.of(
+                Map.of("assigneeId", "u1", "storyPoints", 5, "similarity", 0.72),
+                Map.of("assigneeId", "u1", "storyPoints", 5, "similarity", 0.65));
+
+        Map<String, Object> assignee = service.chooseAssignee(workload, similarIssues, 5);
+
+        assertEquals("u1", assignee.get("memberId"));
+        assertEquals(2, assignee.get("similarIssueCount"));
     }
 }

@@ -35,6 +35,48 @@ import java.util.stream.Collectors;
 public class IssueSuggestionService {
 
     private static final List<Integer> FIBONACCI_POINTS = List.of(0, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89);
+    private static final Set<String> STOP_WORDS = Set.of(
+            "title", "description", "type", "priority", "labels",
+            "task", "issue", "cong", "viec", "cho", "voi", "cua", "cac", "the", "and", "for", "from", "this",
+            "that", "moi", "mot", "nhung", "dang", "can", "them", "sua", "tao", "cap", "nhat");
+    private static final Map<String, String> DOMAIN_SYNONYMS = Map.ofEntries(
+            Map.entry("login", "auth"),
+            Map.entry("signin", "auth"),
+            Map.entry("auth", "auth"),
+            Map.entry("authentication", "auth"),
+            Map.entry("oauth", "auth"),
+            Map.entry("jwt", "auth"),
+            Map.entry("nhap", "auth"),
+            Map.entry("payment", "payment"),
+            Map.entry("checkout", "payment"),
+            Map.entry("invoice", "payment"),
+            Map.entry("thanh", "payment"),
+            Map.entry("toan", "payment"),
+            Map.entry("profile", "user"),
+            Map.entry("account", "user"),
+            Map.entry("member", "user"),
+            Map.entry("nguoi", "user"),
+            Map.entry("dung", "user"),
+            Map.entry("notification", "notify"),
+            Map.entry("notify", "notify"),
+            Map.entry("email", "notify"),
+            Map.entry("mail", "notify"),
+            Map.entry("dashboard", "report"),
+            Map.entry("report", "report"),
+            Map.entry("chart", "report"),
+            Map.entry("cao", "report"),
+            Map.entry("bug", "defect"),
+            Map.entry("error", "defect"),
+            Map.entry("exception", "defect"),
+            Map.entry("loi", "defect"),
+            Map.entry("ui", "frontend"),
+            Map.entry("ux", "frontend"),
+            Map.entry("frontend", "frontend"),
+            Map.entry("giao", "frontend"),
+            Map.entry("dien", "frontend"),
+            Map.entry("api", "backend"),
+            Map.entry("endpoint", "backend"),
+            Map.entry("backend", "backend"));
 
     private final RestClient projectClient;
     private final OpenRouterEmbeddingService embeddingService;
@@ -131,6 +173,8 @@ public class IssueSuggestionService {
         List<Map<String, Object>> allIssues = fetchList("/projects/" + projectId + "/issues", authorization);
         List<Map<String, Object>> members = fetchList("/projects/" + projectId + "/members", authorization);
         List<Map<String, Object>> statuses = fetchWorkflowStatuses(projectId, authorization);
+        Map<String, String> issueTypeNames = nameById(fetchList("/projects/" + projectId + "/issue-types", authorization));
+        Map<String, String> priorityNames = nameById(fetchList("/projects/" + projectId + "/issue-priorities", authorization));
 
         Set<String> doneStatusIds = statuses.stream()
                 .filter(status -> normalize(stringValue(status.get("category"))).contains("done"))
@@ -162,12 +206,36 @@ public class IssueSuggestionService {
 
         List<Map<String, Object>> assignments = new ArrayList<>();
         for (Map<String, Object> issue : targetIssues) {
-            Map<String, Object> assignee = chooseAssignee(new ArrayList<>(mutableWorkload.values()), List.of(),
-                    intValue(issue.get("storyPoints"), 1));
+            String issueTypeId = stringValue(issue.get("issueTypeId"));
+            String priorityId = stringValue(issue.get("priorityId"));
+            String targetText = issueText(
+                    stringValue(issue.get("title")),
+                    stringValue(issue.get("description")),
+                    issueTypeId,
+                    firstNonBlank(firstNonBlank(issue, "issueTypeName", "typeName", "type"),
+                            issueTypeNames.get(issueTypeId)),
+                    priorityId,
+                    firstNonBlank(firstNonBlank(issue, "priorityName", "priority"),
+                            priorityNames.get(priorityId)),
+                    labelsText(issue.get("labels")));
+            List<Map<String, Object>> similarIssues = rankSimilarIssues(
+                    projectId.toString(),
+                    targetText,
+                    safeEmbed(targetText),
+                    allIssues,
+                    doneStatusIds,
+                    issueTypeNames,
+                    priorityNames)
+                    .stream()
+                    .limit(5)
+                    .map(match -> compactIssue(match.issue(), match.score()))
+                    .toList();
+            int points = Math.max(1, intValue(issue.get("storyPoints"), 1));
+            Map<String, Object> assignee = chooseAssignee(new ArrayList<>(mutableWorkload.values()), similarIssues,
+                    points);
             if (assignee == null) {
                 break;
             }
-            int points = Math.max(1, intValue(issue.get("storyPoints"), 1));
             String memberId = stringValue(assignee.get("memberId"));
             assignee.put("openStoryPoints", intValue(assignee.get("openStoryPoints"), 0) + points);
             assignee.put("openIssueCount", intValue(assignee.get("openIssueCount"), 0) + 1);
@@ -178,7 +246,14 @@ public class IssueSuggestionService {
             assignment.put("suggestedAssigneeId", memberId);
             assignment.put("suggestedAssigneeName", stringValue(assignee.get("name")));
             assignment.put("storyPoints", points);
-            assignment.put("reason", "Người này đang có tổng point mở thấp nhất sau khi cân bằng sprint.");
+            assignment.put("similarIssues", similarIssues);
+            int similarCount = intValue(assignee.get("similarIssueCount"), 0);
+            if (similarCount > 0) {
+                assignment.put("reason", "Nguoi nay tung lam " + similarCount
+                        + " task Done tuong dong va van duoc can bang theo workload hien tai.");
+            } else {
+                assignment.put("reason", "Chua co lich su tuong dong du manh; uu tien workload thap nhat sau khi can bang sprint.");
+            }
             assignments.add(assignment);
         }
 
@@ -300,8 +375,11 @@ public class IssueSuggestionService {
                         List<Double> issueEmbedding = cachedEmbedding(projectId, issueId, text);
                         vectorScore = cosine(requestEmbedding, issueEmbedding);
                     }
-                    double lexicalScore = lexicalSimilarity(requestText, text);
-                    return new SimilarIssue(issue, Math.max(vectorScore, lexicalScore));
+                    double textScore = textSimilarity(requestText, text);
+                    double score = vectorScore > 0
+                            ? Math.max(textScore, vectorScore * 0.72 + textScore * 0.28)
+                            : textScore;
+                    return new SimilarIssue(issue, score);
                 })
                 .filter(match -> match.score() > 0.08)
                 .sorted(Comparator.comparingDouble(SimilarIssue::score).reversed())
@@ -351,7 +429,7 @@ public class IssueSuggestionService {
         }
     }
 
-    private Map<String, Object> chooseAssignee(List<Map<String, Object>> workload,
+    Map<String, Object> chooseAssignee(List<Map<String, Object>> workload,
             List<Map<String, Object>> similarIssues,
             Integer suggestedStoryPoints) {
         Map<String, Integer> similarCountByAssignee = new HashMap<>();
@@ -519,6 +597,13 @@ public class IssueSuggestionService {
         return dot / (Math.sqrt(leftNorm) * Math.sqrt(rightNorm));
     }
 
+    static double textSimilarity(String left, String right) {
+        double lexical = lexicalSimilarity(left, right);
+        double phrase = phraseCoverage(left, right);
+        double ngram = charNgramSimilarity(left, right);
+        return Math.max(lexical, Math.max(phrase * 0.85, ngram * 0.65));
+    }
+
     private static double lexicalSimilarity(String left, String right) {
         Set<String> leftWords = words(left);
         Set<String> rightWords = words(right);
@@ -533,9 +618,57 @@ public class IssueSuggestionService {
     }
 
     private static Set<String> words(String value) {
-        return java.util.Arrays.stream(normalize(value).split("\\s+"))
+        Set<String> result = java.util.Arrays.stream(normalize(value).split("\\s+"))
                 .filter(word -> word.length() > 2)
-                .collect(Collectors.toSet());
+                .filter(word -> !STOP_WORDS.contains(word))
+                .collect(Collectors.toCollection(java.util.LinkedHashSet::new));
+        List<String> synonyms = result.stream()
+                .map(DOMAIN_SYNONYMS::get)
+                .filter(Objects::nonNull)
+                .toList();
+        result.addAll(synonyms);
+        return result;
+    }
+
+    private static double phraseCoverage(String left, String right) {
+        List<String> leftWords = significantWords(left);
+        List<String> rightWords = significantWords(right);
+        if (leftWords.isEmpty() || rightWords.isEmpty()) {
+            return 0;
+        }
+        String rightText = " " + String.join(" ", rightWords) + " ";
+        long covered = leftWords.stream()
+                .filter(word -> rightText.contains(" " + word + " "))
+                .count();
+        return (double) covered / leftWords.size();
+    }
+
+    private static double charNgramSimilarity(String left, String right) {
+        Set<String> leftNgrams = charNgrams(left);
+        Set<String> rightNgrams = charNgrams(right);
+        if (leftNgrams.isEmpty() || rightNgrams.isEmpty()) {
+            return 0;
+        }
+        long intersection = leftNgrams.stream().filter(rightNgrams::contains).count();
+        java.util.HashSet<String> union = new java.util.HashSet<>(leftNgrams);
+        union.addAll(rightNgrams);
+        return union.isEmpty() ? 0 : (double) intersection / union.size();
+    }
+
+    private static Set<String> charNgrams(String value) {
+        String normalized = normalize(value).replace(" ", "");
+        if (normalized.length() < 4) {
+            return Set.of();
+        }
+        Set<String> ngrams = new java.util.LinkedHashSet<>();
+        for (int i = 0; i <= normalized.length() - 4; i++) {
+            ngrams.add(normalized.substring(i, i + 4));
+        }
+        return ngrams;
+    }
+
+    private static List<String> significantWords(String value) {
+        return words(value).stream().toList();
     }
 
     private static int nearestFibonacci(int value) {
