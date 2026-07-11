@@ -169,9 +169,13 @@ public class ProjectToolExecutor {
             return AgentToolResult.error("Mình không tìm thấy issue " + issueKey + " trong dự án này.");
         }
 
-        Map.Entry<String, String> status = findStatus(projectId, targetStatus, authorization);
+        Map<String, String> workflowStatuses = cachedWorkflowStatuses(projectId, authorization);
+        Map.Entry<String, String> status = findStatus(workflowStatuses, targetStatus);
         if (status == null) {
-            return AgentToolResult.error("Mình chưa tìm thấy trạng thái \"" + targetStatus + "\" trong workflow của dự án.");
+            return AgentToolResult.error("M\u00ecnh chưa tìm thấy trạng thái \""
+                    + cleanDisplay(targetStatus, "bạn yêu cầu")
+                    + "\" trong workflow của dự án. Các trạng thái hiện có: "
+                    + formatStatusNames(workflowStatuses) + ".");
         }
 
         String issueId = firstNonBlank(stringValue(issue.get().get("id")), stringValue(issue.get().get("issueId")));
@@ -185,7 +189,7 @@ public class ProjectToolExecutor {
         actionIssue.put("issueId", issueId);
         actionIssue.put("issueKey", issueKey);
         actionIssue.put("title", title);
-        actionIssue.put("currentStatus", displayStatus(issue.get(), cachedWorkflowStatuses(projectId, authorization)));
+        actionIssue.put("currentStatus", displayStatus(issue.get(), workflowStatuses));
 
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("actionId", actionId);
@@ -272,7 +276,18 @@ public class ProjectToolExecutor {
             return AgentToolResult.error("Mình thiếu dữ liệu để cập nhật issue. Bạn gửi lại yêu cầu giúp mình nhé.");
         }
 
-        Map<String, Object> updated = changeIssueStatusSafely(projectId, issueId, statusId, authorization);
+        Map<String, Object> updated;
+        try {
+            updated = changeIssueStatusSafely(projectId, issueId, statusId, authorization);
+        } catch (AgentWriteException ex) {
+            throw new AgentWriteException(statusUpdateFailureMessage(
+                    projectId,
+                    issueId,
+                    issueKey,
+                    targetStatus,
+                    authorization,
+                    ex.getMessage()), ex);
+        }
         cache.evictProjectWriteData(projectId);
         String title = cleanDisplay(stringValue(updated.get("title")), stringValue(pendingAction.payload().get("title")));
         return AgentToolResult.answer("Đã cập nhật " + issueKey + " - " + title + " sang " + targetStatus + ".");
@@ -341,7 +356,7 @@ public class ProjectToolExecutor {
             return "Phien dang nhap da het han nen minh chua the " + actionLabel + ". Ban dang nhap lai roi bam Allow them lan nua nhe.";
         }
         if (statusCode == 403) {
-            return "Tai khoan hien tai chua co quyen ISSUE_UPDATE trong project nay, nen minh khong the " + actionLabel + ".";
+            return "Tài khoản hiện tại chưa có quyền cập nhật issue trong project này, nên mình không thể " + actionLabel + ".";
         }
         if (statusCode == 404) {
             return "Khong tim thay project, issue hoac trang thai can cap nhat. Ban refresh du lieu roi thu lai nhe.";
@@ -350,6 +365,41 @@ public class ProjectToolExecutor {
             return "Project-service tu choi thao tac nay vi du lieu khong hop le hoac workflow khong cho phep chuyen trang thai.";
         }
         return "Project-service dang tu choi thao tac nay. Ban thu lai sau vai giay hoac kiem tra log cua project-service.";
+    }
+
+    private String statusUpdateFailureMessage(String projectId,
+            String issueId,
+            String issueKey,
+            String targetStatus,
+            String authorization,
+            String baseMessage) {
+        try {
+            Map<String, String> statuses = cachedWorkflowStatuses(projectId, authorization);
+            String currentStatus = cachedProjectIssues(projectId, authorization).stream()
+                    .filter(issue -> issueId.equals(firstNonBlank(
+                            stringValue(issue.get("id")),
+                            stringValue(issue.get("issueId")))))
+                    .findFirst()
+                    .map(issue -> displayStatus(issue, statuses))
+                    .orElse("Chưa xác định");
+            return baseMessage
+                    + "\n\nChi tiết: " + issueKey + " hiện đang ở \"" + currentStatus
+                    + "\", yêu cầu chuyển sang \"" + targetStatus + "\"."
+                    + "\nCác trạng thái trong workflow hiện có: " + formatStatusNames(statuses) + "."
+                    + "\nNếu workflow chỉ cho chuyển qua một số bước trung gian, hãy chọn trạng thái kế tiếp hợp lệ rồi bấm Allow lại.";
+        } catch (Exception ignored) {
+            return baseMessage + "\n\nMình chưa đọc lại được workflow hiện tại để bổ sung trạng thái hợp lệ. Bạn kiểm tra project-service/gateway rồi thử lại.";
+        }
+    }
+
+    private String formatStatusNames(Map<String, String> statuses) {
+        if (statuses == null || statuses.isEmpty()) {
+            return "chưa lấy được danh sách trạng thái";
+        }
+        return statuses.values().stream()
+                .filter(name -> name != null && !name.isBlank())
+                .distinct()
+                .collect(Collectors.joining(", "));
     }
 
     static class AgentWriteException extends RuntimeException {
@@ -648,9 +698,9 @@ public class ProjectToolExecutor {
                 .findFirst();
     }
 
-    private Map.Entry<String, String> findStatus(String projectId, String targetStatus, String authorization) {
+    private Map.Entry<String, String> findStatus(Map<String, String> workflowStatuses, String targetStatus) {
         String target = normalize(targetStatus);
-        for (Map.Entry<String, String> entry : cachedWorkflowStatuses(projectId, authorization).entrySet()) {
+        for (Map.Entry<String, String> entry : workflowStatuses.entrySet()) {
             String name = normalize(entry.getValue());
             if (name.equals(target) || name.contains(target) || target.contains(name)) {
                 return entry;

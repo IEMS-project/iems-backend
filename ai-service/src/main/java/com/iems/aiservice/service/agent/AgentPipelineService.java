@@ -3,7 +3,6 @@ package com.iems.aiservice.service.agent;
 import com.iems.aiservice.dto.AgentChatRequest;
 import com.iems.aiservice.dto.AgentChatResponse;
 import com.iems.aiservice.model.agent.AgentAction;
-import com.iems.aiservice.model.agent.AgentProposedAction;
 import com.iems.aiservice.model.agent.AgentPlan;
 import com.iems.aiservice.model.agent.PendingAgentAction;
 import com.iems.aiservice.service.OpenRouterChatService;
@@ -93,18 +92,13 @@ public class AgentPipelineService {
             return response(conversationId, model, clarify, clarify.naturalLanguageHint(), List.of());
         }
 
+        pendingActionStore.consume(conversationId, userId);
         AgentToolResult result;
         try {
             result = projectToolExecutor.executeConfirmedWrite(action, authorization);
         } catch (ProjectToolExecutor.AgentWriteException ex) {
             result = AgentToolResult.error(ex.getMessage());
         }
-        if (result.success()) {
-            pendingActionStore.consume(conversationId, userId);
-        }
-        List<AgentProposedAction> proposedActions = result.success()
-                ? result.proposedActions()
-                : List.of(new AgentProposedAction(action.toolName(), "Thu lai", action.payload()));
         AgentPlan plan = new AgentPlan(
                 AgentAction.EXECUTE_CONFIRMED_WRITE,
                 com.iems.aiservice.model.agent.AgentIntent.ISSUE_UPDATE,
@@ -116,7 +110,7 @@ public class AgentPipelineService {
                 "Execute explicitly allowed action.",
                 false,
                 "");
-        return response(conversationId, model, plan, result.answer(), proposedActions);
+        return response(conversationId, model, plan, result.answer(), result.success() ? result.proposedActions() : List.of());
     }
 
     private AgentChatResponse answerWithOpenRouter(String conversationId,

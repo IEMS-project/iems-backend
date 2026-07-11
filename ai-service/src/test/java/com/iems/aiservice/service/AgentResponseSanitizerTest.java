@@ -40,4 +40,12 @@ class AgentResponseSanitizerTest {
         assertTrue(result.contains("\n- Sanitizer: \u0110\u1ea3m b\u1ea3o"));
         assertTrue(result.contains("\n\nT\u00f3m l\u1ea1i: \u0110\u00e2y l\u00e0 b\u1ea3n thi\u1ebft k\u1ebf"));
     }
+
+    @Test
+    void sanitizeShouldHideInternalSafetyDebugLines() {
+        String result = sanitizer.sanitize("User Safety: safe\n");
+
+        assertFalse(result.contains("User Safety"));
+        assertTrue(result.contains("kh\u00f4ng c\u00f3 n\u1ed9i dung ph\u00f9 h\u1ee3p"));
+    }
 }

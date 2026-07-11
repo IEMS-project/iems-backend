@@ -24,7 +24,8 @@ public class AgentIntentRouterService {
             "tom tat tien do", "dem so issue", "thong ke", "thong ke theo status", "thong ke theo priority",
             "phan tich rui ro", "lap ke hoach hom nay", "de xuat viec can lam", "bao nhieu issue",
             "tinh trang du an", "tom tat tinh trang", "suc khoe du an", "bao cao", "report", "summary",
-            "count issue", "status va priority", "ai dang qua tai", "qua tai", "deadline", "han chot",
+            "count issue", "so task theo trang thai", "task theo trang thai", "issue theo trang thai",
+            "status va priority", "ai dang qua tai", "qua tai", "deadline", "han chot",
             "hom nay can lam gi", "can lam gi hom nay", "viec cua toi hom nay", "uu tien hom nay");
 
     private static final Set<String> ISSUE_ANALYSIS_TERMS = Set.of(

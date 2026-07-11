@@ -2,11 +2,18 @@ package com.iems.aiservice.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
+
 @ConfigurationProperties(prefix = "ai.openrouter")
 public class AiProperties {
 
     private String baseUrl;
     private String apiKey;
+    private String apiKeys;
     private String httpReferer;
     private String title;
     private String model;
@@ -17,6 +24,7 @@ public class AiProperties {
     private int retrievalTopK = 6;
     private int chunkSize = 900;
     private int chunkOverlap = 150;
+    private final AtomicInteger apiKeyCursor = new AtomicInteger();
 
     public String getBaseUrl() {
         return baseUrl;
@@ -32,6 +40,46 @@ public class AiProperties {
 
     public void setApiKey(String apiKey) {
         this.apiKey = apiKey;
+    }
+
+    public String getApiKeys() {
+        return apiKeys;
+    }
+
+    public void setApiKeys(String apiKeys) {
+        this.apiKeys = apiKeys;
+    }
+
+    public List<String> configuredApiKeys() {
+        Set<String> keys = new LinkedHashSet<>();
+        addKeys(keys, apiKey);
+        addKeys(keys, apiKeys);
+        return new ArrayList<>(keys);
+    }
+
+    public boolean hasApiKey() {
+        return !configuredApiKeys().isEmpty();
+    }
+
+    public String nextApiKey() {
+        List<String> keys = configuredApiKeys();
+        if (keys.isEmpty()) {
+            return "";
+        }
+        int index = Math.floorMod(apiKeyCursor.getAndIncrement(), keys.size());
+        return keys.get(index);
+    }
+
+    private void addKeys(Set<String> keys, String raw) {
+        if (raw == null || raw.isBlank()) {
+            return;
+        }
+        for (String key : raw.split("[,;\\n]")) {
+            String trimmed = key.trim();
+            if (!trimmed.isBlank()) {
+                keys.add(trimmed);
+            }
+        }
     }
 
     public String getHttpReferer() {

@@ -11,6 +11,8 @@ public class AgentResponseSanitizer {
             "\\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\b");
     private static final Pattern TECHNICAL_FIELD_LINE_PATTERN = Pattern.compile(
             "(?im)^.*\\b(token|endpoint|api|stack trace)\\b.*$\\R?");
+    private static final Pattern INTERNAL_SAFETY_LINE_PATTERN = Pattern.compile(
+            "(?im)^\\s*(user\\s+safety|assistant\\s+safety|safety)\\s*:\\s*\\w+\\s*$\\R?");
     private static final Pattern INLINE_TECHNICAL_FIELD_PATTERN = Pattern.compile(
             "(?i)\\s*\\|?\\s*(id|projectId|project_id|issueId|internalId|token|endpoint|api)\\s*=\\s*[^|\\n]+");
     private static final Pattern JSON_BLOCK_PATTERN = Pattern.compile("(?s)```\\s*json\\s*.*?```");
@@ -22,6 +24,7 @@ public class AgentResponseSanitizer {
 
         String sanitized = answer;
         sanitized = JSON_BLOCK_PATTERN.matcher(sanitized).replaceAll("");
+        sanitized = INTERNAL_SAFETY_LINE_PATTERN.matcher(sanitized).replaceAll("");
         sanitized = TECHNICAL_FIELD_LINE_PATTERN.matcher(sanitized).replaceAll("");
         sanitized = INLINE_TECHNICAL_FIELD_PATTERN.matcher(sanitized).replaceAll("");
         sanitized = UUID_PATTERN.matcher(sanitized).replaceAll("[\u0111\u00e3 \u1ea9n]");

@@ -56,7 +56,7 @@ class OpenRouterEmbeddingServiceTest {
         properties.setApiKey("   ");
 
         IllegalStateException ex = assertThrows(IllegalStateException.class, () -> service.embed("hello"));
-        assertEquals("OPENROUTER_API_KEY is not configured", ex.getMessage());
+        assertEquals("OPENROUTER_API_KEY or OPENROUTER_API_KEYS is not configured", ex.getMessage());
     }
 
     @Test

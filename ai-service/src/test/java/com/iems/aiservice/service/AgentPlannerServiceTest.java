@@ -39,6 +39,18 @@ class AgentPlannerServiceTest {
     }
 
     @Test
+    void updateStatusShouldTrimCourtesyWordsFromUnknownStatus() {
+        AgentPlan plan = service.plan(
+                "user-1",
+                "conv-1",
+                new AgentChatRequest("Chuyen IEMS2-8 sang trang thai Banana giup toi", "conv-1", "project-1", List.of()),
+                "");
+
+        assertEquals(AgentAction.PROPOSE_WRITE, plan.action());
+        assertEquals("Banana", plan.resolvedInputs().get("targetStatus"));
+    }
+
+    @Test
     void confirmationWithoutPendingActionShouldClarify() {
         AgentPlan plan = service.plan(
                 "user-1",
@@ -83,6 +95,30 @@ class AgentPlannerServiceTest {
 
         assertEquals(AgentAction.READ_PROJECT, plan.action());
         assertEquals(AgentIntent.DAILY_PLAN, plan.intent());
+    }
+
+    @Test
+    void statusCountQuestionShouldReadProjectInsteadOfUpdate() {
+        AgentPlan plan = service.plan(
+                "user-1",
+                "conv-1",
+                new AgentChatRequest("tom tat tinh trang du an, so task theo trang thai", "conv-1", "project-1", List.of()),
+                "");
+
+        assertEquals(AgentAction.READ_PROJECT, plan.action());
+        assertEquals(AgentIntent.PROJECT_SUMMARY, plan.intent());
+    }
+
+    @Test
+    void updateWithoutIssueKeyShouldClarify() {
+        AgentPlan plan = service.plan(
+                "user-1",
+                "conv-1",
+                new AgentChatRequest("User Login sang Done", "conv-1", "project-1", List.of()),
+                "");
+
+        assertEquals(AgentAction.CLARIFY, plan.action());
+        assertEquals(List.of("issueKey"), plan.missingInputs());
     }
 
     @Test

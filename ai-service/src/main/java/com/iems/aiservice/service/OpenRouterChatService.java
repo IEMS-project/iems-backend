@@ -7,9 +7,11 @@ import com.iems.aiservice.service.agent.AgentMarkdownNormalizer;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.ResourceLoader;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -64,12 +66,7 @@ public class OpenRouterChatService {
                         Map.of("role", "user", "content", scopedQuestion)),
                 "temperature", aiProperties.getTemperature());
 
-        Map<?, ?> response = openRouterRestClient.post()
-                .uri("/chat/completions")
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(payload)
-                .retrieve()
-                .body(Map.class);
+        Map<?, ?> response = postJsonWithKeyRotation("/chat/completions", payload);
 
         String text = extractMessageContent(response);
         if (text != null && !text.isBlank()) {
@@ -110,6 +107,7 @@ public class OpenRouterChatService {
 
         openRouterRestClient.post()
                 .uri("/chat/completions")
+                .header(HttpHeaders.AUTHORIZATION, bearer(aiProperties.nextApiKey()))
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(payload)
                 .exchange((request, response) -> {
@@ -161,18 +159,45 @@ public class OpenRouterChatService {
                                 Map.of("type", "image_url", "image_url", Map.of("url", dataUrl))))),
                 "temperature", aiProperties.getTemperature());
 
-        Map<?, ?> response = openRouterRestClient.post()
-                .uri("/chat/completions")
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(payload)
-                .retrieve()
-                .body(Map.class);
+        Map<?, ?> response = postJsonWithKeyRotation("/chat/completions", payload);
 
         String text = extractMessageContent(response);
         if (text == null || text.isBlank()) {
             throw new IllegalStateException("Unable to parse image description from OpenRouter response");
         }
         return text.trim();
+    }
+
+    private Map<?, ?> postJsonWithKeyRotation(String uri, Map<String, Object> payload) {
+        int attempts = Math.max(1, aiProperties.configuredApiKeys().size());
+        RestClientResponseException lastRetryable = null;
+        for (int attempt = 0; attempt < attempts; attempt++) {
+            try {
+                return openRouterRestClient.post()
+                        .uri(uri)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(aiProperties.nextApiKey()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body(payload)
+                        .retrieve()
+                        .body(Map.class);
+            } catch (RestClientResponseException ex) {
+                if (!isRetryableOpenRouterKeyError(ex) || attempts == 1) {
+                    throw ex;
+                }
+                lastRetryable = ex;
+                log.warn("OpenRouter key failed with status {}; trying another configured key", ex.getStatusCode().value());
+            }
+        }
+        throw lastRetryable;
+    }
+
+    private boolean isRetryableOpenRouterKeyError(RestClientResponseException ex) {
+        int status = ex.getStatusCode().value();
+        return status == 401 || status == 402 || status == 429;
+    }
+
+    private String bearer(String apiKey) {
+        return "Bearer " + (apiKey == null ? "" : apiKey);
     }
 
     private String extractMessageContent(Map<?, ?> response) {
@@ -208,12 +233,7 @@ public class OpenRouterChatService {
                                         + "\n\nHÃ£y viáº¿t láº¡i báº±ng tiáº¿ng Viá»‡t, Markdown dá»… Ä‘á»c, khÃ´ng thÃªm thÃ´ng tin khÃ´ng cÃ³.")),
                 "temperature", 0.1);
 
-        Map<?, ?> response = openRouterRestClient.post()
-                .uri("/chat/completions")
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(payload)
-                .retrieve()
-                .body(Map.class);
+        Map<?, ?> response = postJsonWithKeyRotation("/chat/completions", payload);
 
         String repaired = extractMessageContent(response);
         return repaired == null || repaired.isBlank() ? answer : normalizeMarkdown(repaired.trim());
@@ -249,7 +269,7 @@ public class OpenRouterChatService {
     }
 
     private String capabilityAnswer() {
-        return "Xin chao! Minh co the giup ban hoi dap binh thuong, tom tat tinh hinh project, lap top viec uu tien, phan tich rui ro/workload, va chuan bi thao tac cap nhat issue qua nut Allow khi can.";
+        return "Xin chào! Mình có thể giúp bạn hỏi đáp, tóm tắt tình hình project, lập top việc ưu tiên, phân tích rủi ro/workload và chuẩn bị thao tác cập nhật issue qua nút Allow khi cần.";
     }
 
     private String normalizeForIntent(String text) {
@@ -357,8 +377,8 @@ public class OpenRouterChatService {
     }
 
     private void ensureApiKeyConfigured() {
-        if (aiProperties.getApiKey() == null || aiProperties.getApiKey().isBlank()) {
-            throw new IllegalStateException("OPENROUTER_API_KEY is not configured");
+        if (!aiProperties.hasApiKey()) {
+            throw new IllegalStateException("OPENROUTER_API_KEY or OPENROUTER_API_KEYS is not configured");
         }
     }
 }

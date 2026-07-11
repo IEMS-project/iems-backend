@@ -95,7 +95,7 @@ class AgentPipelineServiceTest {
     }
 
     @Test
-    void forbiddenStatusUpdateShouldReturnPermissionMessageAndKeepActionRetryable() {
+    void forbiddenStatusUpdateShouldReturnPermissionMessageAndClearUsedAction() {
         when(projectApiClient.listProjectIssues("project-1", "Bearer token"))
                 .thenReturn(List.of(issue("issue-8", "IEMS2-8", "User Login", "review", "high")));
         when(projectApiClient.listProjectIssuesPaged("project-1", "Bearer token", 200))
@@ -127,8 +127,11 @@ class AgentPipelineServiceTest {
                 "Bearer token",
                 "test-model");
 
-        assertTrue(failed.answer().contains("ISSUE_UPDATE"));
-        assertFalse(failed.proposedActions().isEmpty());
+        assertTrue(failed.answer().contains("quy"));
+        assertTrue(failed.answer().contains("IEMS2-8"));
+        assertTrue(failed.answer().contains("Review"));
+        assertTrue(failed.answer().contains("Done"));
+        assertTrue(failed.proposedActions().isEmpty());
     }
 
     @Test

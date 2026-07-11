@@ -20,7 +20,7 @@ public class AgentPlannerService {
 
     private static final Pattern ISSUE_KEY_PATTERN = Pattern.compile("\\b([A-Z][A-Z0-9]*-\\d+)\\b");
     private static final Pattern STATUS_AFTER_PATTERN = Pattern.compile(
-            "(?:sang|to|thanh|status)\\s+([\\p{L}\\p{N}\\s_-]{2,40})",
+            "(?:sang|to|thanh|status|trang thai)\\s+(?:trang thai\\s+)?([\\p{L}\\p{N}_-]+(?:\\s+[\\p{L}\\p{N}_-]+){0,4})",
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
 
     private final AgentIntentRouterService intentRouterService;
@@ -53,7 +53,7 @@ public class AgentPlannerService {
                     List.of("pendingAction"));
         }
 
-        if (extractIssueKey(question) != null && looksLikeIssueWrite(normalized)) {
+        if (looksLikeIssueWrite(normalized)) {
             return planIssueWrite(AgentIntent.ISSUE_UPDATE, question, normalized, request.projectId());
         }
         if (looksLikeCreateIssue(normalized)) {
@@ -235,9 +235,20 @@ public class AgentPlannerService {
 
         Matcher matcher = STATUS_AFTER_PATTERN.matcher(question == null ? "" : question);
         if (matcher.find()) {
-            return matcher.group(1).trim();
+            return cleanTargetStatus(matcher.group(1));
         }
         return "";
+    }
+
+    private static String cleanTargetStatus(String rawStatus) {
+        if (rawStatus == null) {
+            return "";
+        }
+        String cleaned = rawStatus
+                .replaceAll("(?iu)\\b(giup|giúp|toi|tôi|minh|mình|nhe|nhé|di|đi|lai|lại)\\b.*$", "")
+                .replaceAll("(?iu)^trang\\s+thai\\s+", "")
+                .trim();
+        return cleaned.replaceAll("\\s+", " ");
     }
 
     private static String extractAssigneeText(String question) {
@@ -264,8 +275,8 @@ public class AgentPlannerService {
 
     private static boolean looksLikeIssueWrite(String normalized) {
         return containsAny(normalized,
-                "cap nhat", "update", "chuyen", "doi", "sang", "status", "trang thai",
-                "assign", "gan", "assignee", "done", "hoan thanh");
+                "cap nhat", "update", "chuyen", "doi", "assign", "gan", "assignee",
+                "done", "hoan thanh", "in progress", "dang lam", "todo", "to do");
     }
 
     private static boolean looksLikeCreateIssue(String normalized) {
