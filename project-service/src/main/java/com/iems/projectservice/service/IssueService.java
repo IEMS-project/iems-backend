@@ -16,6 +16,7 @@ import com.iems.projectservice.dto.response.UserDetailDto;
 import com.iems.projectservice.dto.response.UserInfoDto;
 import com.iems.projectservice.entity.*;
 import com.iems.projectservice.entity.enums.SprintStatus;
+import com.iems.projectservice.entity.enums.StatusCategory;
 import com.iems.projectservice.exception.AppException;
 import com.iems.projectservice.exception.ProjectErrorCode;
 import com.iems.projectservice.repository.*;
@@ -447,14 +448,48 @@ public class IssueService {
     }
 
     private void changeStatus(Issue issue, UUID newStatusId, UUID userId) {
+        WorkflowStatus newStatus = workflowStatusRepository.findById(newStatusId)
+                .orElseThrow(() -> new AppException(ProjectErrorCode.WORKFLOW_STATUS_NOT_FOUND));
+
+        if (newStatus.getCategory() == StatusCategory.DONE) {
+            List<Issue> childIssues = issueRepository.findByParentId(issue.getId());
+            if (!childIssues.isEmpty()) {
+                Set<UUID> childStatusIds = childIssues.stream()
+                        .map(Issue::getStatusId)
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.toSet());
+
+                Map<UUID, WorkflowStatus> childStatuses = childStatusIds.isEmpty()
+                        ? Collections.emptyMap()
+                        : workflowStatusRepository.findAllById(childStatusIds).stream()
+                                .collect(Collectors.toMap(WorkflowStatus::getId, s -> s));
+
+                boolean hasIncompleteChildren = false;
+                for (Issue child : childIssues) {
+                    if (child.getStatusId() == null) {
+                        hasIncompleteChildren = true;
+                        break;
+                    }
+                    WorkflowStatus cs = childStatuses.get(child.getStatusId());
+                    if (cs == null || cs.getCategory() != StatusCategory.DONE) {
+                        hasIncompleteChildren = true;
+                        break;
+                    }
+                }
+
+                if (hasIncompleteChildren) {
+                    throw new AppException(ProjectErrorCode.PARENT_CANNOT_BE_DONE_IF_CHILDREN_ACTIVE);
+                }
+            }
+        }
+
         UUID fromStatusId = issue.getStatusId();
 
         String fromName = issue.getStatusId() != null
                 ? workflowStatusRepository.findById(issue.getStatusId())
                         .map(WorkflowStatus::getName).orElse("Unknown")
                 : "None";
-        String toName = workflowStatusRepository.findById(newStatusId)
-                .map(WorkflowStatus::getName).orElse("Unknown");
+        String toName = newStatus.getName();
 
         issue.setStatusId(newStatusId);
 
