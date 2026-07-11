@@ -20,6 +20,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -174,7 +175,13 @@ public class UserService {
     public Optional<UserResponseDto> getUserById(UUID id) {
         try {
             return repository.findById(id)
-                    .map(this::convertToUserResponse)
+                    .map(u -> {
+                        UserResponseDto dto = convertToUserResponse(u);
+                        if (dto != null) {
+                            accountRepository.findById(u.getAccountId()).ifPresent(a -> dto.setEnabled(a.getEnabled()));
+                        }
+                        return dto;
+                    })
                     .or(() -> {
                         throw new AppException(ErrorCode.USER_NOT_EXIST);
                     });
@@ -188,7 +195,13 @@ public class UserService {
     public Optional<UserResponseDto> getUserByAccountId(UUID accountId) {
         try {
             return repository.findByAccountId(accountId)
-                    .map(this::convertToUserResponse)
+                    .map(u -> {
+                        UserResponseDto dto = convertToUserResponse(u);
+                        if (dto != null) {
+                            accountRepository.findById(accountId).ifPresent(a -> dto.setEnabled(a.getEnabled()));
+                        }
+                        return dto;
+                    })
                     .or(() -> {
                         throw new AppException(ErrorCode.USER_NOT_EXIST);
                     });
@@ -214,9 +227,20 @@ public class UserService {
             if (request == null || request.getIds() == null || request.getIds().isEmpty()) {
                 return List.of();
             }
-            return repository.findAllById(request.getIds())
-                    .stream()
-                    .map(this::convertToUserResponse)
+            List<User> users = repository.findAllById(request.getIds());
+            Set<UUID> accountIds = users.stream().map(User::getAccountId).collect(Collectors.toSet());
+            List<Account> accounts = accountRepository.findAllById(accountIds);
+            Map<UUID, Boolean> enabledMap = accounts.stream()
+                    .collect(Collectors.toMap(Account::getId, a -> a.getEnabled() != null ? a.getEnabled() : true, (a1, a2) -> a1));
+            return users.stream()
+                    .map(u -> {
+                        UserResponseDto dto = convertToUserResponse(u);
+                        if (dto != null) {
+                            dto.setEnabled(enabledMap.getOrDefault(u.getAccountId(), true));
+                        }
+                        return dto;
+                    })
+                    .filter(Objects::nonNull)
                     .toList();
         } catch (Exception ex) {
             throw new AppException(ErrorCode.INTERNAL_SERVER_ERROR);
@@ -228,9 +252,19 @@ public class UserService {
             if (request == null || request.getAccountIds() == null || request.getAccountIds().isEmpty()) {
                 return List.of();
             }
-            return repository.findByAccountIdIn(request.getAccountIds())
-                    .stream()
-                    .map(this::convertToUserResponse)
+            List<User> users = repository.findByAccountIdIn(request.getAccountIds());
+            List<Account> accounts = accountRepository.findAllById(request.getAccountIds());
+            Map<UUID, Boolean> enabledMap = accounts.stream()
+                    .collect(Collectors.toMap(Account::getId, a -> a.getEnabled() != null ? a.getEnabled() : true, (a1, a2) -> a1));
+            return users.stream()
+                    .map(u -> {
+                        UserResponseDto dto = convertToUserResponse(u);
+                        if (dto != null) {
+                            dto.setEnabled(enabledMap.getOrDefault(u.getAccountId(), true));
+                        }
+                        return dto;
+                    })
+                    .filter(Objects::nonNull)
                     .toList();
         } catch (Exception ex) {
             throw new AppException(ErrorCode.INTERNAL_SERVER_ERROR);

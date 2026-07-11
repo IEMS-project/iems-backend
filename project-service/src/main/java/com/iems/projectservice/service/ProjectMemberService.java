@@ -41,9 +41,7 @@ public class ProjectMemberService {
 
     @Transactional
     public ProjectMember addMemberToProject(UUID projectId, UUID accountId, UUID roleId) {
-        if (projectMemberRepository.existsByProjectIdAndAccountId(projectId, accountId)) {
-            throw new AppException(ProjectErrorCode.PROJECT_MEMBER_ALREADY_EXISTS);
-        }
+        validateAccountsForInvitation(Set.of(accountId), projectId);
         // Check member limit based on project owner's subscription
         String ownerSub = projectRepository.findById(projectId)
                 .map(p -> p.getOwnerSubscription()).orElse("FREE");
@@ -61,9 +59,7 @@ public class ProjectMemberService {
 
     @Transactional
     public ProjectMember addMemberToProject(UUID projectId, UUID accountId, UUID roleId, UUID assignedBy) {
-        if (projectMemberRepository.existsByProjectIdAndAccountId(projectId, accountId)) {
-            throw new AppException(ProjectErrorCode.PROJECT_MEMBER_ALREADY_EXISTS);
-        }
+        validateAccountsForInvitation(Set.of(accountId), projectId);
         // Check member limit (skip for initial project creation where member == owner)
         if (!accountId.equals(assignedBy)) {
             String ownerSub = projectRepository.findById(projectId)
@@ -95,14 +91,15 @@ public class ProjectMemberService {
     @Transactional
     public List<ProjectMember> addMembersToProject(UUID projectId, List<UUID> accountIds, UUID roleId,
             UUID assignedBy) {
+        Set<UUID> targetIds = accountIds.stream().filter(Objects::nonNull).collect(Collectors.toSet());
+        validateAccountsForInvitation(targetIds, projectId);
+
         String ownerSub = projectRepository.findById(projectId)
                 .map(p -> p.getOwnerSubscription()).orElse("FREE");
         long memberCount = projectMemberRepository.countByProjectIdAndStatus(projectId, MemberStatus.ACTIVE);
 
         List<ProjectMember> created = new ArrayList<>();
-        for (UUID accountId : accountIds) {
-            if (accountId == null) continue;
-            if (projectMemberRepository.existsByProjectIdAndAccountId(projectId, accountId)) continue;
+        for (UUID accountId : targetIds) {
             // Check limit before each insert (count grows as batch progresses)
             subscriptionLimitService.checkCanAddMember(memberCount, ownerSub);
             ProjectMember member = new ProjectMember();
@@ -121,6 +118,12 @@ public class ProjectMemberService {
     public List<ProjectMember> addMembersToProject(UUID projectId,
             List<com.iems.projectservice.dto.request.ProjectMemberDto> members,
             UUID assignedBy) {
+        Set<UUID> targetIds = members.stream()
+                .filter(m -> m != null && m.getAccountId() != null && m.getRoleId() != null)
+                .map(com.iems.projectservice.dto.request.ProjectMemberDto::getAccountId)
+                .collect(Collectors.toSet());
+        validateAccountsForInvitation(targetIds, projectId);
+
         String ownerSub = projectRepository.findById(projectId)
                 .map(p -> p.getOwnerSubscription()).orElse("FREE");
         long memberCount = projectMemberRepository.countByProjectIdAndStatus(projectId, MemberStatus.ACTIVE);
@@ -128,7 +131,6 @@ public class ProjectMemberService {
         List<ProjectMember> created = new ArrayList<>();
         for (com.iems.projectservice.dto.request.ProjectMemberDto memberDto : members) {
             if (memberDto == null || memberDto.getAccountId() == null || memberDto.getRoleId() == null) continue;
-            if (projectMemberRepository.existsByProjectIdAndAccountId(projectId, memberDto.getAccountId())) continue;
             // Check limit before each insert (count grows as batch progresses)
             subscriptionLimitService.checkCanAddMember(memberCount, ownerSub);
             ProjectMember member = new ProjectMember();
@@ -238,5 +240,40 @@ public class ProjectMemberService {
 
     private String trim(String s) {
         return s != null ? s.trim() : "";
+    }
+
+    private void validateAccountsForInvitation(Set<UUID> accountIds, UUID projectId) {
+        if (accountIds == null || accountIds.isEmpty()) return;
+
+        List<UserDetailDto> users = new ArrayList<>();
+        try {
+            ResponseEntity<Map<String, Object>> response = userServiceFeignClient
+                    .getUsersByAccountIds(new AccountIdsDto(accountIds));
+            if (response.getBody() != null && response.getBody().get("data") != null) {
+                users = objectMapper.convertValue(
+                        response.getBody().get("data"),
+                        objectMapper.getTypeFactory().constructCollectionType(List.class, UserDetailDto.class));
+            }
+        } catch (Exception e) {
+            log.error("Failed to fetch user details from iam-service: {}", e.getMessage());
+            throw new AppException(ProjectErrorCode.INTERNAL_SERVER_ERROR);
+        }
+
+        Map<UUID, UserDetailDto> userMap = users.stream()
+                .filter(u -> u.getId() != null)
+                .collect(Collectors.toMap(UserDetailDto::getId, u -> u));
+
+        for (UUID accountId : accountIds) {
+            if (!userMap.containsKey(accountId)) {
+                throw new AppException(ProjectErrorCode.USER_NOT_FOUND);
+            }
+            UserDetailDto user = userMap.get(accountId);
+            if (Boolean.FALSE.equals(user.getEnabled())) {
+                throw new AppException(ProjectErrorCode.USER_LOCKED);
+            }
+            if (projectMemberRepository.existsByProjectIdAndAccountId(projectId, accountId)) {
+                throw new AppException(ProjectErrorCode.PROJECT_MEMBER_ALREADY_EXISTS);
+            }
+        }
     }
 }

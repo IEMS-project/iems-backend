@@ -32,7 +32,9 @@ public interface UserRepository extends JpaRepository<User, UUID> {
                 u.image
             )
             FROM User u
-            WHERE (
+            JOIN Account a ON u.accountId = a.id
+            WHERE a.enabled = true
+            AND (
                 :keyword = '' OR
                 LOWER(TRIM(CONCAT(COALESCE(u.firstName, ''), ' ', COALESCE(u.lastName, '')))) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
                 LOWER(COALESCE(u.email, '')) LIKE LOWER(CONCAT('%', :keyword, '%'))
@@ -51,7 +53,9 @@ public interface UserRepository extends JpaRepository<User, UUID> {
                 u.image
             )
             FROM User u
-            WHERE (
+            JOIN Account a ON u.accountId = a.id
+            WHERE a.enabled = true
+            AND (
                 :keyword = '' OR
                 LOWER(TRIM(CONCAT(COALESCE(u.firstName, ''), ' ', COALESCE(u.lastName, '')))) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
                 LOWER(COALESCE(u.email, '')) LIKE LOWER(CONCAT('%', :keyword, '%'))

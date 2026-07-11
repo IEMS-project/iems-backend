@@ -459,6 +459,7 @@ public class ProjectService {
                 (String) userData.get("bankName"),
                 userData.get("contractType") != null ? userData.get("contractType").toString() : null,
                 userData.get("startDate") != null ? userData.get("startDate").toString() : null,
-                (String) userData.get("role"));
+                (String) userData.get("role"),
+                userData.get("enabled") != null ? Boolean.parseBoolean(userData.get("enabled").toString()) : true);
     }
 }

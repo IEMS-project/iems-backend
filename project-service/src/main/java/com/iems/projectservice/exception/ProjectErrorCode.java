@@ -51,6 +51,8 @@ public enum ProjectErrorCode {
     ATTACHMENT_NOT_FOUND("Attachment not found", HttpStatus.NOT_FOUND),
 
     USER_NOT_FOUND("User not found", HttpStatus.NOT_FOUND),
+    USER_LOCKED("User account is locked", HttpStatus.BAD_REQUEST),
+    PARENT_CANNOT_BE_DONE_IF_CHILDREN_ACTIVE("Cannot mark parent task as DONE while there are incomplete child tasks", HttpStatus.BAD_REQUEST),
 
     // Subscription & Limit Errors
     SUBSCRIPTION_LIMIT_SETTINGS_NOT_FOUND("Subscription limit settings not found", HttpStatus.NOT_FOUND),

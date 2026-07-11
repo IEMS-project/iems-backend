@@ -21,6 +21,20 @@ public class UserResponseDto {
     private Date dob;
     private Gender gender;
     private String image;
+    private Boolean enabled;
+
+    public UserResponseDto(UUID id, String firstName, String lastName, String email, String address, String phone, Date dob, Gender gender, String image) {
+        this.id = id;
+        this.firstName = firstName;
+        this.lastName = lastName;
+        this.email = email;
+        this.address = address;
+        this.phone = phone;
+        this.dob = dob;
+        this.gender = gender;
+        this.image = image;
+        this.enabled = true;
+    }
 }
 
 
