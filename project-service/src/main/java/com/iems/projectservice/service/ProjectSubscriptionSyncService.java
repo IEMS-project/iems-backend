@@ -31,6 +31,19 @@ public class ProjectSubscriptionSyncService {
     private final ObjectMapper objectMapper;
     private final SubscriptionLimitService subscriptionLimitService;
 
+    /**
+     * Refreshes project subscription sync state.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Apply the requested state changes according to the domain rules.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param project the project parameter
+     * @return the refresh project subscription result
+     */
     @Transactional
     public Project refreshProjectSubscription(Project project) {
         if (project == null || project.getManagerAccountId() == null) {
@@ -89,6 +102,17 @@ public class ProjectSubscriptionSyncService {
         return project;
     }
 
+    /**
+     * Resolves project subscription sync information for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     * </ul>
+     *
+     * @param subscription the subscription parameter
+     * @return the resolve effective subscription result
+     */
     private String resolveEffectiveSubscription(AccountSubscriptionResponseDto subscription) {
         if (subscription == null || !"PREMIUM".equalsIgnoreCase(subscription.getSubscriptionType())) {
             return "FREE";
@@ -97,6 +121,17 @@ public class ProjectSubscriptionSyncService {
         return premiumUntil == null || premiumUntil.isAfter(Instant.now()) ? "PREMIUM" : "FREE";
     }
 
+    /**
+     * Returns is violating free limits for project subscription sync processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     * </ul>
+     *
+     * @param project the project parameter
+     * @return true if the requested condition is satisfied; otherwise false
+     */
     private boolean isViolatingFreeLimits(Project project) {
         var freeSettings = subscriptionLimitService.settingsFor(false);
 

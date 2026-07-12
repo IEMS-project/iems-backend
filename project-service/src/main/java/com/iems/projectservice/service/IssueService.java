@@ -82,6 +82,17 @@ public class IssueService {
 
     // ── User enrichment helpers ──────────────────────────────────────────────
 
+    /**
+     * Returns fetch users for ssue processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param accountIds the account ids parameter
+     * @return the fetch users result
+     */
     private Map<UUID, UserDetailDto> fetchUsers(Set<UUID> accountIds) {
         if (accountIds.isEmpty())
             return Collections.emptyMap();
@@ -102,6 +113,17 @@ public class IssueService {
         return new HashMap<>();
     }
 
+    /**
+     * Returns to user info for ssue processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param u the u parameter
+     * @return the to user info result
+     */
     private UserInfoDto toUserInfo(UserDetailDto u) {
         if (u == null)
             return null;
@@ -111,6 +133,17 @@ public class IssueService {
         return new UserInfoDto(u.getId(), name.trim(), u.getEmail(), u.getImage());
     }
 
+    /**
+     * Returns to attachment dto for ssue processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param att the att parameter
+     * @return the to attachment dto result
+     */
     private AttachmentResponseDto toAttachmentDto(Attachment att) {
         if (att == null) return null;
         return AttachmentResponseDto.builder()
@@ -126,6 +159,20 @@ public class IssueService {
                 .build();
     }
 
+    /**
+     * Returns to dto for ssue processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param issue the issue parameter
+     * @param userMap the user map parameter
+     * @param statusMap the status map parameter
+     * @param attachments the attachments parameter
+     * @return the to dto result
+     */
     private IssueResponseDto toDto(Issue issue, Map<UUID, UserDetailDto> userMap, Map<UUID, WorkflowStatus> statusMap, List<AttachmentResponseDto> attachments) {
         WorkflowStatus status = issue.getStatusId() != null ? statusMap.get(issue.getStatusId()) : null;
 
@@ -158,6 +205,18 @@ public class IssueService {
                 .build();
     }
 
+    /**
+     * Returns enrich for ssue processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Create or prepare the requested domain result.</li>
+     * </ul>
+     *
+     * @param issue the issue parameter
+     * @return the enrich result
+     */
     private IssueResponseDto enrich(Issue issue) {
         Set<UUID> ids = new HashSet<>();
         if (issue.getAssigneeId() != null)
@@ -178,6 +237,18 @@ public class IssueService {
         return toDto(issue, fetchUsers(ids), statusMap, attachments);
     }
 
+    /**
+     * Returns enrich list for ssue processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Create or prepare the requested domain result.</li>
+     * </ul>
+     *
+     * @param issues the issues parameter
+     * @return the matching result collection
+     */
     private List<IssueResponseDto> enrichList(List<Issue> issues) {
         Set<UUID> ids = new HashSet<>();
         Set<UUID> statusIds = new HashSet<>();
@@ -213,6 +284,24 @@ public class IssueService {
 
     // ── Issue CRUD ───────────────────────────────────────────────────────────
 
+    /**
+     * Creates ssue data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Create or prepare the requested domain result.</li>
+     *   <li>Apply the requested state changes according to the domain rules.</li>
+     *   <li>Send the required notification or outbound message.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @param dto the dto parameter
+     * @param reporterId the reporter id parameter
+     * @return the create issue result
+     * @throws AppException if a business rule prevents the requested operation
+     */
     @Transactional
     public IssueResponseDto createIssue(UUID projectId, CreateIssueDto dto, UUID reporterId) {
         Project project = projectRepository.findById(projectId)
@@ -266,6 +355,17 @@ public class IssueService {
         return enrich(saved);
     }
 
+    /**
+     * Resolves ssue information for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @return the resolve default status id result
+     */
     private UUID resolveDefaultStatusId(UUID projectId) {
         Workflow defaultWorkflow = workflowRepository.findByProjectIdAndIsDefaultTrue(projectId)
                 .orElse(null);
@@ -278,6 +378,25 @@ public class IssueService {
         return statuses.isEmpty() ? null : statuses.get(0).getId();
     }
 
+    /**
+     * Creates ssue data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Create or prepare the requested domain result.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @param dto the dto parameter
+     * @param reporterId the reporter id parameter
+     * @param issueKey the issue key parameter
+     * @param defaultStatusId the default status id parameter
+     * @param sortOrder the sort order parameter
+     * @param logActivity the log activity parameter
+     * @return the create issue entity result
+     */
     private Issue createIssueEntity(UUID projectId, CreateIssueDto dto, UUID reporterId, String issueKey,
             UUID defaultStatusId, int sortOrder, boolean logActivity) {
         Issue issue = new Issue();
@@ -311,6 +430,24 @@ public class IssueService {
         return saved;
     }
 
+    /**
+     * Updates ssue data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Create or prepare the requested domain result.</li>
+     *   <li>Apply the requested state changes according to the domain rules.</li>
+     *   <li>Remove or clear the requested domain data when allowed.</li>
+     * </ul>
+     *
+     * @param issueId the issue id parameter
+     * @param dto the dto parameter
+     * @param userId the user id parameter
+     * @return the update issue result
+     * @throws IllegalArgumentException if the request contains invalid arguments
+     */
     @Transactional
     public IssueResponseDto updateIssue(UUID issueId, UpdateIssueDto dto, UUID userId) {
         Issue issue = issueRepository.findById(issueId)
@@ -447,6 +584,21 @@ public class IssueService {
         return enrich(saved);
     }
 
+    /**
+     * Performs change status for ssue processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param issue the issue parameter
+     * @param newStatusId the new status id parameter
+     * @param userId the user id parameter
+     * @throws AppException if a business rule prevents the requested operation
+     */
     private void changeStatus(Issue issue, UUID newStatusId, UUID userId) {
         WorkflowStatus newStatus = workflowStatusRepository.findById(newStatusId)
                 .orElseThrow(() -> new AppException(ProjectErrorCode.WORKFLOW_STATUS_NOT_FOUND));
@@ -511,6 +663,19 @@ public class IssueService {
                 issue.getIssueKey() + ": " + fromName + " → " + toName);
     }
 
+    /**
+     * Deletes ssue data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Remove or clear the requested domain data when allowed.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param issueId the issue id parameter
+     * @param userId the user id parameter
+     */
     @Transactional
     public void deleteIssue(UUID issueId, UUID userId) {
         Issue issue = issueRepository.findById(issueId)
@@ -521,16 +686,51 @@ public class IssueService {
         issueRepository.delete(issue);
     }
 
+    /**
+     * Retrieves ssue information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param issueId the issue id parameter
+     * @return the get issue by id result
+     */
     public IssueResponseDto getIssueById(UUID issueId) {
         Issue issue = issueRepository.findById(issueId)
                 .orElseThrow(() -> new AppException(ProjectErrorCode.ISSUE_NOT_FOUND));
         return enrich(issue);
     }
 
+    /**
+     * Retrieves ssue information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @return the matching result collection
+     */
     public List<IssueResponseDto> getIssuesByProject(UUID projectId) {
         return enrichList(issueRepository.findByProjectIdOrderBySortOrderAsc(projectId));
     }
 
+    /**
+     * Retrieves ssue information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @param page the page parameter
+     * @param size the size parameter
+     * @return the paginated result set
+     */
     public PagedResponseDto<IssueResponseDto> getIssuesByProjectPaged(UUID projectId, int page, int size) {
         int safePage = Math.max(page, 0);
         int safeSize = Math.max(1, Math.min(size, 200));
@@ -546,22 +746,81 @@ public class IssueService {
                 result.isLast());
     }
 
+    /**
+     * Retrieves ssue information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @return the matching result collection
+     */
     public List<IssueResponseDto> getBacklog(UUID projectId) {
         return enrichList(issueRepository.findByProjectIdAndSprintIdIsNullOrderBySortOrderAsc(projectId));
     }
 
+    /**
+     * Retrieves ssue information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param sprintId the sprint id parameter
+     * @return the matching result collection
+     */
     public List<IssueResponseDto> getIssuesBySprint(UUID sprintId) {
         return enrichList(issueRepository.findBySprintIdOrderBySortOrderAsc(sprintId));
     }
 
+    /**
+     * Retrieves ssue information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param parentId the parent id parameter
+     * @return the matching result collection
+     */
     public List<IssueResponseDto> getChildIssues(UUID parentId) {
         return enrichList(issueRepository.findByParentId(parentId));
     }
 
+    /**
+     * Retrieves ssue information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param assigneeId the assignee id parameter
+     * @return the matching result collection
+     */
     public List<IssueResponseDto> getMyIssues(UUID assigneeId) {
         return enrichList(issueRepository.findByAssigneeId(assigneeId));
     }
 
+    /**
+     * Adds ssue data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Create or prepare the requested domain result.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param issueId the issue id parameter
+     * @param sprintId the sprint id parameter
+     * @param userId the user id parameter
+     * @return the add to sprint result
+     */
     @Transactional
     public IssueResponseDto addToSprint(UUID issueId, UUID sprintId, UUID userId) {
         Issue issue = issueRepository.findById(issueId)
@@ -574,6 +833,20 @@ public class IssueService {
         return enrich(issueRepository.save(issue));
     }
 
+    /**
+     * Removes ssue data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Remove or clear the requested domain data when allowed.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param issueId the issue id parameter
+     * @param userId the user id parameter
+     * @return the remove from sprint result
+     */
     @Transactional
     public IssueResponseDto removeFromSprint(UUID issueId, UUID userId) {
         Issue issue = issueRepository.findById(issueId)
@@ -584,6 +857,22 @@ public class IssueService {
         return enrich(issueRepository.save(issue));
     }
 
+    /**
+     * Returns import issues from excel for ssue processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @param file the file parameter
+     * @param reporterId the reporter id parameter
+     * @return the import issues from excel result
+     * @throws AppException if a business rule prevents the requested operation
+     */
     @Transactional
     public IssueImportResultDto importIssuesFromExcel(UUID projectId, MultipartFile file, UUID reporterId) {
         validateImportFile(file);
@@ -654,14 +943,50 @@ public class IssueService {
                 .build();
     }
 
+    /**
+     * Returns next issue number for ssue processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param project the project parameter
+     * @return the next issue number result
+     */
     private int nextIssueNumber(Project project) {
         return issueRepository.findMaxIssueNumberByProjectIdAndProjectKey(project.getId(), project.getProjectKey()) + 1;
     }
 
+    /**
+     * Builds ssue data for downstream processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param project the project parameter
+     * @param issueNumber the issue number parameter
+     * @return the build issue key result
+     */
     private String buildIssueKey(Project project, int issueNumber) {
         return project.getProjectKey() + "-" + issueNumber;
     }
 
+    /**
+     * Returns export issues to excel for ssue processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @return the export issues to excel result
+     * @throws AppException if a business rule prevents the requested operation
+     */
     public byte[] exportIssuesToExcel(UUID projectId) {
         projectRepository.findById(projectId)
                 .orElseThrow(() -> new AppException(ProjectErrorCode.PROJECT_NOT_FOUND));
@@ -756,6 +1081,19 @@ public class IssueService {
         }
     }
 
+    /**
+     * Generates ssue data.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @return the generate import template result
+     * @throws AppException if a business rule prevents the requested operation
+     */
     public byte[] generateImportTemplate(UUID projectId) {
         List<IssueType> issueTypes = issueTypeRepository.findByProjectIdOrderBySortOrderAsc(projectId);
         List<IssuePriority> priorities = issuePriorityRepository.findByProjectIdOrderBySortOrderAsc(projectId);
@@ -809,6 +1147,17 @@ public class IssueService {
         }
     }
 
+    /**
+     * Validates ssue data.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     * </ul>
+     *
+     * @param file the file parameter
+     * @throws AppException if a business rule prevents the requested operation
+     */
     private void validateImportFile(MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw new AppException(ProjectErrorCode.ISSUE_IMPORT_FILE_INVALID, "Excel file is required");
@@ -819,6 +1168,23 @@ public class IssueService {
         }
     }
 
+    /**
+     * Parses ssue data.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Create or prepare the requested domain result.</li>
+     * </ul>
+     *
+     * @param file the file parameter
+     * @param issueTypeByName the issue type by name parameter
+     * @param priorityByName the priority by name parameter
+     * @param assigneeByEmail the assignee by email parameter
+     * @param sprintByName the sprint by name parameter
+     * @return the matching result collection
+     * @throws AppException if a business rule prevents the requested operation
+     */
     private List<ParsedIssueImportRow> parseImportRows(
             MultipartFile file,
             Map<String, UUID> issueTypeByName,
@@ -846,6 +1212,17 @@ public class IssueService {
         }
     }
 
+    /**
+     * Validates ssue data.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     * </ul>
+     *
+     * @param sheet the sheet parameter
+     * @throws AppException if a business rule prevents the requested operation
+     */
     private void validateHeader(Sheet sheet) {
         Row header = sheet.getRow(0);
         if (header == null) {
@@ -862,6 +1239,17 @@ public class IssueService {
         }
     }
 
+    /**
+     * Returns is empty row for ssue processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param row the row parameter
+     * @return true if the requested condition is satisfied; otherwise false
+     */
     private boolean isEmptyRow(Row row) {
         if (row == null) {
             return true;
@@ -876,6 +1264,25 @@ public class IssueService {
         return true;
     }
 
+    /**
+     * Maps ssue data to the target representation.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Create or prepare the requested domain result.</li>
+     *   <li>Send the required notification or outbound message.</li>
+     * </ul>
+     *
+     * @param row the row parameter
+     * @param rowNumber the row number parameter
+     * @param issueTypeByName the issue type by name parameter
+     * @param priorityByName the priority by name parameter
+     * @param assigneeByEmail the assignee by email parameter
+     * @param sprintByName the sprint by name parameter
+     * @return the map row result
+     * @throws AppException if a business rule prevents the requested operation
+     */
     private ParsedIssueImportRow mapRow(
             Row row,
             int rowNumber,
@@ -972,6 +1379,19 @@ public class IssueService {
         return new ParsedIssueImportRow(issueKey, dto);
     }
 
+    /**
+     * Applies ssue changes.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param issue the issue parameter
+     * @param dto the dto parameter
+     * @param userId the user id parameter
+     * @return true if the requested condition is satisfied; otherwise false
+     */
     private boolean applyImportedChanges(Issue issue, CreateIssueDto dto, UUID userId) {
         boolean changed = false;
 
@@ -1015,6 +1435,18 @@ public class IssueService {
         return changed;
     }
 
+    /**
+     * Ensures that ssue requirements are satisfied.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param issue the issue parameter
+     * @throws AppException if a business rule prevents the requested operation
+     */
     private void ensureIssueEditable(Issue issue) {
         if (issue == null || issue.getSprintId() == null) {
             return;
@@ -1027,6 +1459,21 @@ public class IssueService {
         }
     }
 
+    /**
+     * Ensures that ssue requirements are satisfied.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Create or prepare the requested domain result.</li>
+     *   <li>Apply the requested state changes according to the domain rules.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @param sprintId the sprint id parameter
+     * @throws AppException if a business rule prevents the requested operation
+     */
     private void ensureTargetSprintAcceptsIssues(UUID projectId, UUID sprintId) {
         if (sprintId == null) {
             return;
@@ -1043,12 +1490,36 @@ public class IssueService {
         }
     }
 
+    /**
+     * Retrieves ssue information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param row the row parameter
+     * @param col the col parameter
+     * @return the get string cell value result
+     */
     private String getStringCellValue(Row row, int col) {
         DataFormatter formatter = new DataFormatter();
         String value = formatter.formatCellValue(row.getCell(col));
         return value == null ? "" : value.trim();
     }
 
+    /**
+     * Resolves ssue information for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @return the resolve assignee by email result
+     */
     private Map<String, UUID> resolveAssigneeByEmail(UUID projectId) {
         List<ProjectMember> members = projectMemberRepository.findByProjectId(projectId);
         Set<UUID> accountIds = members.stream()
@@ -1066,6 +1537,17 @@ public class IssueService {
         return emailMap;
     }
 
+    /**
+     * Normalizes ssue content.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param value the value parameter
+     * @return the normalize key result
+     */
     private String normalizeKey(String value) {
         if (value == null) {
             return "";
@@ -1073,10 +1555,32 @@ public class IssueService {
         return value.trim().toLowerCase(Locale.ROOT);
     }
 
+    /**
+     * Returns null to empty for ssue processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param value the value parameter
+     * @return the null to empty result
+     */
     private String nullToEmpty(String value) {
         return value == null ? "" : value;
     }
 
+    /**
+     * Normalizes ssue content.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param value the value parameter
+     * @return the normalize nullable text result
+     */
     private String normalizeNullableText(String value) {
         if (value == null || value.trim().isEmpty()) {
             return null;
@@ -1084,6 +1588,17 @@ public class IssueService {
         return value;
     }
 
+    /**
+     * Resolves ssue information for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @return the matching result collection
+     */
     private List<String> resolveAssigneeEmails(UUID projectId) {
         List<ProjectMember> members = projectMemberRepository.findByProjectId(projectId);
         Set<UUID> accountIds = members.stream()
@@ -1104,6 +1619,21 @@ public class IssueService {
                 .toList();
     }
 
+    /**
+     * Adds ssue data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Create or prepare the requested domain result.</li>
+     * </ul>
+     *
+     * @param workbook the workbook parameter
+     * @param mainSheet the main sheet parameter
+     * @param issueTypeOptions the issue type options parameter
+     * @param priorityOptions the priority options parameter
+     * @param assigneeOptions the assignee options parameter
+     * @param sprintOptions the sprint options parameter
+     */
     private void addTemplateDropdowns(
             Workbook workbook,
             Sheet mainSheet,
@@ -1131,6 +1661,19 @@ public class IssueService {
         workbook.setSheetHidden(workbook.getSheetIndex(optionsSheet), true);
     }
 
+    /**
+     * Returns write options for ssue processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param optionsSheet the options sheet parameter
+     * @param colIndex the col index parameter
+     * @param options the options parameter
+     * @return the write options result
+     */
     private int writeOptions(Sheet optionsSheet, int colIndex, List<String> options) {
         if (options == null || options.isEmpty()) {
             return 0;
@@ -1146,6 +1689,21 @@ public class IssueService {
         return options.size();
     }
 
+    /**
+     * Returns define named range for ssue processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param workbook the workbook parameter
+     * @param rangeName the range name parameter
+     * @param optionsSheetName the options sheet name parameter
+     * @param optionsColIndex the options col index parameter
+     * @param optionsCount the options count parameter
+     * @return the define named range result
+     */
     private String defineNamedRange(Workbook workbook, String rangeName, String optionsSheetName, int optionsColIndex,
             int optionsCount) {
         if (optionsCount <= 0) {
@@ -1164,6 +1722,18 @@ public class IssueService {
         return rangeName;
     }
 
+    /**
+     * Adds ssue data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Create or prepare the requested domain result.</li>
+     * </ul>
+     *
+     * @param mainSheet the main sheet parameter
+     * @param formulaOrRangeName the formula or range name parameter
+     * @param targetColIndex the target col index parameter
+     */
     private void addDropdownValidation(Sheet mainSheet, String formulaOrRangeName, int targetColIndex) {
         if (formulaOrRangeName == null || formulaOrRangeName.isBlank()) {
             return;
@@ -1189,15 +1759,56 @@ public class IssueService {
 
     // ── IssueType CRUD ───────────────────────────────────────────────────────
 
+    /**
+     * Retrieves ssue information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @return the matching result collection
+     */
     public List<IssueType> getIssueTypes(UUID projectId) {
         return issueTypeRepository.findByProjectIdOrderBySortOrderAsc(projectId);
     }
 
+    /**
+     * Creates ssue data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Create or prepare the requested domain result.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @param name the name parameter
+     * @param description the description parameter
+     * @param iconUrl the icon url parameter
+     * @return the create issue type result
+     */
     public IssueType createIssueType(UUID projectId, String name, String description, String iconUrl) {
         int sortOrder = (int) issueTypeRepository.countByProjectId(projectId);
         return createIssueTypeWithSortOrder(projectId, name, description, iconUrl, sortOrder);
     }
 
+    /**
+     * Updates ssue data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Apply the requested state changes according to the domain rules.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param id the id parameter
+     * @param name the name parameter
+     * @param description the description parameter
+     * @param iconUrl the icon url parameter
+     * @return the update issue type result
+     */
     public IssueType updateIssueType(UUID id, String name, String description, String iconUrl) {
         IssueType it = issueTypeRepository.findById(id)
                 .orElseThrow(() -> new AppException(ProjectErrorCode.ISSUE_TYPE_NOT_FOUND));
@@ -1210,12 +1821,40 @@ public class IssueService {
         return issueTypeRepository.save(it);
     }
 
+    /**
+     * Deletes ssue data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Remove or clear the requested domain data when allowed.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param id the id parameter
+     */
     public void deleteIssueType(UUID id) {
         IssueType it = issueTypeRepository.findById(id)
                 .orElseThrow(() -> new AppException(ProjectErrorCode.ISSUE_TYPE_NOT_FOUND));
         issueTypeRepository.delete(it);
     }
 
+    /**
+     * Returns sync issue types for ssue processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Apply the requested state changes according to the domain rules.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @param items the items parameter
+     * @return the matching result collection
+     * @throws AppException if a business rule prevents the requested operation
+     */
     @Transactional
     public List<IssueType> syncIssueTypes(UUID projectId, List<IssueTypeSyncItemDto> items) {
         List<IssueTypeSyncItemDto> safeItems = items != null ? items : List.of();
@@ -1267,10 +1906,36 @@ public class IssueService {
 
     // ── IssuePriority CRUD ───────────────────────────────────────────────────
 
+    /**
+     * Retrieves ssue information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @return the matching result collection
+     */
     public List<IssuePriority> getIssuePriorities(UUID projectId) {
         return issuePriorityRepository.findByProjectIdOrderBySortOrderAsc(projectId);
     }
 
+    /**
+     * Creates ssue data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Create or prepare the requested domain result.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @param name the name parameter
+     * @param iconUrl the icon url parameter
+     * @param color the color parameter
+     * @param userId the user id parameter
+     * @return the create issue priority result
+     */
     public IssuePriority createIssuePriority(UUID projectId, String name, String iconUrl, String color, UUID userId) {
         int sortOrder = (int) issuePriorityRepository.countByProjectId(projectId);
         IssuePriority priority = createIssuePriorityWithSortOrder(projectId, name, iconUrl, color, sortOrder);
@@ -1279,6 +1944,24 @@ public class IssueService {
         return priority;
     }
 
+    /**
+     * Updates ssue data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Create or prepare the requested domain result.</li>
+     *   <li>Apply the requested state changes according to the domain rules.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param id the id parameter
+     * @param name the name parameter
+     * @param iconUrl the icon url parameter
+     * @param color the color parameter
+     * @param userId the user id parameter
+     * @return the update issue priority result
+     */
     public IssuePriority updateIssuePriority(UUID id, String name, String iconUrl, String color, UUID userId) {
         IssuePriority ip = issuePriorityRepository.findById(id)
                 .orElseThrow(() -> new AppException(ProjectErrorCode.ISSUE_PRIORITY_NOT_FOUND));
@@ -1304,6 +1987,19 @@ public class IssueService {
         return saved;
     }
 
+    /**
+     * Deletes ssue data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Remove or clear the requested domain data when allowed.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param id the id parameter
+     * @param userId the user id parameter
+     */
     public void deleteIssuePriority(UUID id, UUID userId) {
         IssuePriority ip = issuePriorityRepository.findById(id)
                 .orElseThrow(() -> new AppException(ProjectErrorCode.ISSUE_PRIORITY_NOT_FOUND));
@@ -1312,6 +2008,24 @@ public class IssueService {
         issuePriorityRepository.delete(ip);
     }
 
+    /**
+     * Returns sync issue priorities for ssue processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Apply the requested state changes according to the domain rules.</li>
+     *   <li>Remove or clear the requested domain data when allowed.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @param items the items parameter
+     * @param userId the user id parameter
+     * @return the matching result collection
+     * @throws AppException if a business rule prevents the requested operation
+     */
     @Transactional
     public List<IssuePriority> syncIssuePriorities(UUID projectId, List<IssuePrioritySyncItemDto> items, UUID userId) {
         List<IssuePrioritySyncItemDto> safeItems = items != null ? items : List.of();
@@ -1386,6 +2100,16 @@ public class IssueService {
         return issuePriorityRepository.findByProjectIdOrderBySortOrderAsc(projectId);
     }
 
+    /**
+     * Creates ssue data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Create or prepare the requested domain result.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     */
     @Transactional
     public void createDefaultIssueTypes(UUID projectId) {
         int nextSortOrder = (int) issueTypeRepository.countByProjectId(projectId);
@@ -1396,6 +2120,16 @@ public class IssueService {
         createIssueTypeWithSortOrder(projectId, "SUBTASK", "A subtask", null, nextSortOrder);
     }
 
+    /**
+     * Creates ssue data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Create or prepare the requested domain result.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     */
     @Transactional
     public void createDefaultPriorities(UUID projectId) {
         int nextSortOrder = (int) issuePriorityRepository.countByProjectId(projectId);
@@ -1406,6 +2140,22 @@ public class IssueService {
         createIssuePriorityWithSortOrder(projectId, "Lowest", null, "#0065FF", nextSortOrder);
     }
 
+    /**
+     * Creates ssue data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Create or prepare the requested domain result.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @param name the name parameter
+     * @param description the description parameter
+     * @param iconUrl the icon url parameter
+     * @param sortOrder the sort order parameter
+     * @return the create issue type with sort order result
+     */
     private IssueType createIssueTypeWithSortOrder(UUID projectId, String name, String description, String iconUrl,
             int sortOrder) {
         IssueType it = new IssueType();
@@ -1417,6 +2167,22 @@ public class IssueService {
         return issueTypeRepository.save(it);
     }
 
+    /**
+     * Creates ssue data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Create or prepare the requested domain result.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @param name the name parameter
+     * @param iconUrl the icon url parameter
+     * @param color the color parameter
+     * @param sortOrder the sort order parameter
+     * @return the create issue priority with sort order result
+     */
     private IssuePriority createIssuePriorityWithSortOrder(UUID projectId, String name, String iconUrl, String color,
             int sortOrder) {
         IssuePriority ip = new IssuePriority();

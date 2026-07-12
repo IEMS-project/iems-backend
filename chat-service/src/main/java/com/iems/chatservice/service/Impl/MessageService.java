@@ -47,6 +47,18 @@ public class MessageService implements IMessageService {
     private IUserService userService;
 
 
+    /**
+     * Retrieves message information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Create or prepare the requested domain result.</li>
+     * </ul>
+     *
+     * @param conversationId the conversation id parameter
+     * @return the matching result collection
+     */
     @Override
     public List<MemberResponseDto> getMembersByConversationId(String conversationId) {
         Optional<Conversation> conversationOpt = conversationRepository.findById(conversationId);
@@ -82,16 +94,54 @@ public class MessageService implements IMessageService {
         return members;
     }
 
+    /**
+     * Saves message data.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param message the message parameter
+     * @return the save and broadcast result
+     */
     @Override
     public Message saveAndBroadcast(Message message) {
         return messageBroadcastService.saveAndBroadcast(message);
     }
 
+    /**
+     * Retrieves message information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param conversationId the conversation id parameter
+     * @param page the page parameter
+     * @param size the size parameter
+     * @return the paginated result set
+     */
     @Override
     public Page<Message> getRecentMessages(String conversationId, int page, int size) {
         return messageRepository.findByConversationIdOrderBySentAtDesc(conversationId, PageRequest.of(page, size));
     }
 
+    /**
+     * Retrieves message information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param conversationId the conversation id parameter
+     * @param before the before parameter
+     * @param limit the limit parameter
+     * @return the matching result collection
+     */
     @Override
     public List<Message> getMessagesScroll(String conversationId, LocalDateTime before, int limit) {
         Query q = new Query();
@@ -104,6 +154,17 @@ public class MessageService implements IMessageService {
         return mongoTemplate.find(q, Message.class);
     }
 
+    /**
+     * Marks message data according to the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Apply the requested state changes according to the domain rules.</li>
+     * </ul>
+     *
+     * @param conversationId the conversation id parameter
+     */
     @Override
     public void markAsRead(String conversationId) {
         UUID accountId = userService.getAccountIdFromRequest();
@@ -123,18 +184,54 @@ public class MessageService implements IMessageService {
         mongoTemplate.updateMulti(q, up, Message.class);
     }
 
+    /**
+     * Retrieves message information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @return the get unread counts by user result
+     */
     @Override
     public Map<String, Integer> getUnreadCountsByUser() {
         UUID accountId = userService.getAccountIdFromRequest();
         return messageReadService.getUnreadCountsByUser(accountId.toString());
     }
 
+    /**
+     * Retrieves message information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param conversationId the conversation id parameter
+     * @return the get unread count for conversation result
+     */
     @Override
     public int getUnreadCountForConversation(String conversationId) {
         UUID accountId = userService.getAccountIdFromRequest();
         return messageReadService.getUnreadCountForConversation(conversationId, accountId.toString());
     }
 
+    /**
+     * Returns reply to message for message processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param conversationId the conversation id parameter
+     * @param content the content parameter
+     * @param replyToMessageId the reply to message id parameter
+     * @return the reply to message result
+     * @throws RuntimeException if the service cannot complete the requested operation
+     */
     @Override
     public Message replyToMessage(String conversationId, String content, String replyToMessageId) {
         UUID accountId = userService.getAccountIdFromRequest();
@@ -157,6 +254,22 @@ public class MessageService implements IMessageService {
         return saveAndBroadcast(reply);
     }
 
+    /**
+     * Returns reply to message for message processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param conversationId the conversation id parameter
+     * @param content the content parameter
+     * @param replyToMessageId the reply to message id parameter
+     * @param explicitSenderId the explicit sender id parameter
+     * @return the reply to message result
+     * @throws RuntimeException if the service cannot complete the requested operation
+     */
     @Override
     public Message replyToMessage(String conversationId, String content, String replyToMessageId, String explicitSenderId) {
         String senderId = explicitSenderId;
@@ -179,6 +292,18 @@ public class MessageService implements IMessageService {
     }
 
     // Add reaction to message
+    /**
+     * Adds message data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Create or prepare the requested domain result.</li>
+     * </ul>
+     *
+     * @param messageId the message id parameter
+     * @param emoji the emoji parameter
+     * @return the add reaction result
+     */
     @Override
     public Message addReaction(String messageId, String emoji) {
         UUID accountId = userService.getAccountIdFromRequest();
@@ -186,6 +311,17 @@ public class MessageService implements IMessageService {
     }
 
     // Remove reaction from message
+    /**
+     * Removes message data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Remove or clear the requested domain data when allowed.</li>
+     * </ul>
+     *
+     * @param messageId the message id parameter
+     * @return the remove reaction result
+     */
     @Override
     public Message removeReaction(String messageId) {
         UUID accountId = userService.getAccountIdFromRequest();
@@ -193,6 +329,17 @@ public class MessageService implements IMessageService {
     }
 
     // Delete message for user (delete for me)
+    /**
+     * Deletes message data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Remove or clear the requested domain data when allowed.</li>
+     * </ul>
+     *
+     * @param messageId the message id parameter
+     * @return true if the requested condition is satisfied; otherwise false
+     */
     @Override
     public boolean deleteForMe(String messageId) {
         UUID accountId = userService.getAccountIdFromRequest();
@@ -200,6 +347,17 @@ public class MessageService implements IMessageService {
     }
 
     // Recall message (delete for everyone)
+    /**
+     * Returns recall message for message processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param messageId the message id parameter
+     * @return the recall message result
+     */
     @Override
     public Message recallMessage(String messageId) {
         UUID accountId = userService.getAccountIdFromRequest();
@@ -207,6 +365,18 @@ public class MessageService implements IMessageService {
     }
 
     // Pin message
+    /**
+     * Pins message data for quick access.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Apply the requested state changes according to the domain rules.</li>
+     * </ul>
+     *
+     * @param conversationId the conversation id parameter
+     * @param messageId the message id parameter
+     * @return the pin message result
+     */
     @Override
     public Message pinMessage(String conversationId, String messageId) {
         UUID accountId = userService.getAccountIdFromRequest();
@@ -214,6 +384,18 @@ public class MessageService implements IMessageService {
     }
 
     // Unpin message
+    /**
+     * Unpins message data.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Apply the requested state changes according to the domain rules.</li>
+     * </ul>
+     *
+     * @param conversationId the conversation id parameter
+     * @param messageId the message id parameter
+     * @return the unpin message result
+     */
     @Override
     public Message unpinMessage(String conversationId, String messageId) {
         UUID accountId = userService.getAccountIdFromRequest();
@@ -221,6 +403,17 @@ public class MessageService implements IMessageService {
     }
 
     // Get pinned messages for conversation
+    /**
+     * Retrieves message information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param conversationId the conversation id parameter
+     * @return the matching result collection
+     */
     @Override
     public List<Message> getPinnedMessages(String conversationId) {
         Query query = new Query(Criteria.where("conversationId").is(conversationId).and("pinned").is(true));
@@ -229,6 +422,17 @@ public class MessageService implements IMessageService {
     }
 
     // Enhanced mark as read with last read message tracking
+    /**
+     * Marks message data according to the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Apply the requested state changes according to the domain rules.</li>
+     * </ul>
+     *
+     * @param conversationId the conversation id parameter
+     * @param lastMessageId the last message id parameter
+     */
     @Override
     public void markAsReadWithLastMessage(String conversationId, String lastMessageId) {
         UUID accountId = userService.getAccountIdFromRequest();
@@ -236,6 +440,17 @@ public class MessageService implements IMessageService {
     }
 
     // Mark entire conversation as read
+    /**
+     * Marks message data according to the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Apply the requested state changes according to the domain rules.</li>
+     * </ul>
+     *
+     * @param conversationId the conversation id parameter
+     * @return true if the requested condition is satisfied; otherwise false
+     */
     @Override
     public boolean markConversationAsRead(String conversationId) {
         UUID accountId = userService.getAccountIdFromRequest();
@@ -244,6 +459,20 @@ public class MessageService implements IMessageService {
 
 
     // Get messages with user-specific filtering (exclude deleted/recalled)
+    /**
+     * Retrieves message information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param conversationId the conversation id parameter
+     * @param page the page parameter
+     * @param size the size parameter
+     * @return the matching result collection
+     */
     @Override
     public List<Message> getMessagesForUser(String conversationId, int page, int size) {
         UUID accountId = userService.getAccountIdFromRequest();
@@ -267,6 +496,22 @@ public class MessageService implements IMessageService {
     }
 
     // Get paginated messages for conversation with cursor-based pagination
+    /**
+     * Retrieves message information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Create or prepare the requested domain result.</li>
+     *   <li>Remove or clear the requested domain data when allowed.</li>
+     * </ul>
+     *
+     * @param conversationId the conversation id parameter
+     * @param limit the limit parameter
+     * @param before the before parameter
+     * @return the get conversation messages paginated result
+     */
     @Override
     public Map<String, Object> getConversationMessagesPaginated(String conversationId, int limit, String before) {
         UUID accountId = userService.getAccountIdFromRequest();
@@ -329,6 +574,22 @@ public class MessageService implements IMessageService {
     }
 
     // Get newest messages by type (IMAGE/VIDEO/FILE or MEDIA=both) with before cursor
+    /**
+     * Retrieves message information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Remove or clear the requested domain data when allowed.</li>
+     * </ul>
+     *
+     * @param conversationId the conversation id parameter
+     * @param type the type parameter
+     * @param limit the limit parameter
+     * @param before the before parameter
+     * @return the get latest by type result
+     */
     @Override
     public Map<String, Object> getLatestByType(String conversationId, String type, int limit, String before) {
         UUID accountId = userService.getAccountIdFromRequest();
@@ -399,6 +660,19 @@ public class MessageService implements IMessageService {
     // Broadcast helpers moved to MessageBroadcastService
 
     // Get message by ID with neighbors for jump-to-message functionality
+    /**
+     * Retrieves message information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param messageId the message id parameter
+     * @param withNeighbors the with neighbors parameter
+     * @param neighborLimit the neighbor limit parameter
+     * @return the get message with neighbors result
+     */
     @Override
     public Map<String, Object> getMessageWithNeighbors(String messageId, boolean withNeighbors, int neighborLimit) {
         // First, get the target message
@@ -430,6 +704,19 @@ public class MessageService implements IMessageService {
     }
 
     // Get messages before a specific message
+    /**
+     * Retrieves message information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param targetMessage the target message parameter
+     * @param limit the limit parameter
+     * @return the matching result collection
+     */
     @Override
     public List<Message> getMessagesBefore(Message targetMessage, int limit) {
         Criteria criteria = new Criteria().andOperator(
@@ -448,6 +735,19 @@ public class MessageService implements IMessageService {
     }
 
     // Get messages after a specific message
+    /**
+     * Retrieves message information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param targetMessage the target message parameter
+     * @param limit the limit parameter
+     * @return the matching result collection
+     */
     @Override
     public List<Message> getMessagesAfter(Message targetMessage, int limit) {
         Criteria criteria = new Criteria().andOperator(
@@ -464,6 +764,21 @@ public class MessageService implements IMessageService {
     }
 
     // Get media messages around a specific message, filtered by type
+    /**
+     * Retrieves message information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param messageId the message id parameter
+     * @param type the type parameter
+     * @param before the before parameter
+     * @param after the after parameter
+     * @return the get messages around by type result
+     */
     @Override
     public Map<String, Object> getMessagesAroundByType(String messageId, String type, int before, int after) {
         Message targetMessage = messageRepository.findById(messageId).orElse(null);
@@ -523,6 +838,22 @@ public class MessageService implements IMessageService {
     }
 
     // Search messages by text content
+    /**
+     * Searches message information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Create or prepare the requested domain result.</li>
+     * </ul>
+     *
+     * @param conversationId the conversation id parameter
+     * @param keyword the keyword parameter
+     * @param page the page parameter
+     * @param size the size parameter
+     * @return the search messages result
+     */
     @Override
     public Map<String, Object> searchMessages(String conversationId, String keyword, int page, int size) {
         if (keyword == null || keyword.trim().isEmpty()) {
@@ -574,6 +905,19 @@ public class MessageService implements IMessageService {
     }
 
     // Get messages around a specific message (for jump-to-message)
+    /**
+     * Retrieves message information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param messageId the message id parameter
+     * @param before the before parameter
+     * @param after the after parameter
+     * @return the get messages around result
+     */
     @Override
     public Map<String, Object> getMessagesAround(String messageId, int before, int after) {
         // First, get the target message
@@ -601,6 +945,19 @@ public class MessageService implements IMessageService {
     }
 
     // Get messages between two message IDs (for gap filling)
+    /**
+     * Retrieves message information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param fromMessageId the from message id parameter
+     * @param toMessageId the to message id parameter
+     * @param conversationId the conversation id parameter
+     * @return the matching result collection
+     */
     @Override
     public List<Message> getMessagesBetween(String fromMessageId, String toMessageId, String conversationId) {
         // Get the two boundary messages

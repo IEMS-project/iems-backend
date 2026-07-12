@@ -68,6 +68,23 @@ public class PayOSPaymentService {
     @Value("${payos.account-number:}")
     private String accountNumber;
 
+    /**
+     * Creates pay ospayment data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Create or prepare the requested domain result.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     *   <li>Coordinate with external services needed by the operation.</li>
+     * </ul>
+     *
+     * @param accountId the account id parameter
+     * @param request the request parameter
+     * @return the create payment result
+     * @throws AppException if a business rule prevents the requested operation
+     */
     @Transactional
     public PayOSPaymentResponse createPayment(UUID accountId, CreatePayOSPaymentRequest request) {
         Account account = accountService.findById(accountId);
@@ -128,6 +145,21 @@ public class PayOSPaymentService {
         return toCreateResponse(saved);
     }
 
+    /**
+     * Returns sync payment status for admin for pay ospayment processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Apply the requested state changes according to the domain rules.</li>
+     *   <li>Coordinate with external services needed by the operation.</li>
+     * </ul>
+     *
+     * @param orderCode the order code parameter
+     * @return the sync payment status for admin result
+     * @throws AppException if a business rule prevents the requested operation
+     */
     @Transactional
     public PayOSPaymentStatusResponse syncPaymentStatusForAdmin(Long orderCode) {
         PaymentTransaction transaction = paymentTransactionRepository.findByOrderCode(orderCode)
@@ -150,6 +182,22 @@ public class PayOSPaymentService {
         return toStatusResponse(transaction);
     }
 
+    /**
+     * Returns cancel payment for admin for pay ospayment processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     *   <li>Coordinate with external services needed by the operation.</li>
+     * </ul>
+     *
+     * @param orderCode the order code parameter
+     * @param reason the reason parameter
+     * @return the cancel payment for admin result
+     * @throws AppException if a business rule prevents the requested operation
+     */
     @Transactional
     public PayOSPaymentStatusResponse cancelPaymentForAdmin(Long orderCode, String reason) {
         PaymentTransaction transaction = paymentTransactionRepository.findByOrderCode(orderCode)
@@ -172,6 +220,23 @@ public class PayOSPaymentService {
         return toStatusResponse(transaction);
     }
 
+    /**
+     * Searches pay ospayment information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param status the status parameter
+     * @param accountId the account id parameter
+     * @param planId the plan id parameter
+     * @param from the from parameter
+     * @param to the to parameter
+     * @param keyword the keyword parameter
+     * @param pageable the pageable parameter
+     * @return the paginated result set
+     */
     public Page<PaymentTransactionResponse> searchPayments(PaymentStatus status, UUID accountId, String planId,
                                                            Instant from, Instant to, String keyword, Pageable pageable) {
         String normalizedPlanId = StringUtils.hasText(planId) ? planId.trim().toLowerCase(Locale.ROOT) : null;
@@ -225,6 +290,23 @@ public class PayOSPaymentService {
         return new PageImpl<>(content, pageable, total);
     }
 
+    /**
+     * Builds pay ospayment data for downstream processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Create or prepare the requested domain result.</li>
+     * </ul>
+     *
+     * @param cb the cb parameter
+     * @param root the root parameter
+     * @param status the status parameter
+     * @param accountId the account id parameter
+     * @param planId the plan id parameter
+     * @param from the from parameter
+     * @param to the to parameter
+     * @return the matching result collection
+     */
     private List<Predicate> buildPaymentPredicates(CriteriaBuilder cb, Root<PaymentTransaction> root,
                                                    PaymentStatus status, UUID accountId, String planId,
                                                    Instant from, Instant to) {
@@ -247,11 +329,37 @@ public class PayOSPaymentService {
         return predicates;
     }
 
+    /**
+     * Retrieves pay ospayment information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param id the id parameter
+     * @return the get payment result
+     */
     public PaymentTransactionResponse getPayment(UUID id) {
         return paymentTransactionRepository.findAdminResponseById(id)
                 .orElseThrow(() -> new AppException(ErrorCode.PAYMENT_TRANSACTION_NOT_FOUND));
     }
 
+    /**
+     * Retrieves pay ospayment information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Coordinate with external services needed by the operation.</li>
+     * </ul>
+     *
+     * @param orderCode the order code parameter
+     * @param accountId the account id parameter
+     * @return the get payment status result
+     * @throws AppException if a business rule prevents the requested operation
+     */
     @Transactional
     public PayOSPaymentStatusResponse getPaymentStatus(Long orderCode, UUID accountId) {
         PaymentTransaction transaction = paymentTransactionRepository.findByOrderCode(orderCode)
@@ -281,6 +389,23 @@ public class PayOSPaymentService {
         return toStatusResponse(transaction);
     }
 
+    /**
+     * Returns cancel payment for pay ospayment processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     *   <li>Coordinate with external services needed by the operation.</li>
+     * </ul>
+     *
+     * @param orderCode the order code parameter
+     * @param accountId the account id parameter
+     * @param reason the reason parameter
+     * @return the cancel payment result
+     * @throws AppException if a business rule prevents the requested operation
+     */
     @Transactional
     public PayOSPaymentStatusResponse cancelPayment(Long orderCode, UUID accountId, String reason) {
         PaymentTransaction transaction = paymentTransactionRepository.findByOrderCode(orderCode)
@@ -318,6 +443,20 @@ public class PayOSPaymentService {
         return toStatusResponse(transaction);
     }
 
+    /**
+     * Handles the pay ospayment operation.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     *   <li>Coordinate with external services needed by the operation.</li>
+     * </ul>
+     *
+     * @param rawPayload the raw payload parameter
+     * @throws InvalidPayOSWebhookException if the requested operation cannot be completed
+     */
     @Transactional
     public void handleWebhook(String rawPayload) {
         Webhook webhook;
@@ -370,6 +509,16 @@ public class PayOSPaymentService {
                 transaction.getOrderCode(), transaction.getPaymentLinkId(), transaction.getStatus());
     }
 
+    /**
+     * Generates pay ospayment data.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @return the generate order code result
+     */
     private Long generateOrderCode() {
         long candidate = System.currentTimeMillis();
         while (paymentTransactionRepository.existsByOrderCode(candidate)) {
@@ -378,6 +527,19 @@ public class PayOSPaymentService {
         return candidate;
     }
 
+    /**
+     * Normalizes pay ospayment content.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param description the description parameter
+     * @param orderCode the order code parameter
+     * @param plan the plan parameter
+     * @return the normalize description result
+     */
     private String normalizeDescription(String description, Long orderCode, SubscriptionPlan plan) {
         String base = StringUtils.hasText(description)
                 ? description
@@ -389,21 +551,68 @@ public class PayOSPaymentService {
         return full;
     }
 
+    /**
+     * Builds pay ospayment data for downstream processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param path the path parameter
+     * @param orderCode the order code parameter
+     * @return the build payment result url result
+     */
     private String buildPaymentResultUrl(String path, Long orderCode) {
         String normalizedFrontendUrl = StringUtils.trimTrailingCharacter(frontendUrl, '/');
         return normalizedFrontendUrl + path + "?orderCode=" + orderCode;
     }
 
+    /**
+     * Returns is successful payment for pay ospayment processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param webhook the webhook parameter
+     * @param data the data parameter
+     * @return true if the requested condition is satisfied; otherwise false
+     */
     private boolean isSuccessfulPayment(Webhook webhook, WebhookData data) {
         return Boolean.TRUE.equals(webhook.getSuccess()) && SUCCESS_CODE.equals(data.getCode());
     }
 
+    /**
+     * Returns is cancellation for pay ospayment processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param webhook the webhook parameter
+     * @param data the data parameter
+     * @return true if the requested condition is satisfied; otherwise false
+     */
     private boolean isCancellation(Webhook webhook, WebhookData data) {
         return isCancelledValue(webhook.getCode())
                 || isCancelledValue(data.getCode())
                 || isCancelledValue(data.getDesc());
     }
 
+    /**
+     * Returns is cancelled value for pay ospayment processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param value the value parameter
+     * @return true if the requested condition is satisfied; otherwise false
+     */
     private boolean isCancelledValue(String value) {
         if (!StringUtils.hasText(value)) {
             return false;
@@ -412,6 +621,17 @@ public class PayOSPaymentService {
         return normalized.contains("cancel") || normalized.contains("huy") || normalized.contains("hủy");
     }
 
+    /**
+     * Resolves pay ospayment information for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param response the response parameter
+     * @return the resolve qr code result
+     */
     private String resolveQrCode(CreatePaymentLinkResponse response) {
         if (StringUtils.hasText(response.getQrCode())) {
             return response.getQrCode();
@@ -419,6 +639,17 @@ public class PayOSPaymentService {
         return response.getCheckoutUrl();
     }
 
+    /**
+     * Applies pay ospayment changes.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param transaction the transaction parameter
+     * @param paymentLink the payment link parameter
+     */
     private void applyPaymentLinkStatus(PaymentTransaction transaction, PaymentLink paymentLink) {
         if (paymentLink == null) {
             return;
@@ -451,6 +682,17 @@ public class PayOSPaymentService {
         paymentTransactionRepository.save(transaction);
     }
 
+    /**
+     * Maps pay ospayment data to the target representation.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param status the status parameter
+     * @return the map pay osstatus result
+     */
     private PaymentStatus mapPayOSStatus(PaymentLinkStatus status) {
         if (status == null) {
             return PaymentStatus.PROCESSING;
@@ -464,6 +706,19 @@ public class PayOSPaymentService {
         };
     }
 
+    /**
+     * Updates pay ospayment data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Apply the requested state changes according to the domain rules.</li>
+     * </ul>
+     *
+     * @param transaction the transaction parameter
+     * @param data the data parameter
+     * @param rawPayload the raw payload parameter
+     */
     private void updateWebhookMetadata(PaymentTransaction transaction, WebhookData data, String rawPayload) {
         if (StringUtils.hasText(data.getPaymentLinkId())) {
             transaction.setPaymentLinkId(data.getPaymentLinkId());
@@ -472,6 +727,17 @@ public class PayOSPaymentService {
         transaction.setRawWebhookJson(rawPayload);
     }
 
+    /**
+     * Returns to create response for pay ospayment processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Create or prepare the requested domain result.</li>
+     * </ul>
+     *
+     * @param transaction the transaction parameter
+     * @return the to create response result
+     */
     private PayOSPaymentResponse toCreateResponse(PaymentTransaction transaction) {
         return PayOSPaymentResponse.builder()
                 .orderCode(transaction.getOrderCode())
@@ -491,6 +757,17 @@ public class PayOSPaymentService {
                 .build();
     }
 
+    /**
+     * Returns to status response for pay ospayment processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param transaction the transaction parameter
+     * @return the to status response result
+     */
     private PayOSPaymentStatusResponse toStatusResponse(PaymentTransaction transaction) {
         return PayOSPaymentStatusResponse.builder()
                 .orderCode(transaction.getOrderCode())
@@ -511,6 +788,17 @@ public class PayOSPaymentService {
                 .build();
     }
 
+    /**
+     * Returns to payment transaction response for pay ospayment processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param transaction the transaction parameter
+     * @return the to payment transaction response result
+     */
     private PaymentTransactionResponse toPaymentTransactionResponse(PaymentTransaction transaction) {
         return PaymentTransactionResponse.builder()
                 .id(transaction.getId())

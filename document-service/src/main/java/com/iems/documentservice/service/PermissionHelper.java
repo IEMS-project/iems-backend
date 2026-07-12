@@ -23,6 +23,13 @@ public class PermissionHelper {
     private final StoredFileRepository storedFileRepository;
     private final ShareRepository shareRepository;
 
+    /**
+     * Creates a new permission service instance.
+     *
+     * @param folderRepository the folder repository parameter
+     * @param storedFileRepository the stored file repository parameter
+     * @param shareRepository the share repository parameter
+     */
     public PermissionHelper(FolderRepository folderRepository,
                             StoredFileRepository storedFileRepository,
                             ShareRepository shareRepository) {
@@ -31,6 +38,16 @@ public class PermissionHelper {
         this.shareRepository = shareRepository;
     }
 
+    /**
+     * Retrieves permission information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     * </ul>
+     *
+     * @return the get current user id result
+     */
     public UUID getCurrentUserId() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         return ((JwtUserDetails) auth.getPrincipal()).getUserId();
@@ -137,6 +154,19 @@ public class PermissionHelper {
         throw new AppException(DocumentErrorCode.PERMISSION_DENIED);
     }
 
+    /**
+     * Returns share for permission processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param requesterId the requester id parameter
+     * @return the share result
+     * @throws AppException if a business rule prevents the requested operation
+     */
     /** Kiểm tra quyền đọc folder: owner, public, hoặc được share (có hỗ trợ thừa kế từ cha) */
     public void enforceFolderReadPermission(UUID folderId, UUID requesterId) {
         Folder folder = folderRepository.findById(folderId)
@@ -152,12 +182,37 @@ public class PermissionHelper {
         throw new AppException(DocumentErrorCode.PERMISSION_DENIED);
     }
 
+    /**
+     * Validates permission data.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param targetId the target id parameter
+     * @param type the type parameter
+     * @return true if the requested condition is satisfied; otherwise false
+     */
     public boolean validateTargetExists(UUID targetId, String type) {
         if ("FILE".equals(type)) return storedFileRepository.findById(targetId).isPresent();
         if ("FOLDER".equals(type)) return folderRepository.findById(targetId).isPresent();
         return false;
     }
 
+    /**
+     * Validates permission data.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param targetId the target id parameter
+     * @param type the type parameter
+     * @param ownerId the owner id parameter
+     * @return true if the requested condition is satisfied; otherwise false
+     */
     public boolean validateTargetExistsAndOwned(UUID targetId, String type, UUID ownerId) {
         if ("FILE".equals(type)) {
             return storedFileRepository.findById(targetId)

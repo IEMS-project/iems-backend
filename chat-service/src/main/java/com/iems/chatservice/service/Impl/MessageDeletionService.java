@@ -34,6 +34,21 @@ public class MessageDeletionService implements IMessageDeletionService {
     @Autowired
     private IMessageBroadcastService messageBroadcastService;
 
+    /**
+     * Deletes message deletion data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Apply the requested state changes according to the domain rules.</li>
+     *   <li>Remove or clear the requested domain data when allowed.</li>
+     *   <li>Send the required notification or outbound message.</li>
+     * </ul>
+     *
+     * @param messageId the message id parameter
+     * @param accountId the account id parameter
+     * @return true if the requested condition is satisfied; otherwise false
+     */
     @Override
     public boolean deleteForMe(String messageId, String accountId) {
         Message message = messageRepository.findById(messageId).orElse(null);
@@ -90,6 +105,21 @@ public class MessageDeletionService implements IMessageDeletionService {
         return true;
     }
 
+    /**
+     * Returns recall message for message deletion processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param messageId the message id parameter
+     * @param accountId the account id parameter
+     * @return the recall message result
+     * @throws RuntimeException if the service cannot complete the requested operation
+     */
     @Override
     public Message recallMessage(String messageId, String accountId) {
         Message message = messageRepository.findById(messageId).orElse(null);

@@ -53,16 +53,51 @@ public class ProjectApiToolRegistry {
                     "Create issue after explicit user confirmation.",
                     Set.of("projectId"), ToolAccess.CONFIRMATION_REQUIRED));
 
+    /**
+     * Returns read only tools for project api tool processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @return the matching result collection
+     */
     public List<ProjectApiTool> readOnlyTools() {
         return tools.stream()
                 .filter(tool -> tool.access() == ToolAccess.READ_ONLY)
                 .toList();
     }
 
+    /**
+     * Returns all tools for project api tool processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @return the matching result collection
+     */
     public List<ProjectApiTool> allTools() {
         return tools;
     }
 
+    /**
+     * Returns read for project api tool processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param name the name parameter
+     * @param method the method parameter
+     * @param path the path parameter
+     * @param description the description parameter
+     * @param inputs the inputs parameter
+     * @return the read result
+     */
     private static ProjectApiTool read(String name, String method, String path, String description, String... inputs) {
         return new ProjectApiTool(name, method, path, description, Set.of(inputs), ToolAccess.READ_ONLY);
     }

@@ -39,6 +39,20 @@ public class DocumentContextService {
     private final OpenRouterEmbeddingService openRouterEmbeddingService;
     private final AiProperties aiProperties;
 
+    /**
+     * Indexes document context data for search or AI processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Create or prepare the requested domain result.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @param docId the doc id parameter
+     * @param fileName the file name parameter
+     * @param fileType the file type parameter
+     * @param downloadUrl the download url parameter
+     */
     public void indexDocument(String projectId,
             String docId,
             String fileName,
@@ -82,6 +96,22 @@ public class DocumentContextService {
         upsertDocumentEmbeddings(projectId, docId, resolvedFileName, content);
     }
 
+    /**
+     * Indexes document context data for search or AI processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Create or prepare the requested domain result.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @param docId the doc id parameter
+     * @param fileName the file name parameter
+     * @param fileType the file type parameter
+     * @param contentBytes the content bytes parameter
+     * @throws IllegalArgumentException if the request contains invalid arguments
+     */
     public void indexUploadedDocument(String projectId,
             String docId,
             String fileName,
@@ -106,6 +136,21 @@ public class DocumentContextService {
         upsertDocumentEmbeddings(projectId, docId, resolvedFileName, content);
     }
 
+    /**
+     * Indexes document context data for search or AI processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Create or prepare the requested domain result.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @param docId the doc id parameter
+     * @param fileName the file name parameter
+     * @param content the content parameter
+     * @throws IllegalArgumentException if the request contains invalid arguments
+     */
     public void indexTextDocument(String projectId,
             String docId,
             String fileName,
@@ -117,18 +162,52 @@ public class DocumentContextService {
         upsertDocumentEmbeddings(projectId, docId, resolvedFileName, content);
     }
 
+    /**
+     * Performs deindex document for document context processing.
+     *
+     * @param projectId the project id parameter
+     * @param docId the doc id parameter
+     */
     public void deindexDocument(String projectId, String docId) {
         log.info("Deindex start projectId={} docId={}", projectId, docId);
         documentVectorChunkRepository.deleteByProjectIdAndDocumentId(projectId, docId);
         log.info("Deindex completed projectId={} docId={}", projectId, docId);
     }
 
+    /**
+     * Builds document context data for downstream processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @param selectedDocumentIds the selected document ids parameter
+     * @param question the question parameter
+     * @return the build document context result
+     */
     public String buildDocumentContext(String projectId,
             List<String> selectedDocumentIds,
             String question) {
         return buildDocumentContextResult(projectId, selectedDocumentIds, question).context();
     }
 
+    /**
+     * Builds document context data for downstream processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Create or prepare the requested domain result.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @param selectedDocumentIds the selected document ids parameter
+     * @param question the question parameter
+     * @return the build document context result result
+     */
     public DocumentContextResult buildDocumentContextResult(String projectId,
             List<String> selectedDocumentIds,
             String question) {
@@ -197,6 +276,21 @@ public class DocumentContextService {
         return new DocumentContextResult(context.toString(), sources);
     }
 
+    /**
+     * Performs upsert document embeddings for document context processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Create or prepare the requested domain result.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @param docId the doc id parameter
+     * @param fileName the file name parameter
+     * @param content the content parameter
+     */
     private void upsertDocumentEmbeddings(String projectId,
             String docId,
             String fileName,
@@ -250,6 +344,18 @@ public class DocumentContextService {
         log.info("Indexed document {} with {} chunks", docId, toSave.size());
     }
 
+    /**
+     * Returns is supported for embedding for document context processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param fileName the file name parameter
+     * @param fileType the file type parameter
+     * @return true if the requested condition is satisfied; otherwise false
+     */
     private boolean isSupportedForEmbedding(String fileName, String fileType) {
         String lowerFileName = fileName != null ? fileName.toLowerCase() : "";
         String lowerFileType = fileType != null ? fileType.toLowerCase() : "";
@@ -264,6 +370,20 @@ public class DocumentContextService {
                 || lowerFileType.contains("markdown");
     }
 
+    /**
+     * Returns extract text content for document context processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     * </ul>
+     *
+     * @param contentBytes the content bytes parameter
+     * @param fileName the file name parameter
+     * @param fileType the file type parameter
+     * @return the extract text content result
+     * @throws IllegalStateException if the requested operation cannot be completed
+     */
     private String extractTextContent(byte[] contentBytes, String fileName, String fileType) {
         if (contentBytes == null || contentBytes.length == 0) {
             return "";
@@ -294,6 +414,19 @@ public class DocumentContextService {
         }
     }
 
+    /**
+     * Returns chunk text for document context processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Create or prepare the requested domain result.</li>
+     * </ul>
+     *
+     * @param text the text parameter
+     * @param chunkSize the chunk size parameter
+     * @param chunkOverlap the chunk overlap parameter
+     * @return the matching result collection
+     */
     private List<String> chunkText(String text, int chunkSize, int chunkOverlap) {
         if (text.isBlank()) {
             return List.of();
@@ -318,6 +451,18 @@ public class DocumentContextService {
         return chunks;
     }
 
+    /**
+     * Returns cosine similarity for document context processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param a the a parameter
+     * @param b the b parameter
+     * @return the cosine similarity result
+     */
     private double cosineSimilarity(List<Double> a, List<Double> b) {
         if (a == null || b == null || a.isEmpty() || b.isEmpty()) {
             return -1.0;
@@ -340,6 +485,18 @@ public class DocumentContextService {
         return dot / (Math.sqrt(normA) * Math.sqrt(normB));
     }
 
+    /**
+     * Returns sha256 for document context processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     * </ul>
+     *
+     * @param content the content parameter
+     * @return the sha256 result
+     * @throws IllegalStateException if the requested operation cannot be completed
+     */
     private String sha256(String content) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");

@@ -22,6 +22,16 @@ public class AgentPipelineService {
     private final OpenRouterChatService openRouterChatService;
     private final AgentResponseSanitizer responseSanitizer;
 
+    /**
+     * Creates a new agent pipeline service instance.
+     *
+     * @param inputSanitizer the input sanitizer parameter
+     * @param plannerService the planner service parameter
+     * @param projectToolExecutor the project tool executor parameter
+     * @param pendingActionStore the pending action store parameter
+     * @param openRouterChatService the open router chat service parameter
+     * @param responseSanitizer the response sanitizer parameter
+     */
     public AgentPipelineService(AgentInputSanitizer inputSanitizer,
             AgentPlannerService plannerService,
             ProjectToolExecutor projectToolExecutor,
@@ -36,6 +46,23 @@ public class AgentPipelineService {
         this.responseSanitizer = responseSanitizer;
     }
 
+    /**
+     * Handles the agent pipeline operation.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param userId the user id parameter
+     * @param conversationId the conversation id parameter
+     * @param request the request parameter
+     * @param authorization the authorization parameter
+     * @param documentContext the document context parameter
+     * @param conversationContext the conversation context parameter
+     * @param model the model parameter
+     * @return the handle result
+     */
     public AgentChatResponse handle(String userId,
             String conversationId,
             AgentChatRequest request,
@@ -68,6 +95,22 @@ public class AgentPipelineService {
         };
     }
 
+    /**
+     * Returns confirm action for agent pipeline processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param userId the user id parameter
+     * @param conversationId the conversation id parameter
+     * @param actionId the action id parameter
+     * @param projectId the project id parameter
+     * @param authorization the authorization parameter
+     * @param model the model parameter
+     * @return the confirm action result
+     */
     public AgentChatResponse confirmAction(String userId,
             String conversationId,
             String actionId,
@@ -113,6 +156,22 @@ public class AgentPipelineService {
         return response(conversationId, model, plan, result.answer(), result.success() ? result.proposedActions() : List.of());
     }
 
+    /**
+     * Returns answer with open router for agent pipeline processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param conversationId the conversation id parameter
+     * @param request the request parameter
+     * @param documentContext the document context parameter
+     * @param conversationContext the conversation context parameter
+     * @param model the model parameter
+     * @param plan the plan parameter
+     * @return the answer with open router result
+     */
     private AgentChatResponse answerWithOpenRouter(String conversationId,
             AgentChatRequest request,
             String documentContext,
@@ -127,6 +186,22 @@ public class AgentPipelineService {
         return response(conversationId, model, plan, answer, List.of());
     }
 
+    /**
+     * Returns answer with project data for agent pipeline processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param userId the user id parameter
+     * @param conversationId the conversation id parameter
+     * @param request the request parameter
+     * @param authorization the authorization parameter
+     * @param model the model parameter
+     * @param plan the plan parameter
+     * @return the answer with project data result
+     */
     private AgentChatResponse answerWithProjectData(String userId,
             String conversationId,
             AgentChatRequest request,
@@ -137,6 +212,22 @@ public class AgentPipelineService {
         return response(conversationId, model, plan, result.answer(), result.proposedActions());
     }
 
+    /**
+     * Returns propose write for agent pipeline processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param userId the user id parameter
+     * @param conversationId the conversation id parameter
+     * @param request the request parameter
+     * @param authorization the authorization parameter
+     * @param model the model parameter
+     * @param plan the plan parameter
+     * @return the propose write result
+     */
     private AgentChatResponse proposeWrite(String userId,
             String conversationId,
             AgentChatRequest request,
@@ -152,6 +243,22 @@ public class AgentPipelineService {
         return response(conversationId, model, effectivePlan, result.answer(), result.proposedActions());
     }
 
+    /**
+     * Executes the agent pipeline operation.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param userId the user id parameter
+     * @param conversationId the conversation id parameter
+     * @param request the request parameter
+     * @param authorization the authorization parameter
+     * @param model the model parameter
+     * @param plan the plan parameter
+     * @return the execute confirmed write result
+     */
     private AgentChatResponse executeConfirmedWrite(String userId,
             String conversationId,
             AgentChatRequest request,
@@ -179,6 +286,21 @@ public class AgentPipelineService {
         return response(conversationId, model, plan, result.answer(), result.proposedActions());
     }
 
+    /**
+     * Returns response for agent pipeline processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param conversationId the conversation id parameter
+     * @param model the model parameter
+     * @param plan the plan parameter
+     * @param answer the answer parameter
+     * @param actions the actions parameter
+     * @return the response result
+     */
     private AgentChatResponse response(String conversationId,
             String model,
             AgentPlan plan,

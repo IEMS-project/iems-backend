@@ -24,6 +24,14 @@ public class FavoriteService {
     private final FolderRepository folderRepository;
     private final PermissionHelper permissionHelper;
 
+    /**
+     * Creates a new favorite service instance.
+     *
+     * @param favoriteRepository the favorite repository parameter
+     * @param storedFileRepository the stored file repository parameter
+     * @param folderRepository the folder repository parameter
+     * @param permissionHelper the permission helper parameter
+     */
     public FavoriteService(FavoriteRepository favoriteRepository,
                            StoredFileRepository storedFileRepository,
                            FolderRepository folderRepository,
@@ -34,6 +42,23 @@ public class FavoriteService {
         this.permissionHelper = permissionHelper;
     }
 
+    /**
+     * Returns toggle for favorite processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Apply the requested state changes according to the domain rules.</li>
+     *   <li>Remove or clear the requested domain data when allowed.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param targetId the target id parameter
+     * @param type the type parameter
+     * @return true if the requested condition is satisfied; otherwise false
+     * @throws AppException if a business rule prevents the requested operation
+     */
     @Transactional
     public boolean toggle(UUID targetId, String type) {
         UUID userId = permissionHelper.getCurrentUserId();
@@ -64,6 +89,16 @@ public class FavoriteService {
         return true;
     }
 
+    /**
+     * Lists favorite information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @return the matching result collection
+     */
     public List<FavoriteItemResponse> listFavorites() {
         UUID userId = permissionHelper.getCurrentUserId();
         return favoriteRepository.findByUserId(userId).stream()
@@ -77,6 +112,18 @@ public class FavoriteService {
         return favoriteRepository.findByUserIdAndTargetId(userId, targetId).isPresent();
     }
 
+    /**
+     * Builds favorite data for downstream processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param fav the fav parameter
+     * @return the build response result
+     */
     private FavoriteItemResponse buildResponse(Favorite fav) {
         var file = storedFileRepository.findById(fav.getTargetId());
         if (file.isPresent()) {
@@ -118,6 +165,17 @@ public class FavoriteService {
         return unknownFavorite(fav);
     }
 
+    /**
+     * Returns unknown favorite for favorite processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param fav the fav parameter
+     * @return the unknown favorite result
+     */
     private FavoriteItemResponse unknownFavorite(Favorite fav) {
         return FavoriteItemResponse.builder()
                 .id(fav.getId())

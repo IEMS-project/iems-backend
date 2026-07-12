@@ -15,6 +15,17 @@ public class JwtService {
     @Value("${jwt.secret}")
     private String secretKey;
 
+    /**
+     * Returns extract user id for jwt processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     * </ul>
+     *
+     * @param token the token parameter
+     * @return the extract user id result
+     */
     public String extractUserId(String token) {
         Claims claims = extractAllClaims(token);
 
@@ -31,6 +42,17 @@ public class JwtService {
         return claims.getSubject();
     }
 
+    /**
+     * Returns extract all claims for jwt processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     * </ul>
+     *
+     * @param token the token parameter
+     * @return the extract all claims result
+     */
     private Claims extractAllClaims(String token) {
         return Jwts.parser()
                 .verifyWith((javax.crypto.SecretKey) getSignInKey())
@@ -39,6 +61,16 @@ public class JwtService {
                 .getPayload();
     }
 
+    /**
+     * Retrieves jwt information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @return the get sign in key result
+     */
     private Key getSignInKey() {
         byte[] keyBytes = Decoders.BASE64.decode(secretKey);
         return Keys.hmacShaKeyFor(keyBytes);

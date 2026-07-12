@@ -38,6 +38,17 @@ public class ActivityService {
     private final UserServiceFeignClient userServiceFeignClient;
     private final ObjectMapper objectMapper;
 
+    /**
+     * Creates a new activity service instance.
+     *
+     * @param documentActivityRepository the document activity repository parameter
+     * @param permissionHelper the permission helper parameter
+     * @param folderRepository the folder repository parameter
+     * @param storedFileRepository the stored file repository parameter
+     * @param projectDocumentRepository the project document repository parameter
+     * @param userServiceFeignClient the user service feign client parameter
+     * @param objectMapper the object mapper parameter
+     */
     public ActivityService(DocumentActivityRepository documentActivityRepository,
                            PermissionHelper permissionHelper,
                            FolderRepository folderRepository,
@@ -54,11 +65,31 @@ public class ActivityService {
         this.objectMapper = objectMapper;
     }
 
+    /**
+     * Performs log for activity processing.
+     *
+     * @param targetType the target type parameter
+     * @param targetId the target id parameter
+     * @param actionKey the action key parameter
+     */
     @Transactional
     public void log(String targetType, UUID targetId, String actionKey) {
         log(targetType, targetId, actionKey, null);
     }
 
+    /**
+     * Performs log for activity processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param targetType the target type parameter
+     * @param targetId the target id parameter
+     * @param actionKey the action key parameter
+     * @param payload the payload parameter
+     */
     @Transactional
     public void log(String targetType, UUID targetId, String actionKey, Map<String, Object> payload) {
         UUID actorUserId = permissionHelper.getCurrentUserId();
@@ -77,6 +108,21 @@ public class ActivityService {
                 .build());
     }
 
+    /**
+     * Lists activity information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Send the required notification or outbound message.</li>
+     * </ul>
+     *
+     * @param targetId the target id parameter
+     * @param targetType the target type parameter
+     * @return the matching result collection
+     * @throws AppException if a business rule prevents the requested operation
+     */
     public List<DocumentActivityResponse> listActivities(UUID targetId, String targetType) {
         String normalizedType = normalizeType(targetType);
         UUID requesterId = permissionHelper.getCurrentUserId();
@@ -119,6 +165,17 @@ public class ActivityService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Retrieves activity information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param activities the activities parameter
+     * @return the get actor map result
+     */
     private Map<UUID, Map<String, Object>> getActorMap(List<DocumentActivity> activities) {
         Set<UUID> actorIds = activities.stream()
                 .map(DocumentActivity::getActorUserId)
@@ -152,6 +209,17 @@ public class ActivityService {
         return result;
     }
 
+    /**
+     * Retrieves activity information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param accountIds the account ids parameter
+     * @return the get users by account ids result
+     */
     private Map<UUID, Map<String, Object>> getUsersByAccountIds(Set<UUID> accountIds) {
         try {
             var response = userServiceFeignClient.getUsersByAccountIds(AccountIdsDto.builder().accountIds(accountIds).build());
@@ -161,6 +229,17 @@ public class ActivityService {
         }
     }
 
+    /**
+     * Retrieves activity information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param userIds the user ids parameter
+     * @return the get users by ids result
+     */
     private Map<UUID, Map<String, Object>> getUsersByIds(Set<UUID> userIds) {
         try {
             var response = userServiceFeignClient.getUsersByID(UserIdsDto.builder().ids(userIds).build());
@@ -170,6 +249,17 @@ public class ActivityService {
         }
     }
 
+    /**
+     * Retrieves activity information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param accountId the account id parameter
+     * @return the get actor by account id result
+     */
     private Map<String, Object> getActorByAccountId(UUID accountId) {
         try {
             var response = userServiceFeignClient.getUserByAccountId(accountId);
@@ -180,6 +270,17 @@ public class ActivityService {
         }
     }
 
+    /**
+     * Retrieves activity information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param userId the user id parameter
+     * @return the get actor by user id result
+     */
     private Map<String, Object> getActorByUserId(UUID userId) {
         try {
             var response = userServiceFeignClient.getUserById(userId);
@@ -190,6 +291,17 @@ public class ActivityService {
         }
     }
 
+    /**
+     * Returns extract single user for activity processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param body the body parameter
+     * @return the extract single user result
+     */
     private Map<String, Object> extractSingleUser(Object body) {
         if (!(body instanceof Map<?, ?> bodyMap)) return Map.of();
         Object data = bodyMap.get("data");
@@ -201,6 +313,17 @@ public class ActivityService {
         return map.getOrDefault(accountId, Map.of());
     }
 
+    /**
+     * Returns extract users from api response for activity processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param body the body parameter
+     * @return the extract users from api response result
+     */
     private Map<UUID, Map<String, Object>> extractUsersFromApiResponse(Object body) {
         if (!(body instanceof Map<?, ?> bodyMap)) return Map.of();
         Object data = bodyMap.get("data");
@@ -219,12 +342,29 @@ public class ActivityService {
         return result;
     }
 
+    /**
+     * Performs merge users for activity processing.
+     *
+     * @param target the target parameter
+     * @param source the source parameter
+     */
     private void mergeUsers(Map<UUID, Map<String, Object>> target, Map<UUID, Map<String, Object>> source) {
         for (Map.Entry<UUID, Map<String, Object>> entry : source.entrySet()) {
             target.putIfAbsent(entry.getKey(), entry.getValue());
         }
     }
 
+    /**
+     * Performs collect actor row for activity processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Send the required notification or outbound message.</li>
+     * </ul>
+     *
+     * @param result the result parameter
+     * @param row the row parameter
+     */
     private void collectActorRow(Map<UUID, Map<String, Object>> result, Object row) {
         if (!(row instanceof Map<?, ?> rowMap)) return;
         UUID userId = parseUuid(rowMap.get("id"));
@@ -239,6 +379,17 @@ public class ActivityService {
         result.put(userId, normalized);
     }
 
+    /**
+     * Builds activity data for downstream processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param actor the actor parameter
+     * @return the build actor name result
+     */
     private String buildActorName(Map<String, Object> actor) {
         if (actor == null || actor.isEmpty()) return null;
         String firstName = toStringOrNull(actor.get("firstName"));
@@ -253,6 +404,17 @@ public class ActivityService {
         return null;
     }
 
+    /**
+     * Returns to json for activity processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param payload the payload parameter
+     * @return the to json result
+     */
     private String toJson(Map<String, Object> payload) {
         if (payload == null || payload.isEmpty()) return null;
         try {
@@ -262,6 +424,17 @@ public class ActivityService {
         }
     }
 
+    /**
+     * Returns from json for activity processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param payload the payload parameter
+     * @return the from json result
+     */
     private Map<String, Object> fromJson(String payload) {
         if (payload == null || payload.isBlank()) return Map.of();
         try {
@@ -271,6 +444,17 @@ public class ActivityService {
         }
     }
 
+    /**
+     * Parses activity data.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param value the value parameter
+     * @return the parse uuid result
+     */
     private UUID parseUuid(Object value) {
         if (value == null) return null;
         try {
@@ -280,12 +464,35 @@ public class ActivityService {
         }
     }
 
+    /**
+     * Returns to string or null for activity processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param value the value parameter
+     * @return the to string or null result
+     */
     private String toStringOrNull(Object value) {
         if (value == null) return null;
         String s = String.valueOf(value);
         return s.isBlank() ? null : s;
     }
 
+    /**
+     * Normalizes activity content.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     * </ul>
+     *
+     * @param targetType the target type parameter
+     * @return the normalize type result
+     * @throws AppException if a business rule prevents the requested operation
+     */
     private String normalizeType(String targetType) {
         if (targetType == null) {
             throw new AppException(DocumentErrorCode.INVALID_REQUEST);

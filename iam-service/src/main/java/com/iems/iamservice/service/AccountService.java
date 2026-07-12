@@ -90,6 +90,18 @@ public class AccountService {
         return accountRepository.findAll();
     }
 
+    /**
+     * Searches account information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param keyword the keyword parameter
+     * @param pageable the pageable parameter
+     * @return the paginated result set
+     */
     public Page<AdminAccountResponseDto> searchAdminAccounts(String keyword, Pageable pageable) {
         String normalizedKeyword = keyword == null ? "" : keyword.trim();
         Page<Account> page = accountRepository.searchAdminAccounts(normalizedKeyword, pageable);
@@ -117,6 +129,18 @@ public class AccountService {
         return accountRepository.findByUsernameOrEmail(usernameOrEmail);
     }
 
+    /**
+     * Finds account information that matches the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Send the required notification or outbound message.</li>
+     * </ul>
+     *
+     * @param email the email parameter
+     * @return an optional result when matching data is available
+     */
     public Optional<Account> findByEmail(String email) {
         return accountRepository.findByEmail(email);
     }
@@ -204,6 +228,17 @@ public class AccountService {
         return accountRepository.save(user);
     }
 
+    /**
+     * Normalizes account content.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param account the account parameter
+     * @return the normalize expired subscription result
+     */
     @Transactional
     public Account normalizeExpiredSubscription(Account account) {
         if (account != null
@@ -284,6 +319,18 @@ public class AccountService {
         return dto;
     }
 
+    /**
+     * Returns to admin account response for account processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Send the required notification or outbound message.</li>
+     * </ul>
+     *
+     * @param account the account parameter
+     * @param user the user parameter
+     * @return the to admin account response result
+     */
     public AdminAccountResponseDto toAdminAccountResponse(Account account, User user) {
         account = normalizeExpiredSubscription(account);
         String displayName = user == null

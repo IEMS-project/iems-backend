@@ -36,6 +36,16 @@ public class NotificationPublisher {
 
     // ── Internal async senders (KHÔNG resolve email ở đây) ──────────
 
+    /**
+     * Sends notification communication.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Send the required notification or outbound message.</li>
+     * </ul>
+     *
+     * @param request the request parameter
+     */
     @Async
     public void sendAsync(CreateNotificationRequest request) {
         if (request.getRecipientId() == null) return;
@@ -46,6 +56,16 @@ public class NotificationPublisher {
         }
     }
 
+    /**
+     * Sends notification communication.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Send the required notification or outbound message.</li>
+     * </ul>
+     *
+     * @param requests the requests parameter
+     */
     @Async
     public void sendBatchAsync(List<CreateNotificationRequest> requests) {
         if (requests == null || requests.isEmpty()) return;
@@ -58,6 +78,17 @@ public class NotificationPublisher {
 
     // ── Helpers ───────────────────────────────────────────────────
 
+    /**
+     * Returns actor display for notification processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param actorName the actor name parameter
+     * @return the actor display result
+     */
     private String actorDisplay(String actorName) {
         return (actorName != null && !actorName.isBlank()) ? actorName : "Someone";
     }
@@ -101,6 +132,23 @@ public class NotificationPublisher {
 
     // ── Typed factory methods (gọi trên REQUEST thread) ──────────────
 
+    /**
+     * Sends notification notifications.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param recipientId the recipient id parameter
+     * @param actorId the actor id parameter
+     * @param actorName the actor name parameter
+     * @param issueKey the issue key parameter
+     * @param issueTitle the issue title parameter
+     * @param issueId the issue id parameter
+     * @param projectId the project id parameter
+     * @param projectName the project name parameter
+     */
     public void notifyIssueAssigned(UUID recipientId, UUID actorId, String actorName,
                                      String issueKey, String issueTitle, UUID issueId,
                                      UUID projectId, String projectName) {
@@ -122,6 +170,22 @@ public class NotificationPublisher {
         sendAsync(req);
     }
 
+    /**
+     * Sends notification notifications.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param recipientId the recipient id parameter
+     * @param actorId the actor id parameter
+     * @param actorName the actor name parameter
+     * @param issueKey the issue key parameter
+     * @param issueId the issue id parameter
+     * @param projectId the project id parameter
+     * @param projectName the project name parameter
+     */
     public void notifyIssueCommented(UUID recipientId, UUID actorId, String actorName,
                                       String issueKey, UUID issueId,
                                       UUID projectId, String projectName) {
@@ -143,6 +207,20 @@ public class NotificationPublisher {
         sendAsync(req);
     }
 
+    /**
+     * Sends notification notifications.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param recipientId the recipient id parameter
+     * @param actorId the actor id parameter
+     * @param actorName the actor name parameter
+     * @param projectId the project id parameter
+     * @param projectName the project name parameter
+     */
     public void notifyMemberAdded(UUID recipientId, UUID actorId, String actorName,
                                    UUID projectId, String projectName) {
         if (recipientId == null || recipientId.equals(actorId)) return;
@@ -163,6 +241,22 @@ public class NotificationPublisher {
         sendAsync(req);
     }
 
+    /**
+     * Sends notification notifications.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param memberIds the member ids parameter
+     * @param actorId the actor id parameter
+     * @param actorName the actor name parameter
+     * @param sprintId the sprint id parameter
+     * @param sprintName the sprint name parameter
+     * @param projectId the project id parameter
+     * @param projectName the project name parameter
+     */
     public void notifySprintStarted(List<UUID> memberIds, UUID actorId, String actorName,
                                      UUID sprintId, String sprintName,
                                      UUID projectId, String projectName) {
@@ -186,6 +280,22 @@ public class NotificationPublisher {
         sendBatchAsync(requests);
     }
 
+    /**
+     * Sends notification notifications.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param memberIds the member ids parameter
+     * @param actorId the actor id parameter
+     * @param actorName the actor name parameter
+     * @param sprintId the sprint id parameter
+     * @param sprintName the sprint name parameter
+     * @param projectId the project id parameter
+     * @param projectName the project name parameter
+     */
     public void notifySprintCompleted(List<UUID> memberIds, UUID actorId, String actorName,
                                        UUID sprintId, String sprintName,
                                        UUID projectId, String projectName) {
@@ -209,6 +319,23 @@ public class NotificationPublisher {
         sendBatchAsync(requests);
     }
 
+    /**
+     * Sends notification notifications.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param recipientId the recipient id parameter
+     * @param issueKey the issue key parameter
+     * @param issueTitle the issue title parameter
+     * @param issueId the issue id parameter
+     * @param projectId the project id parameter
+     * @param projectName the project name parameter
+     * @param recipientEmail the recipient email parameter
+     * @param recipientName the recipient name parameter
+     */
     public void notifyIssueDueSoon(UUID recipientId, String issueKey, String issueTitle,
                                     UUID issueId, UUID projectId, String projectName,
                                     String recipientEmail, String recipientName) {
@@ -229,6 +356,23 @@ public class NotificationPublisher {
         sendAsync(req);
     }
 
+    /**
+     * Sends notification notifications.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param recipientId the recipient id parameter
+     * @param actorId the actor id parameter
+     * @param actorName the actor name parameter
+     * @param issueKey the issue key parameter
+     * @param issueId the issue id parameter
+     * @param commentId the comment id parameter
+     * @param projectId the project id parameter
+     * @param projectName the project name parameter
+     */
     public void notifyCommentReplied(UUID recipientId, UUID actorId, String actorName,
                                      String issueKey, UUID issueId,
                                      UUID commentId, UUID projectId, String projectName) {
@@ -250,6 +394,24 @@ public class NotificationPublisher {
         sendAsync(req);
     }
 
+    /**
+     * Sends notification notifications.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param recipientIds the recipient ids parameter
+     * @param actorId the actor id parameter
+     * @param actorName the actor name parameter
+     * @param issueKey the issue key parameter
+     * @param issueTitle the issue title parameter
+     * @param issueId the issue id parameter
+     * @param commentId the comment id parameter
+     * @param projectId the project id parameter
+     * @param projectName the project name parameter
+     */
     public void notifyMentioned(List<UUID> recipientIds, UUID actorId, String actorName,
                                  String issueKey, String issueTitle, UUID issueId,
                                  UUID commentId, UUID projectId, String projectName) {

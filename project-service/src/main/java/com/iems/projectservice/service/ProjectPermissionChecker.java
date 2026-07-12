@@ -38,6 +38,20 @@ public class ProjectPermissionChecker {
     private final RoleRepository roleRepository;
     private final RolePermissionRepository rolePermissionRepository;
 
+    /**
+     * Returns has permission for project permission checker processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @param accountId the account id parameter
+     * @param permission the permission parameter
+     * @return true if the requested condition is satisfied; otherwise false
+     */
     public boolean hasPermission(UUID projectId, UUID accountId, ProjectPermission permission) {
         // 1 — membership check first
         ProjectMember member = projectMemberRepository
@@ -70,6 +84,17 @@ public class ProjectPermissionChecker {
         return false;
     }
 
+    /**
+     * Resolves project permission checker information for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param requested the requested parameter
+     * @return the matching result collection
+     */
     private List<ProjectPermission> resolvePermissionCandidates(ProjectPermission requested) {
         return switch (requested) {
             case PROJECT_READ -> Arrays.asList(
@@ -132,6 +157,18 @@ public class ProjectPermissionChecker {
         };
     }
 
+    /**
+     * Returns permission denied for project permission checker processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     * </ul>
+     *
+     * @param permission the permission parameter
+     * @return the permission denied result
+     * @throws AppException if a business rule prevents the requested operation
+     */
     /** Throws PERMISSION_DENIED (HTTP 403) when the member lacks the permission. */
     public void requirePermission(UUID projectId, UUID accountId, ProjectPermission permission) {
         if (!hasPermission(projectId, accountId, permission)) {

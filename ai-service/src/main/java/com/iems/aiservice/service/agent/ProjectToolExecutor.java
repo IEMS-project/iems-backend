@@ -32,6 +32,14 @@ public class ProjectToolExecutor {
     private final PendingActionStore pendingActionStore;
     private final ProjectApiToolRegistry toolRegistry;
 
+    /**
+     * Creates a new project tool service instance.
+     *
+     * @param projectApiClient the project api client parameter
+     * @param cache the cache parameter
+     * @param pendingActionStore the pending action store parameter
+     * @param toolRegistry the tool registry parameter
+     */
     public ProjectToolExecutor(ProjectApiClient projectApiClient,
             AgentDataCache cache,
             PendingActionStore pendingActionStore,
@@ -42,6 +50,20 @@ public class ProjectToolExecutor {
         this.toolRegistry = toolRegistry;
     }
 
+    /**
+     * Returns read project for project tool processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param plan the plan parameter
+     * @param request the request parameter
+     * @param userId the user id parameter
+     * @param authorization the authorization parameter
+     * @return the read project result
+     */
     public AgentToolResult readProject(AgentPlan plan,
             AgentChatRequest request,
             String userId,
@@ -57,6 +79,20 @@ public class ProjectToolExecutor {
         };
     }
 
+    /**
+     * Returns propose write for project tool processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param plan the plan parameter
+     * @param userId the user id parameter
+     * @param conversationId the conversation id parameter
+     * @param authorization the authorization parameter
+     * @return the propose write result
+     */
     public AgentToolResult proposeWrite(AgentPlan plan,
             String userId,
             String conversationId,
@@ -72,6 +108,18 @@ public class ProjectToolExecutor {
         };
     }
 
+    /**
+     * Executes the project tool operation.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param pendingAction the pending action parameter
+     * @param authorization the authorization parameter
+     * @return the execute confirmed write result
+     */
     public AgentToolResult executeConfirmedWrite(PendingAgentAction pendingAction, String authorization) {
         if (!isRegisteredTool(pendingAction.toolName())) {
             return AgentToolResult.error("Mình chưa hỗ trợ thực thi thao tác này.");
@@ -90,10 +138,33 @@ public class ProjectToolExecutor {
         }
     }
 
+    /**
+     * Returns is registered tool for project tool processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param toolName the tool name parameter
+     * @return true if the requested condition is satisfied; otherwise false
+     */
     private boolean isRegisteredTool(String toolName) {
         return toolRegistry.allTools().stream().anyMatch(tool -> tool.name().equals(toolName));
     }
 
+    /**
+     * Returns cached project issues for project tool processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @param authorization the authorization parameter
+     * @return the cached project issues result
+     */
     public List<Map<String, Object>> cachedProjectIssues(String projectId, String authorization) {
         return cache.getOrLoad(
                 "project_issues",
@@ -104,6 +175,19 @@ public class ProjectToolExecutor {
                         projectApiClient.listProjectIssuesPaged(projectId, authorization, 200)));
     }
 
+    /**
+     * Returns cached my issues for project tool processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @param userId the user id parameter
+     * @param authorization the authorization parameter
+     * @return the cached my issues result
+     */
     public List<Map<String, Object>> cachedMyIssues(String projectId, String userId, String authorization) {
         return cache.getOrLoad(
                 "my_issues",
@@ -112,6 +196,18 @@ public class ProjectToolExecutor {
                 () -> projectApiClient.listMyIssues(projectId, authorization));
     }
 
+    /**
+     * Returns cached priorities for project tool processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @param authorization the authorization parameter
+     * @return the cached priorities result
+     */
     public Map<String, String> cachedPriorities(String projectId, String authorization) {
         return cache.getOrLoad(
                 "priorities",
@@ -120,6 +216,18 @@ public class ProjectToolExecutor {
                 () -> mapIdToName(projectApiClient.listIssuePriorities(projectId, authorization)));
     }
 
+    /**
+     * Returns cached issue types for project tool processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @param authorization the authorization parameter
+     * @return the cached issue types result
+     */
     public Map<String, String> cachedIssueTypes(String projectId, String authorization) {
         return cache.getOrLoad(
                 "issue_types",
@@ -128,6 +236,18 @@ public class ProjectToolExecutor {
                 () -> mapIdToName(projectApiClient.listIssueTypes(projectId, authorization)));
     }
 
+    /**
+     * Returns cached workflow statuses for project tool processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @param authorization the authorization parameter
+     * @return the cached workflow statuses result
+     */
     public Map<String, String> cachedWorkflowStatuses(String projectId, String authorization) {
         return cache.getOrLoad(
                 "workflow_statuses",
@@ -148,6 +268,18 @@ public class ProjectToolExecutor {
                 });
     }
 
+    /**
+     * Returns cached members for project tool processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @param authorization the authorization parameter
+     * @return the cached members result
+     */
     public List<Map<String, Object>> cachedMembers(String projectId, String authorization) {
         return cache.getOrLoad(
                 "members",
@@ -156,6 +288,21 @@ public class ProjectToolExecutor {
                 () -> projectApiClient.listMembers(projectId, authorization));
     }
 
+    /**
+     * Returns propose issue status update for project tool processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Apply the requested state changes according to the domain rules.</li>
+     * </ul>
+     *
+     * @param plan the plan parameter
+     * @param userId the user id parameter
+     * @param conversationId the conversation id parameter
+     * @param authorization the authorization parameter
+     * @return the propose issue status update result
+     */
     private AgentToolResult proposeIssueStatusUpdate(AgentPlan plan,
             String userId,
             String conversationId,
@@ -217,6 +364,23 @@ public class ProjectToolExecutor {
                 payload);
     }
 
+    /**
+     * Returns propose assign issue for project tool processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Create or prepare the requested domain result.</li>
+     *   <li>Send the required notification or outbound message.</li>
+     * </ul>
+     *
+     * @param plan the plan parameter
+     * @param userId the user id parameter
+     * @param conversationId the conversation id parameter
+     * @param authorization the authorization parameter
+     * @return the propose assign issue result
+     */
     private AgentToolResult proposeAssignIssue(AgentPlan plan,
             String userId,
             String conversationId,
@@ -265,6 +429,20 @@ public class ProjectToolExecutor {
                 payload);
     }
 
+    /**
+     * Executes the project tool operation.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Apply the requested state changes according to the domain rules.</li>
+     * </ul>
+     *
+     * @param pendingAction the pending action parameter
+     * @param authorization the authorization parameter
+     * @return the execute status update result
+     * @throws AgentWriteException if the requested operation cannot be completed
+     */
     private AgentToolResult executeStatusUpdate(PendingAgentAction pendingAction, String authorization) {
         String projectId = firstNonBlank(pendingAction.projectId(), stringValue(pendingAction.payload().get("projectId")));
         String issueId = stringValue(pendingAction.payload().get("issueId"));
@@ -293,6 +471,18 @@ public class ProjectToolExecutor {
         return AgentToolResult.answer("Đã cập nhật " + issueKey + " - " + title + " sang " + targetStatus + ".");
     }
 
+    /**
+     * Executes the project tool operation.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Create or prepare the requested domain result.</li>
+     * </ul>
+     *
+     * @param pendingAction the pending action parameter
+     * @param authorization the authorization parameter
+     * @return the execute assign issue result
+     */
     private AgentToolResult executeAssignIssue(PendingAgentAction pendingAction, String authorization) {
         String projectId = firstNonBlank(pendingAction.projectId(), stringValue(pendingAction.payload().get("projectId")));
         String issueId = stringValue(pendingAction.payload().get("issueId"));
@@ -309,6 +499,18 @@ public class ProjectToolExecutor {
         return AgentToolResult.answer("Đã gán " + issueKey + " cho " + assigneeName + ".");
     }
 
+    /**
+     * Executes the project tool operation.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Create or prepare the requested domain result.</li>
+     * </ul>
+     *
+     * @param pendingAction the pending action parameter
+     * @param authorization the authorization parameter
+     * @return the execute create issue result
+     */
     @SuppressWarnings("unchecked")
     private AgentToolResult executeCreateIssue(PendingAgentAction pendingAction, String authorization) {
         String projectId = firstNonBlank(pendingAction.projectId(), stringValue(pendingAction.payload().get("projectId")));
@@ -321,6 +523,21 @@ public class ProjectToolExecutor {
         return AgentToolResult.answer("Đã tạo issue " + cleanDisplay(stringValue(created.get("issueKey")), "mới") + ".");
     }
 
+    /**
+     * Returns change issue status safely for project tool processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @param issueId the issue id parameter
+     * @param statusId the status id parameter
+     * @param authorization the authorization parameter
+     * @return the change issue status safely result
+     * @throws AgentWriteException if the requested operation cannot be completed
+     */
     private Map<String, Object> changeIssueStatusSafely(String projectId, String issueId, String statusId, String authorization) {
         try {
             return projectApiClient.changeIssueStatus(projectId, issueId, statusId, authorization);
@@ -331,6 +548,21 @@ public class ProjectToolExecutor {
         }
     }
 
+    /**
+     * Assigns project tool data according to the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Create or prepare the requested domain result.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @param issueId the issue id parameter
+     * @param assigneeId the assignee id parameter
+     * @param authorization the authorization parameter
+     * @throws AgentWriteException if the requested operation cannot be completed
+     */
     private void assignIssueSafely(String projectId, String issueId, String assigneeId, String authorization) {
         try {
             projectApiClient.assignIssue(projectId, issueId, assigneeId, authorization);
@@ -341,6 +573,21 @@ public class ProjectToolExecutor {
         }
     }
 
+    /**
+     * Creates project tool data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Create or prepare the requested domain result.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @param body the body parameter
+     * @param authorization the authorization parameter
+     * @return the create issue safely result
+     * @throws AgentWriteException if the requested operation cannot be completed
+     */
     private Map<String, Object> createIssueSafely(String projectId, Map<String, Object> body, String authorization) {
         try {
             return projectApiClient.createIssue(projectId, body, authorization);
@@ -351,6 +598,18 @@ public class ProjectToolExecutor {
         }
     }
 
+    /**
+     * Returns write failure message for project tool processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Apply the requested state changes according to the domain rules.</li>
+     * </ul>
+     *
+     * @param statusCode the status code parameter
+     * @param actionLabel the action label parameter
+     * @return the write failure message result
+     */
     private String writeFailureMessage(int statusCode, String actionLabel) {
         if (statusCode == 401) {
             return "Phien dang nhap da het han nen minh chua the " + actionLabel + ". Ban dang nhap lai roi bam Allow them lan nua nhe.";
@@ -367,6 +626,23 @@ public class ProjectToolExecutor {
         return "Project-service dang tu choi thao tac nay. Ban thu lai sau vai giay hoac kiem tra log cua project-service.";
     }
 
+    /**
+     * Returns status update failure message for project tool processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Apply the requested state changes according to the domain rules.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @param issueId the issue id parameter
+     * @param issueKey the issue key parameter
+     * @param targetStatus the target status parameter
+     * @param authorization the authorization parameter
+     * @param baseMessage the base message parameter
+     * @return the status update failure message result
+     */
     private String statusUpdateFailureMessage(String projectId,
             String issueId,
             String issueKey,
@@ -392,6 +668,17 @@ public class ProjectToolExecutor {
         }
     }
 
+    /**
+     * Returns format status names for project tool processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param statuses the statuses parameter
+     * @return the format status names result
+     */
     private String formatStatusNames(Map<String, String> statuses) {
         if (statuses == null || statuses.isEmpty()) {
             return "chưa lấy được danh sách trạng thái";
@@ -408,6 +695,19 @@ public class ProjectToolExecutor {
         }
     }
 
+    /**
+     * Builds project tool data for downstream processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     * </ul>
+     *
+     * @param request the request parameter
+     * @param userId the user id parameter
+     * @param authorization the authorization parameter
+     * @return the build daily plan result
+     */
     private String buildDailyPlan(AgentChatRequest request, String userId, String authorization) {
         String projectId = request.projectId();
         boolean myOnly = isMyWorkQuestion(request.question());
@@ -443,6 +743,19 @@ public class ProjectToolExecutor {
         return out.toString().trim();
     }
 
+    /**
+     * Builds project tool data for downstream processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     * </ul>
+     *
+     * @param request the request parameter
+     * @param userId the user id parameter
+     * @param authorization the authorization parameter
+     * @return the build issue list result
+     */
     private String buildIssueList(AgentChatRequest request, String userId, String authorization) {
         String projectId = request.projectId();
         boolean myOnly = isMyWorkQuestion(request.question());
@@ -470,6 +783,18 @@ public class ProjectToolExecutor {
         return out.toString().trim();
     }
 
+    /**
+     * Builds project tool data for downstream processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     * </ul>
+     *
+     * @param request the request parameter
+     * @param authorization the authorization parameter
+     * @return the build project summary result
+     */
     private String buildProjectSummary(AgentChatRequest request, String authorization) {
         String projectId = request.projectId();
         List<Map<String, Object>> issues = cachedProjectIssues(projectId, authorization);
@@ -525,6 +850,19 @@ public class ProjectToolExecutor {
         return out.toString().trim();
     }
 
+    /**
+     * Builds project tool data for downstream processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Apply the requested state changes according to the domain rules.</li>
+     * </ul>
+     *
+     * @param request the request parameter
+     * @param authorization the authorization parameter
+     * @return the build risk signals result
+     */
     private String buildRiskSignals(AgentChatRequest request, String authorization) {
         String projectId = request.projectId();
         List<Map<String, Object>> issues = cachedProjectIssues(projectId, authorization);
@@ -563,6 +901,18 @@ public class ProjectToolExecutor {
         return out.toString().trim();
     }
 
+    /**
+     * Builds project tool data for downstream processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     * </ul>
+     *
+     * @param request the request parameter
+     * @param authorization the authorization parameter
+     * @return the build member workload result
+     */
     private String buildMemberWorkload(AgentChatRequest request, String authorization) {
         List<Map<String, Object>> issues = cachedProjectIssues(request.projectId(), authorization);
         Map<String, String> statuses = cachedWorkflowStatuses(request.projectId(), authorization);
@@ -603,6 +953,19 @@ public class ProjectToolExecutor {
         return out.toString().trim();
     }
 
+    /**
+     * Builds project tool data for downstream processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param request the request parameter
+     * @param authorization the authorization parameter
+     * @return the build sprint report result
+     */
     private String buildSprintReport(AgentChatRequest request, String authorization) {
         String normalizedQuestion = normalize(request.question());
         if (normalizedQuestion.contains("standup") || normalizedQuestion.contains("blocker")) {
@@ -627,6 +990,18 @@ public class ProjectToolExecutor {
                 + "- Số issue: " + sprintIssues.size();
     }
 
+    /**
+     * Builds project tool data for downstream processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     * </ul>
+     *
+     * @param request the request parameter
+     * @param authorization the authorization parameter
+     * @return the build standup report result
+     */
     private String buildStandupReport(AgentChatRequest request, String authorization) {
         String projectId = request.projectId();
         List<Map<String, Object>> issues = cachedProjectIssues(projectId, authorization);
@@ -668,6 +1043,20 @@ public class ProjectToolExecutor {
         return out.toString().trim();
     }
 
+    /**
+     * Performs append issue bullets for project tool processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param out the out parameter
+     * @param issues the issues parameter
+     * @param statuses the statuses parameter
+     * @param priorities the priorities parameter
+     * @param today the today parameter
+     */
     private void appendIssueBullets(StringBuilder out,
             List<Map<String, Object>> issues,
             Map<String, String> statuses,
@@ -688,6 +1077,19 @@ public class ProjectToolExecutor {
                 .append("\n"));
     }
 
+    /**
+     * Finds project tool information that matches the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @param issueKey the issue key parameter
+     * @param authorization the authorization parameter
+     * @return the find issue by key result
+     */
     private Optional<Map<String, Object>> findIssueByKey(String projectId, String issueKey, String authorization) {
         if (issueKey == null || issueKey.isBlank()) {
             return Optional.empty();
@@ -698,6 +1100,18 @@ public class ProjectToolExecutor {
                 .findFirst();
     }
 
+    /**
+     * Finds project tool information that matches the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param workflowStatuses the workflow statuses parameter
+     * @param targetStatus the target status parameter
+     * @return the find status result
+     */
     private Map.Entry<String, String> findStatus(Map<String, String> workflowStatuses, String targetStatus) {
         String target = normalize(targetStatus);
         for (Map.Entry<String, String> entry : workflowStatuses.entrySet()) {
@@ -709,6 +1123,20 @@ public class ProjectToolExecutor {
         return null;
     }
 
+    /**
+     * Finds project tool information that matches the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @param assigneeText the assignee text parameter
+     * @param authorization the authorization parameter
+     * @return the find member result
+     */
     private Optional<Map<String, Object>> findMember(String projectId, String assigneeText, String authorization) {
         String target = normalize(assigneeText);
         if (target.isBlank()) {
@@ -719,6 +1147,19 @@ public class ProjectToolExecutor {
                 .findFirst();
     }
 
+    /**
+     * Returns matches member for project tool processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Send the required notification or outbound message.</li>
+     * </ul>
+     *
+     * @param target the target parameter
+     * @param member the member parameter
+     * @return true if the requested condition is satisfied; otherwise false
+     */
     private boolean matchesMember(String target, Map<String, Object> member) {
         String email = normalize(stringValue(member.get("userEmail")));
         String name = normalize(stringValue(member.get("userName")));
@@ -726,6 +1167,22 @@ public class ProjectToolExecutor {
                 || (!name.isBlank() && (name.contains(target) || target.contains(name)));
     }
 
+    /**
+     * Saves project tool data.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param actionId the action id parameter
+     * @param conversationId the conversation id parameter
+     * @param userId the user id parameter
+     * @param projectId the project id parameter
+     * @param toolName the tool name parameter
+     * @param payload the payload parameter
+     * @param summary the summary parameter
+     */
     private void savePending(String actionId,
             String conversationId,
             String userId,
@@ -746,6 +1203,18 @@ public class ProjectToolExecutor {
                 now.plus(PendingActionStore.DEFAULT_TTL)));
     }
 
+    /**
+     * Returns merge issues for project tool processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Create or prepare the requested domain result.</li>
+     * </ul>
+     *
+     * @param first the first parameter
+     * @param second the second parameter
+     * @return the merge issues result
+     */
     private List<Map<String, Object>> mergeIssues(List<Map<String, Object>> first, List<Map<String, Object>> second) {
         List<Map<String, Object>> result = new ArrayList<>();
         Set<String> seen = new HashSet<>();
@@ -764,6 +1233,17 @@ public class ProjectToolExecutor {
         return result;
     }
 
+    /**
+     * Maps project tool data to the target representation.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param items the items parameter
+     * @return the map id to name result
+     */
     private Map<String, String> mapIdToName(List<Map<String, Object>> items) {
         Map<String, String> byId = new LinkedHashMap<>();
         if (items == null) {
@@ -780,6 +1260,20 @@ public class ProjectToolExecutor {
         return byId;
     }
 
+    /**
+     * Returns importance score for project tool processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param issue the issue parameter
+     * @param statuses the statuses parameter
+     * @param priorities the priorities parameter
+     * @param today the today parameter
+     * @return the importance score result
+     */
     private int importanceScore(Map<String, Object> issue,
             Map<String, String> statuses,
             Map<String, String> priorities,
@@ -803,6 +1297,20 @@ public class ProjectToolExecutor {
         return score;
     }
 
+    /**
+     * Returns priority reason for project tool processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param issue the issue parameter
+     * @param statuses the statuses parameter
+     * @param priorities the priorities parameter
+     * @param today the today parameter
+     * @return the priority reason result
+     */
     private String priorityReason(Map<String, Object> issue,
             Map<String, String> statuses,
             Map<String, String> priorities,
@@ -823,6 +1331,18 @@ public class ProjectToolExecutor {
         return "Đang mở và có mức ưu tiên cần theo dõi.";
     }
 
+    /**
+     * Returns is done for project tool processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param issue the issue parameter
+     * @param statuses the statuses parameter
+     * @return true if the requested condition is satisfied; otherwise false
+     */
     private boolean isDone(Map<String, Object> issue, Map<String, String> statuses) {
         String status = normalize(displayStatus(issue, statuses));
         String category = normalize(stringValue(issue.get("statusCategory")));
@@ -830,16 +1350,51 @@ public class ProjectToolExecutor {
                 || category.contains("done");
     }
 
+    /**
+     * Returns is overdue for project tool processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param issue the issue parameter
+     * @param today the today parameter
+     * @return true if the requested condition is satisfied; otherwise false
+     */
     private boolean isOverdue(Map<String, Object> issue, LocalDate today) {
         LocalDate due = parseDate(stringValue(issue.get("dueDate")));
         return due != null && due.isBefore(today);
     }
 
+    /**
+     * Returns is due today for project tool processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param issue the issue parameter
+     * @param today the today parameter
+     * @return true if the requested condition is satisfied; otherwise false
+     */
     private boolean isDueToday(Map<String, Object> issue, LocalDate today) {
         LocalDate due = parseDate(stringValue(issue.get("dueDate")));
         return due != null && due.isEqual(today);
     }
 
+    /**
+     * Returns priority weight for project tool processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param priorityName the priority name parameter
+     * @return the priority weight result
+     */
     private int priorityWeight(String priorityName) {
         String priority = normalize(priorityName);
         if (priority.contains("highest") || priority.contains("critical")) {
@@ -857,6 +1412,17 @@ public class ProjectToolExecutor {
         return 30;
     }
 
+    /**
+     * Assigns project tool data according to the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Send the required notification or outbound message.</li>
+     * </ul>
+     *
+     * @param issue the issue parameter
+     * @return the assignee name result
+     */
     @SuppressWarnings("unchecked")
     private String assigneeName(Map<String, Object> issue) {
         Object assignee = issue.get("assignee");
@@ -874,18 +1440,53 @@ public class ProjectToolExecutor {
                 stringValue(issue.get("assigneeEmail"))), "Chưa có người phụ trách");
     }
 
+    /**
+     * Returns display status for project tool processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param issue the issue parameter
+     * @param statuses the statuses parameter
+     * @return the display status result
+     */
     private String displayStatus(Map<String, Object> issue, Map<String, String> statuses) {
         return cleanDisplay(firstNonBlank(
                 stringValue(issue.get("statusName")),
                 statuses.get(stringValue(issue.get("statusId")))), "Chưa phân loại");
     }
 
+    /**
+     * Returns display priority for project tool processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param issue the issue parameter
+     * @param priorities the priorities parameter
+     * @return the display priority result
+     */
     private String displayPriority(Map<String, Object> issue, Map<String, String> priorities) {
         return cleanDisplay(firstNonBlank(
                 stringValue(issue.get("priorityName")),
                 priorities.get(stringValue(issue.get("priorityId")))), "Chưa phân loại");
     }
 
+    /**
+     * Parses project tool data.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param raw the raw parameter
+     * @return the parse date result
+     */
     private LocalDate parseDate(String raw) {
         if (raw == null || raw.isBlank()) {
             return null;
@@ -897,16 +1498,50 @@ public class ProjectToolExecutor {
         }
     }
 
+    /**
+     * Returns is my work question for project tool processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param question the question parameter
+     * @return true if the requested condition is satisfied; otherwise false
+     */
     private boolean isMyWorkQuestion(String question) {
         String normalized = normalize(question);
         return normalized.contains("cua toi") || normalized.contains("cua minh")
                 || normalized.contains("viec toi") || normalized.contains("my ");
     }
 
+    /**
+     * Returns clean display for project tool processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param value the value parameter
+     * @param fallback the fallback parameter
+     * @return the clean display result
+     */
     private String cleanDisplay(String value, String fallback) {
         return value == null || value.isBlank() ? fallback : value.replace("|", "/").trim();
     }
 
+    /**
+     * Returns first non blank for project tool processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param values the values parameter
+     * @return the first non blank result
+     */
     private String firstNonBlank(String... values) {
         for (String value : values) {
             if (value != null && !value.isBlank()) {
@@ -916,14 +1551,47 @@ public class ProjectToolExecutor {
         return null;
     }
 
+    /**
+     * Returns string value for project tool processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param value the value parameter
+     * @return the string value result
+     */
     private String stringValue(Object value) {
         return value == null ? null : String.valueOf(value);
     }
 
+    /**
+     * Returns safe for project tool processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param value the value parameter
+     * @return the safe result
+     */
     private String safe(String value) {
         return value == null ? "" : value;
     }
 
+    /**
+     * Normalizes project tool content.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param value the value parameter
+     * @return the normalize result
+     */
     private String normalize(String value) {
         if (value == null) {
             return "";

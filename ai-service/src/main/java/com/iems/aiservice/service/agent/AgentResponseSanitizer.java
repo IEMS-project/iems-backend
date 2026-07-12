@@ -17,6 +17,17 @@ public class AgentResponseSanitizer {
             "(?i)\\s*\\|?\\s*(id|projectId|project_id|issueId|internalId|token|endpoint|api)\\s*=\\s*[^|\\n]+");
     private static final Pattern JSON_BLOCK_PATTERN = Pattern.compile("(?s)```\\s*json\\s*.*?```");
 
+    /**
+     * Sanitizes agent response input.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param answer the answer parameter
+     * @return the sanitize result
+     */
     public String sanitize(String answer) {
         if (answer == null || answer.isBlank()) {
             return "M\u00ecnh ch\u01b0a c\u00f3 \u0111\u1ee7 d\u1eef li\u1ec7u \u0111\u1ec3 tr\u1ea3 l\u1eddi. B\u1ea1n th\u1eed l\u1ea1i sau v\u00e0i gi\u00e2y nh\u00e9.";

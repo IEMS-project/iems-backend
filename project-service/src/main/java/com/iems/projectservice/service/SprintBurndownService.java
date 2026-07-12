@@ -34,6 +34,18 @@ public class SprintBurndownService {
     private final WorkflowRepository workflowRepository;
     private final WorkflowStatusRepository workflowStatusRepository;
 
+    /**
+     * Retrieves sprint burndown information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Create or prepare the requested domain result.</li>
+     * </ul>
+     *
+     * @param sprintId the sprint id parameter
+     * @return the get sprint burndown result
+     */
     public SprintBurndownDto getSprintBurndown(UUID sprintId) {
         Sprint sprint = sprintRepository.findById(sprintId)
                 .orElseThrow(() -> new AppException(ProjectErrorCode.SPRINT_NOT_FOUND));
@@ -145,6 +157,17 @@ public class SprintBurndownService {
                 points);
     }
 
+    /**
+     * Resolves sprint burndown information for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param sprint the sprint parameter
+     * @return the resolve start date result
+     */
     private LocalDate resolveStartDate(Sprint sprint) {
         if (sprint.getStartDate() != null) {
             return sprint.getStartDate().toLocalDate();
@@ -155,6 +178,18 @@ public class SprintBurndownService {
         return LocalDate.now();
     }
 
+    /**
+     * Resolves sprint burndown information for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param sprint the sprint parameter
+     * @param startDate the start date parameter
+     * @return the resolve end date result
+     */
     private LocalDate resolveEndDate(Sprint sprint, LocalDate startDate) {
         if (sprint.getEndDate() != null) {
             LocalDate end = sprint.getEndDate().toLocalDate();

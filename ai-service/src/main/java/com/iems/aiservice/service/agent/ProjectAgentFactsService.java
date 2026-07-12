@@ -18,6 +18,13 @@ public class ProjectAgentFactsService {
     private final ProjectApiClient projectApiClient;
     private final ProjectIssueToolService projectIssueToolService;
 
+    /**
+     * Creates a new project agent facts service instance.
+     *
+     * @param toolRegistry the tool registry parameter
+     * @param projectApiClient the project api client parameter
+     * @param projectIssueToolService the project issue tool service parameter
+     */
     public ProjectAgentFactsService(ProjectApiToolRegistry toolRegistry,
             ProjectApiClient projectApiClient,
             ProjectIssueToolService projectIssueToolService) {
@@ -26,6 +33,19 @@ public class ProjectAgentFactsService {
         this.projectIssueToolService = projectIssueToolService;
     }
 
+    /**
+     * Resolves project agent facts information for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param request the request parameter
+     * @param authorization the authorization parameter
+     * @param intent the intent parameter
+     * @return the resolve facts result
+     */
     public Map<String, Object> resolveFacts(AgentChatRequest request, String authorization, AgentIntent intent) {
         if (request.projectId() == null || request.projectId().isBlank()) {
             return Collections.emptyMap();
@@ -61,6 +81,18 @@ public class ProjectAgentFactsService {
         return facts;
     }
 
+    /**
+     * Adds project agent facts data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Create or prepare the requested domain result.</li>
+     * </ul>
+     *
+     * @param facts the facts parameter
+     * @param request the request parameter
+     * @param authorization the authorization parameter
+     */
     private void addDailyPlanFacts(Map<String, Object> facts, AgentChatRequest request, String authorization) {
         boolean myOnly = isMyWorkQuestion(request.question());
         addToolResult(facts, myOnly ? "my_issues" : "issues",
@@ -73,6 +105,18 @@ public class ProjectAgentFactsService {
                 : "Prioritize open tasks that are overdue, due today, high priority, blocked, or unassigned.");
     }
 
+    /**
+     * Adds project agent facts data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Create or prepare the requested domain result.</li>
+     * </ul>
+     *
+     * @param facts the facts parameter
+     * @param request the request parameter
+     * @param authorization the authorization parameter
+     */
     private void addIssueFacts(Map<String, Object> facts, AgentChatRequest request, String authorization) {
         boolean myOnly = isMyWorkQuestion(request.question());
         addToolResult(facts, myOnly ? "my_issues" : "issues",
@@ -81,6 +125,18 @@ public class ProjectAgentFactsService {
                         : projectIssueToolService.getProjectIssues(request.projectId(), authorization));
     }
 
+    /**
+     * Adds project agent facts data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Create or prepare the requested domain result.</li>
+     * </ul>
+     *
+     * @param facts the facts parameter
+     * @param request the request parameter
+     * @param authorization the authorization parameter
+     */
     private void addSprintFacts(Map<String, Object> facts, AgentChatRequest request, String authorization) {
         List<Map<String, Object>> sprints = safeList(() -> projectApiClient.listSprints(request.projectId(), authorization));
         facts.put("sprints", limitList(sprints, 10));
@@ -98,12 +154,34 @@ public class ProjectAgentFactsService {
                 () -> projectApiClient.getSprintBurndown(request.projectId(), selectedSprintId, authorization));
     }
 
+    /**
+     * Returns is my work question for project agent facts processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param question the question parameter
+     * @return true if the requested condition is satisfied; otherwise false
+     */
     private static boolean isMyWorkQuestion(String question) {
         String text = question == null ? "" : question.toLowerCase(Locale.ROOT);
         return text.contains("của tôi") || text.contains("của mình") || text.contains("toi")
                 || text.contains("mình") || text.contains("my ");
     }
 
+    /**
+     * Returns choose sprint id for project agent facts processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     * </ul>
+     *
+     * @param sprints the sprints parameter
+     * @return the choose sprint id result
+     */
     private static String chooseSprintId(List<Map<String, Object>> sprints) {
         for (Map<String, Object> sprint : sprints) {
             String status = stringValue(sprint.get("status"));
@@ -114,6 +192,18 @@ public class ProjectAgentFactsService {
         return sprints.isEmpty() ? null : stringValue(sprints.get(0).get("id"));
     }
 
+    /**
+     * Adds project agent facts data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Create or prepare the requested domain result.</li>
+     * </ul>
+     *
+     * @param facts the facts parameter
+     * @param key the key parameter
+     * @param call the call parameter
+     */
     private static void addToolResult(Map<String, Object> facts, String key, ToolCall call) {
         try {
             Object value = call.execute();
@@ -123,6 +213,17 @@ public class ProjectAgentFactsService {
         }
     }
 
+    /**
+     * Returns safe list for project agent facts processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param call the call parameter
+     * @return the safe list result
+     */
     private static List<Map<String, Object>> safeList(ListToolCall call) {
         try {
             return call.execute();
@@ -131,6 +232,18 @@ public class ProjectAgentFactsService {
         }
     }
 
+    /**
+     * Returns limit list for project agent facts processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     * </ul>
+     *
+     * @param items the items parameter
+     * @param limit the limit parameter
+     * @return the matching result collection
+     */
     private static List<?> limitList(List<?> items, int limit) {
         if (items == null || items.size() <= limit) {
             return items == null ? List.of() : items;
@@ -138,6 +251,17 @@ public class ProjectAgentFactsService {
         return items.subList(0, limit);
     }
 
+    /**
+     * Returns string value for project agent facts processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param value the value parameter
+     * @return the string value result
+     */
     private static String stringValue(Object value) {
         return value == null ? null : String.valueOf(value);
     }

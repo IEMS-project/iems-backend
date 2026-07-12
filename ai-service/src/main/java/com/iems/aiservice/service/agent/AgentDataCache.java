@@ -21,6 +21,20 @@ public class AgentDataCache {
 
     private final Map<String, CacheEntry> entries = new ConcurrentHashMap<>();
 
+    /**
+     * Retrieves agent data information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param namespace the namespace parameter
+     * @param key the key parameter
+     * @param ttl the ttl parameter
+     * @param loader the loader parameter
+     * @return the get or load result
+     */
     @SuppressWarnings("unchecked")
     public <T> T getOrLoad(String namespace, String key, Duration ttl, Supplier<T> loader) {
         String cacheKey = cacheKey(namespace, key);
@@ -37,6 +51,16 @@ public class AgentDataCache {
         return loaded;
     }
 
+    /**
+     * Evicts cached agent data state.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Remove or clear the requested domain data when allowed.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     */
     public void evictProjectWriteData(String projectId) {
         if (projectId == null || projectId.isBlank()) {
             return;
@@ -52,18 +76,59 @@ public class AgentDataCache {
                 || key.startsWith("my_issues:" + projectId + ":"));
     }
 
+    /**
+     * Clears agent data state.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Remove or clear the requested domain data when allowed.</li>
+     * </ul>
+     */
     public void clear() {
         entries.clear();
     }
 
+    /**
+     * Returns size for agent data processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @return the size result
+     */
     int size() {
         return entries.size();
     }
 
+    /**
+     * Returns cache key for agent data processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param namespace the namespace parameter
+     * @param key the key parameter
+     * @return the cache key result
+     */
     private static String cacheKey(String namespace, String key) {
         return Objects.toString(namespace, "default") + ":" + Objects.toString(key, "");
     }
 
+    /**
+     * Returns copy for cache for agent data processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param value the value parameter
+     * @return the copy for cache result
+     */
     private static Object copyForCache(Object value) {
         if (value instanceof java.util.List<?> list) {
             return new ArrayList<>(list);

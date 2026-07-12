@@ -26,6 +26,18 @@ public class MessageReadService implements IMessageReadService {
     private final ConversationRepository conversationRepository;
     private final SimpMessagingTemplate messagingTemplate;
 
+    /**
+     * Marks message read data according to the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Apply the requested state changes according to the domain rules.</li>
+     * </ul>
+     *
+     * @param conversationId the conversation id parameter
+     * @param accountId the account id parameter
+     */
     @Override
     public void markAsRead(String conversationId, String accountId) {
         if (conversationId == null || accountId == null || conversationId.isBlank() || accountId.isBlank()) return;
@@ -43,6 +55,17 @@ public class MessageReadService implements IMessageReadService {
         mongoTemplate.updateMulti(q, up, Message.class);
     }
 
+    /**
+     * Retrieves message read information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     * </ul>
+     *
+     * @param accountId the account id parameter
+     * @return the get unread counts by user result
+     */
     @Override
     public Map<String, Integer> getUnreadCountsByUser(String accountId) {
         if (accountId == null || accountId.isBlank()) return Map.of();
@@ -71,6 +94,18 @@ public class MessageReadService implements IMessageReadService {
         return map;
     }
 
+    /**
+     * Retrieves message read information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     * </ul>
+     *
+     * @param conversationId the conversation id parameter
+     * @param accountId the account id parameter
+     * @return the get unread count for conversation result
+     */
     @Override
     public int getUnreadCountForConversation(String conversationId, String accountId) {
         if (accountId == null || accountId.isBlank() || conversationId == null || conversationId.isBlank()) {
@@ -95,6 +130,18 @@ public class MessageReadService implements IMessageReadService {
         return (int) mongoTemplate.count(query, Message.class);
     }
 
+    /**
+     * Marks message read data according to the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Apply the requested state changes according to the domain rules.</li>
+     * </ul>
+     *
+     * @param conversationId the conversation id parameter
+     * @param accountId the account id parameter
+     * @param lastMessageId the last message id parameter
+     */
     @Override
     public void markAsReadWithLastMessage(String conversationId, String accountId, String lastMessageId) {
         markAsRead(conversationId, accountId);
@@ -108,6 +155,21 @@ public class MessageReadService implements IMessageReadService {
         broadcastReadStatusUpdate(conversationId, accountId, lastMessageId);
     }
 
+    /**
+     * Marks message read data according to the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Apply the requested state changes according to the domain rules.</li>
+     *   <li>Remove or clear the requested domain data when allowed.</li>
+     * </ul>
+     *
+     * @param conversationId the conversation id parameter
+     * @param accountId the account id parameter
+     * @return true if the requested condition is satisfied; otherwise false
+     */
     @Override
     public boolean markConversationAsRead(String conversationId, String accountId) {
         Conversation conversation = conversationRepository.findById(conversationId).orElse(null);
@@ -151,6 +213,19 @@ public class MessageReadService implements IMessageReadService {
         return true;
     }
 
+    /**
+     * Performs broadcast read status update for message read processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Apply the requested state changes according to the domain rules.</li>
+     * </ul>
+     *
+     * @param conversationId the conversation id parameter
+     * @param accountId the account id parameter
+     * @param lastMessageId the last message id parameter
+     */
     @Override
     public void broadcastReadStatusUpdate(String conversationId, String accountId, String lastMessageId) {
         Conversation conv = conversationRepository.findById(conversationId).orElse(null);

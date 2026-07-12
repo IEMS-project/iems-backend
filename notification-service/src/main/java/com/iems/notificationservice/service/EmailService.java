@@ -93,6 +93,19 @@ public class EmailService {
 
     // ── Private helpers ───────────────────────────────────────────
 
+    /**
+     * Sends email communication.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Send the required notification or outbound message.</li>
+     * </ul>
+     *
+     * @param to the to parameter
+     * @param subject the subject parameter
+     * @param htmlBody the html body parameter
+     * @throws MessagingException if the requested operation cannot be completed
+     */
     private void sendHtml(String to, String subject, String htmlBody) throws MessagingException {
         MimeMessage message = mailSender.createMimeMessage();
         MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
@@ -103,6 +116,17 @@ public class EmailService {
         mailSender.send(message);
     }
 
+    /**
+     * Builds email data for downstream processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param req the req parameter
+     * @return the build subject result
+     */
     private String buildSubject(CreateNotificationRequest req) {
         return switch (req.getType()) {
             case "ISSUE_ASSIGNED"   -> "[IEMS] You were assigned: " + safe(req.getTitle());
@@ -115,6 +139,18 @@ public class EmailService {
         };
     }
 
+    /**
+     * Builds email data for downstream processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Send the required notification or outbound message.</li>
+     * </ul>
+     *
+     * @param req the req parameter
+     * @param recipientName the recipient name parameter
+     * @return the build html body result
+     */
     private String buildHtmlBody(CreateNotificationRequest req, String recipientName) {
         Context ctx = new Context(Locale.ENGLISH);
 
@@ -142,6 +178,17 @@ public class EmailService {
         return templateEngine.process("email/notification-email", ctx);
     }
 
+    /**
+     * Builds email data for downstream processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Send the required notification or outbound message.</li>
+     * </ul>
+     *
+     * @param type the type parameter
+     * @return the build badge label result
+     */
     private String buildBadgeLabel(String type) {
         return switch (type) {
             case "ISSUE_ASSIGNED"   -> "✅  Task Assigned";
@@ -167,6 +214,17 @@ public class EmailService {
         };
     }
 
+    /**
+     * Resolves email information for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param type the type parameter
+     * @return the resolve entity label key result
+     */
     private String resolveEntityLabelKey(String type) {
         return switch (type) {
             case "ISSUE_ASSIGNED", "ISSUE_DUE_SOON", "ISSUE_COMMENTED" -> "Task";
@@ -176,11 +234,33 @@ public class EmailService {
         };
     }
 
+    /**
+     * Resolves email information for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param req the req parameter
+     * @return the resolve entity label result
+     */
     private String resolveEntityLabel(CreateNotificationRequest req) {
         if (req.getTitle() != null && !req.getTitle().isBlank()) return req.getTitle();
         return req.getEntityId();
     }
 
+    /**
+     * Builds email data for downstream processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param req the req parameter
+     * @return the build link result
+     */
     private String buildLink(CreateNotificationRequest req) {
         if (req.getLinkPath() == null || req.getLinkPath().isBlank()) return null;
         // frontendUrl được load từ ${app.frontend-url} trong application.properties
@@ -191,6 +271,17 @@ public class EmailService {
         return base + req.getLinkPath();
     }
 
+    /**
+     * Builds email data for downstream processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param type the type parameter
+     * @return the build cta label result
+     */
     private String buildCtaLabel(String type) {
         return switch (type) {
             case "ISSUE_ASSIGNED", "ISSUE_DUE_SOON", "ISSUE_COMMENTED" -> "View Task →";

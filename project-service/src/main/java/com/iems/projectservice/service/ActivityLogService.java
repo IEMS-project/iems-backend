@@ -34,6 +34,21 @@ public class ActivityLogService {
     private final UserServiceFeignClient userServiceFeignClient;
     private final ObjectMapper objectMapper;
 
+    /**
+     * Returns log for activity log processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @param issueId the issue id parameter
+     * @param userId the user id parameter
+     * @param action the action parameter
+     * @param details the details parameter
+     * @return the log result
+     */
     public ActivityLog log(UUID projectId, UUID issueId, UUID userId, String action, String details) {
         ActivityLog entry = new ActivityLog();
         entry.setProjectId(projectId);
@@ -44,11 +59,34 @@ public class ActivityLogService {
         return activityLogRepository.save(entry);
     }
 
+    /**
+     * Retrieves activity log information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @param pageable the pageable parameter
+     * @return the paginated result set
+     */
     public PagedResponseDto<ActivityLogResponseDto> getProjectActivities(UUID projectId, Pageable pageable) {
         Page<ActivityLog> page = activityLogRepository.findByProjectIdOrderByCreatedAtDesc(projectId, pageable);
         return toPagedResponse(page);
     }
 
+    /**
+     * Retrieves activity log information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param pageable the pageable parameter
+     * @return the paginated result set
+     */
     public PagedResponseDto<ActivityLogResponseDto> getMyRecentActivities(Pageable pageable) {
         UUID accountId = getUserIdFromRequest();
         List<UUID> projectIds = projectRepository.findIdsByOwnerOrMember(accountId);
@@ -61,11 +99,34 @@ public class ActivityLogService {
         return toPagedResponse(page);
     }
 
+    /**
+     * Retrieves activity log information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param issueId the issue id parameter
+     * @param pageable the pageable parameter
+     * @return the paginated result set
+     */
     public PagedResponseDto<ActivityLogResponseDto> getIssueActivities(UUID issueId, Pageable pageable) {
         Page<ActivityLog> page = activityLogRepository.findByIssueIdOrderByCreatedAtDesc(issueId, pageable);
         return toPagedResponse(page);
     }
 
+    /**
+     * Returns to paged response for activity log processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param page the page parameter
+     * @return the paginated result set
+     */
     private PagedResponseDto<ActivityLogResponseDto> toPagedResponse(Page<ActivityLog> page) {
         return new PagedResponseDto<>(
                 enrich(page.getContent()),
@@ -76,6 +137,17 @@ public class ActivityLogService {
                 page.isLast());
     }
 
+    /**
+     * Returns enrich for activity log processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param logs the logs parameter
+     * @return the matching result collection
+     */
     private List<ActivityLogResponseDto> enrich(List<ActivityLog> logs) {
         if (logs.isEmpty())
             return List.of();
@@ -129,12 +201,33 @@ public class ActivityLogService {
         }).collect(Collectors.toList());
     }
 
+    /**
+     * Retrieves activity log information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @return the get user id from request result
+     */
     private UUID getUserIdFromRequest() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         JwtUserDetails userDetails = (JwtUserDetails) authentication.getPrincipal();
         return userDetails.getUserId();
     }
 
+    /**
+     * Returns trim for activity log processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param s the s parameter
+     * @return the trim result
+     */
     private String trim(String s) {
         return s != null ? s.trim() : "";
     }

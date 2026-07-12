@@ -19,6 +19,16 @@ public class AiIndexingService {
     private final AiServiceFeignClient aiServiceFeignClient;
     private final ObjectStorageService objectStorageService;
 
+    /**
+     * Performs dispatch index for ai indexing processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Create or prepare the requested domain result.</li>
+     * </ul>
+     *
+     * @param doc the doc parameter
+     */
     @Async
     public void dispatchIndex(ProjectDocument doc) {
         try {
@@ -46,6 +56,11 @@ public class AiIndexingService {
         }
     }
 
+    /**
+     * Performs dispatch deindex for ai indexing processing.
+     *
+     * @param doc the doc parameter
+     */
     @Async
     public void dispatchDeindex(ProjectDocument doc) {
         try {

@@ -23,6 +23,14 @@ public class TrashService {
     private final ObjectStorageService storageService;
     private final PermissionHelper permissionHelper;
 
+    /**
+     * Creates a new trash service instance.
+     *
+     * @param storedFileRepository the stored file repository parameter
+     * @param folderRepository the folder repository parameter
+     * @param storageService the storage service parameter
+     * @param permissionHelper the permission helper parameter
+     */
     public TrashService(StoredFileRepository storedFileRepository,
                         FolderRepository folderRepository,
                         ObjectStorageService storageService,
@@ -35,6 +43,17 @@ public class TrashService {
 
     // ──────────────────────────── SOFT DELETE ────────────────────────────
 
+    /**
+     * Performs soft delete file for trash processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Remove or clear the requested domain data when allowed.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param fileId the file id parameter
+     */
     @Transactional
     public void softDeleteFile(UUID fileId) {
         UUID userId = permissionHelper.getCurrentUserId();
@@ -44,6 +63,16 @@ public class TrashService {
         storedFileRepository.save(file);
     }
 
+    /**
+     * Performs soft delete folder for trash processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Remove or clear the requested domain data when allowed.</li>
+     * </ul>
+     *
+     * @param folderId the folder id parameter
+     */
     @Transactional
     public void softDeleteFolder(UUID folderId) {
         UUID userId = permissionHelper.getCurrentUserId();
@@ -53,6 +82,19 @@ public class TrashService {
         softDeleteFolderRecursive(folder, now);
     }
 
+    /**
+     * Performs soft delete folder recursive for trash processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Remove or clear the requested domain data when allowed.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param folder the folder parameter
+     * @param deletionTime the deletion time parameter
+     */
     private void softDeleteFolderRecursive(Folder folder, OffsetDateTime deletionTime) {
         // Soft-delete tất cả file trong folder chưa bị xóa
         storedFileRepository.findByFolderIdAndDeletedAtIsNull(folder.getId())
@@ -70,6 +112,18 @@ public class TrashService {
 
     // ──────────────────────────── LIST TRASH ────────────────────────────
 
+    /**
+     * Lists trash information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Create or prepare the requested domain result.</li>
+     *   <li>Remove or clear the requested domain data when allowed.</li>
+     * </ul>
+     *
+     * @return the matching result collection
+     */
     public List<TrashItemResponse> listTrash() {
         UUID userId = permissionHelper.getCurrentUserId();
         List<TrashItemResponse> result = new ArrayList<>();
@@ -106,6 +160,19 @@ public class TrashService {
 
     // ──────────────────────────── RESTORE ────────────────────────────
 
+    /**
+     * Restores trash data.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Apply the requested state changes according to the domain rules.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param fileId the file id parameter
+     * @throws AppException if a business rule prevents the requested operation
+     */
     @Transactional
     public void restoreFile(UUID fileId) {
         UUID userId = permissionHelper.getCurrentUserId();
@@ -120,6 +187,18 @@ public class TrashService {
         storedFileRepository.save(file);
     }
 
+    /**
+     * Restores trash data.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Apply the requested state changes according to the domain rules.</li>
+     * </ul>
+     *
+     * @param folderId the folder id parameter
+     * @throws AppException if a business rule prevents the requested operation
+     */
     @Transactional
     public void restoreFolder(UUID folderId) {
         UUID userId = permissionHelper.getCurrentUserId();
@@ -136,6 +215,19 @@ public class TrashService {
         restoreFolderRecursive(folder, deletionTime);
     }
 
+    /**
+     * Restores trash data.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Apply the requested state changes according to the domain rules.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param folder the folder parameter
+     * @param deletionTime the deletion time parameter
+     */
     private void restoreFolderRecursive(Folder folder, OffsetDateTime deletionTime) {
         folder.setDeletedAt(null);
         folderRepository.save(folder);
@@ -156,6 +248,20 @@ public class TrashService {
 
     // ──────────────────────────── PERMANENT DELETE ────────────────────────────
 
+    /**
+     * Performs permanent delete file for trash processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Remove or clear the requested domain data when allowed.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param fileId the file id parameter
+     * @throws Exception if the requested operation cannot be completed
+     * @throws AppException if a business rule prevents the requested operation
+     */
     @Transactional
     public void permanentDeleteFile(UUID fileId) throws Exception {
         UUID userId = permissionHelper.getCurrentUserId();
@@ -166,6 +272,19 @@ public class TrashService {
         storedFileRepository.delete(file);
     }
 
+    /**
+     * Performs permanent delete folder for trash processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Remove or clear the requested domain data when allowed.</li>
+     * </ul>
+     *
+     * @param folderId the folder id parameter
+     * @throws Exception if the requested operation cannot be completed
+     * @throws AppException if a business rule prevents the requested operation
+     */
     @Transactional
     public void permanentDeleteFolder(UUID folderId) throws Exception {
         UUID userId = permissionHelper.getCurrentUserId();
@@ -175,6 +294,20 @@ public class TrashService {
         permanentDeleteFolderRecursive(folder);
     }
 
+    /**
+     * Performs permanent delete folder recursive for trash processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Remove or clear the requested domain data when allowed.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     *   <li>Coordinate with external services needed by the operation.</li>
+     * </ul>
+     *
+     * @param folder the folder parameter
+     * @throws Exception if the requested operation cannot be completed
+     */
     private void permanentDeleteFolderRecursive(Folder folder) throws Exception {
         // Xóa tất cả file trong folder khỏi storage + DB
         for (StoredFile file : storedFileRepository.findByFolderId(folder.getId())) {
@@ -188,6 +321,18 @@ public class TrashService {
         folderRepository.delete(folder);
     }
 
+    /**
+     * Performs empty trash for trash processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Remove or clear the requested domain data when allowed.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @throws Exception if the requested operation cannot be completed
+     */
     @Transactional
     public void emptyTrash() throws Exception {
         UUID userId = permissionHelper.getCurrentUserId();
@@ -204,11 +349,33 @@ public class TrashService {
 
     // ──────────────────────────── HELPERS ────────────────────────────
 
+    /**
+     * Retrieves trash information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param fileId the file id parameter
+     * @return the get file or throw result
+     */
     private StoredFile getFileOrThrow(UUID fileId) {
         return storedFileRepository.findById(fileId)
                 .orElseThrow(() -> new AppException(DocumentErrorCode.FILE_NOT_FOUND));
     }
 
+    /**
+     * Retrieves trash information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param folderId the folder id parameter
+     * @return the get folder or throw result
+     */
     private Folder getFolderOrThrow(UUID folderId) {
         return folderRepository.findById(folderId)
                 .orElseThrow(() -> new AppException(DocumentErrorCode.FOLDER_NOT_FOUND));

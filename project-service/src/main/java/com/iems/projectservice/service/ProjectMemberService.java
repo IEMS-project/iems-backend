@@ -39,6 +39,22 @@ public class ProjectMemberService {
     private final NotificationPublisher notificationPublisher;
     private final ActorNameResolver actorNameResolver;
 
+    /**
+     * Adds project member data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Create or prepare the requested domain result.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @param accountId the account id parameter
+     * @param roleId the role id parameter
+     * @return the add member to project result
+     */
     @Transactional
     public ProjectMember addMemberToProject(UUID projectId, UUID accountId, UUID roleId) {
         validateAccountsForInvitation(Set.of(accountId), projectId);
@@ -57,6 +73,24 @@ public class ProjectMemberService {
         return projectMemberRepository.save(member);
     }
 
+    /**
+     * Adds project member data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Create or prepare the requested domain result.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     *   <li>Send the required notification or outbound message.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @param accountId the account id parameter
+     * @param roleId the role id parameter
+     * @param assignedBy the assigned by parameter
+     * @return the add member to project result
+     */
     @Transactional
     public ProjectMember addMemberToProject(UUID projectId, UUID accountId, UUID roleId, UUID assignedBy) {
         validateAccountsForInvitation(Set.of(accountId), projectId);
@@ -88,6 +122,23 @@ public class ProjectMemberService {
         return saved;
     }
 
+    /**
+     * Adds project member data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Create or prepare the requested domain result.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @param accountIds the account ids parameter
+     * @param roleId the role id parameter
+     * @param assignedBy the assigned by parameter
+     * @return the matching result collection
+     */
     @Transactional
     public List<ProjectMember> addMembersToProject(UUID projectId, List<UUID> accountIds, UUID roleId,
             UUID assignedBy) {
@@ -114,6 +165,22 @@ public class ProjectMemberService {
         return created;
     }
 
+    /**
+     * Adds project member data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Create or prepare the requested domain result.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @param members the members parameter
+     * @param assignedBy the assigned by parameter
+     * @return the matching result collection
+     */
     @Transactional
     public List<ProjectMember> addMembersToProject(UUID projectId,
             List<com.iems.projectservice.dto.request.ProjectMemberDto> members,
@@ -145,6 +212,20 @@ public class ProjectMemberService {
         return created;
     }
 
+    /**
+     * Removes project member data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Remove or clear the requested domain data when allowed.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @param accountId the account id parameter
+     */
     @Transactional
     public void removeMember(UUID projectId, UUID accountId) {
         ProjectMember member = projectMemberRepository.findByProjectIdAndAccountId(projectId, accountId)
@@ -153,6 +234,22 @@ public class ProjectMemberService {
         projectMemberRepository.delete(member);
     }
 
+    /**
+     * Updates project member data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Apply the requested state changes according to the domain rules.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @param accountId the account id parameter
+     * @param newRoleId the new role id parameter
+     * @return the update member role result
+     */
     @Transactional
     public ProjectMember updateMemberRole(UUID projectId, UUID accountId, UUID newRoleId) {
         ProjectMember member = projectMemberRepository.findByProjectIdAndAccountId(projectId, accountId)
@@ -161,6 +258,22 @@ public class ProjectMemberService {
         return projectMemberRepository.save(member);
     }
 
+    /**
+     * Updates project member data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Apply the requested state changes according to the domain rules.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @param accountId the account id parameter
+     * @param status the status parameter
+     * @return the update member status result
+     */
     @Transactional
     public ProjectMember updateMemberStatus(UUID projectId, UUID accountId, MemberStatus status) {
         ProjectMember member = projectMemberRepository.findByProjectIdAndAccountId(projectId, accountId)
@@ -169,19 +282,68 @@ public class ProjectMemberService {
         return projectMemberRepository.save(member);
     }
 
+    /**
+     * Retrieves project member information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @return the matching result collection
+     */
     public List<ProjectMember> getProjectMembers(UUID projectId) {
         return projectMemberRepository.findByProjectId(projectId);
     }
 
+    /**
+     * Returns is project member for project member processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @param accountId the account id parameter
+     * @return true if the requested condition is satisfied; otherwise false
+     */
     public boolean isProjectMember(UUID projectId, UUID accountId) {
         return projectMemberRepository.existsByProjectIdAndAccountIdAndStatus(projectId, accountId, MemberStatus.ACTIVE);
     }
 
+    /**
+     * Retrieves project member information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @param accountId the account id parameter
+     * @return the get member result
+     */
     public ProjectMember getMember(UUID projectId, UUID accountId) {
         return projectMemberRepository.findByProjectIdAndAccountId(projectId, accountId)
                 .orElseThrow(() -> new AppException(ProjectErrorCode.MEMBER_NOT_FOUND));
     }
 
+    /**
+     * Retrieves project member information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Create or prepare the requested domain result.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @return the matching result collection
+     */
     public List<ProjectMemberResponseDto> getProjectMembersEnriched(UUID projectId) {
         List<ProjectMember> members = projectMemberRepository.findByProjectId(projectId);
         if (members.isEmpty())
@@ -238,10 +400,34 @@ public class ProjectMemberService {
         }).collect(Collectors.toList());
     }
 
+    /**
+     * Returns trim for project member processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param s the s parameter
+     * @return the trim result
+     */
     private String trim(String s) {
         return s != null ? s.trim() : "";
     }
 
+    /**
+     * Validates project member data.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param accountIds the account ids parameter
+     * @param projectId the project id parameter
+     * @throws AppException if a business rule prevents the requested operation
+     */
     private void validateAccountsForInvitation(Set<UUID> accountIds, UUID projectId) {
         if (accountIds == null || accountIds.isEmpty()) return;
 

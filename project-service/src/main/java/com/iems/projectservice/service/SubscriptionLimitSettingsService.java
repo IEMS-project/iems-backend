@@ -20,6 +20,15 @@ public class SubscriptionLimitSettingsService {
 
     private final SubscriptionLimitSettingsRepository repository;
 
+    /**
+     * Ensures that subscription limit settings requirements are satisfied.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     */
     @Transactional
     public void ensureDefaults() {
         if (!repository.existsById("FREE")) {
@@ -30,6 +39,16 @@ public class SubscriptionLimitSettingsService {
         }
     }
 
+    /**
+     * Lists subscription limit settings information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @return the matching result collection
+     */
     public List<SubscriptionLimitSettingsResponse> list() {
         ensureDefaults();
         return repository.findAll().stream()
@@ -38,6 +57,17 @@ public class SubscriptionLimitSettingsService {
                 .toList();
     }
 
+    /**
+     * Retrieves subscription limit settings information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param planType the plan type parameter
+     * @return the get settings result
+     */
     public SubscriptionLimitSettings getSettings(String planType) {
         ensureDefaults();
         String normalized = normalizePlanType(planType);
@@ -45,6 +75,20 @@ public class SubscriptionLimitSettingsService {
                 .orElseThrow(() -> new AppException(ProjectErrorCode.SUBSCRIPTION_LIMIT_SETTINGS_NOT_FOUND));
     }
 
+    /**
+     * Updates subscription limit settings data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Apply the requested state changes according to the domain rules.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param planType the plan type parameter
+     * @param request the request parameter
+     * @return the update result
+     */
     @Transactional
     public SubscriptionLimitSettingsResponse update(String planType, SubscriptionLimitSettingsRequest request) {
         SubscriptionLimitSettings settings = getSettings(planType);
@@ -60,6 +104,17 @@ public class SubscriptionLimitSettingsService {
         return toResponse(repository.save(settings));
     }
 
+    /**
+     * Returns to response for subscription limit settings processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param settings the settings parameter
+     * @return the to response result
+     */
     public SubscriptionLimitSettingsResponse toResponse(SubscriptionLimitSettings settings) {
         return SubscriptionLimitSettingsResponse.builder()
                 .planType(settings.getPlanType())
@@ -77,6 +132,18 @@ public class SubscriptionLimitSettingsService {
                 .build();
     }
 
+    /**
+     * Normalizes subscription limit settings content.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     * </ul>
+     *
+     * @param planType the plan type parameter
+     * @return the normalize plan type result
+     * @throws AppException if a business rule prevents the requested operation
+     */
     private String normalizePlanType(String planType) {
         String normalized = planType == null ? "FREE" : planType.trim().toUpperCase(Locale.ROOT);
         if (!"FREE".equals(normalized) && !"PREMIUM".equals(normalized)) {
@@ -85,6 +152,16 @@ public class SubscriptionLimitSettingsService {
         return normalized;
     }
 
+    /**
+     * Returns default free for subscription limit settings processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @return the default free result
+     */
     private SubscriptionLimitSettings defaultFree() {
         return SubscriptionLimitSettings.builder()
                 .planType("FREE")
@@ -100,6 +177,16 @@ public class SubscriptionLimitSettingsService {
                 .build();
     }
 
+    /**
+     * Returns default premium for subscription limit settings processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @return the default premium result
+     */
     private SubscriptionLimitSettings defaultPremium() {
         return SubscriptionLimitSettings.builder()
                 .planType("PREMIUM")

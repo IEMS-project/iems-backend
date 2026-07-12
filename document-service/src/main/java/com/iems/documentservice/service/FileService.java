@@ -39,6 +39,17 @@ public class FileService {
     private final PermissionHelper permissionHelper;
     private final UserServiceFeignClient userServiceFeignClient;
 
+    /**
+     * Creates a new file service instance.
+     *
+     * @param storedFileRepository the stored file repository parameter
+     * @param folderRepository the folder repository parameter
+     * @param shareRepository the share repository parameter
+     * @param favoriteRepository the favorite repository parameter
+     * @param storageService the storage service parameter
+     * @param permissionHelper the permission helper parameter
+     * @param userServiceFeignClient the user service feign client parameter
+     */
     public FileService(StoredFileRepository storedFileRepository,
                        FolderRepository folderRepository,
                        ShareRepository shareRepository,
@@ -57,6 +68,21 @@ public class FileService {
 
     // ──────────────────────────── UPLOAD ────────────────────────────
 
+    /**
+     * Uploads file content.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Create or prepare the requested domain result.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param folderId the folder id parameter
+     * @param file the file parameter
+     * @return the upload file result
+     * @throws Exception if the requested operation cannot be completed
+     */
     public FileResponse uploadFile(UUID folderId, MultipartFile file) throws Exception {
         UUID ownerId = permissionHelper.getCurrentUserId();
         permissionHelper.enforceWritePermission(folderId, ownerId);
@@ -77,6 +103,19 @@ public class FileService {
         return toResponse(saved, null, ownerId);
     }
 
+    /**
+     * Uploads file content.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Create or prepare the requested domain result.</li>
+     * </ul>
+     *
+     * @param folderId the folder id parameter
+     * @param files the files parameter
+     * @return the matching result collection
+     * @throws Exception if the requested operation cannot be completed
+     */
     public List<SimpleFileResponse> uploadBatch(UUID folderId, MultipartFile[] files) throws Exception {
         List<SimpleFileResponse> results = new ArrayList<>();
         for (MultipartFile f : files) {
@@ -92,6 +131,19 @@ public class FileService {
         return results;
     }
 
+    /**
+     * Generates file data.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Create or prepare the requested domain result.</li>
+     * </ul>
+     *
+     * @param fileName the file name parameter
+     * @param contentType the content type parameter
+     * @param folderId the folder id parameter
+     * @return the generate upload signature result
+     */
     public Map<String, Object> generateUploadSignature(String fileName, String contentType, UUID folderId) {
         UUID ownerId = permissionHelper.getCurrentUserId();
         permissionHelper.enforceWritePermission(folderId, ownerId);
@@ -103,6 +155,19 @@ public class FileService {
         return storageService.generateUploadSignature(objectKey, timestamp, contentType);
     }
     
+    /**
+     * Registers a new user account.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Create or prepare the requested domain result.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param request the request parameter
+     * @return the register metadata result
+     */
     @Transactional
     public FileResponse registerMetadata(RegisterFileMetadataRequest request) {
         UUID ownerId = permissionHelper.getCurrentUserId();
@@ -123,6 +188,22 @@ public class FileService {
         return toResponse(saved, null, ownerId);
     }
 
+    /**
+     * Uploads file content.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Create or prepare the requested domain result.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param conversationId the conversation id parameter
+     * @param files the files parameter
+     * @return the matching result collection
+     * @throws Exception if the requested operation cannot be completed
+     * @throws AppException if a business rule prevents the requested operation
+     */
     public List<SimpleFileResponse> uploadChatFiles(String conversationId, MultipartFile[] files) throws Exception {
         UUID ownerId = permissionHelper.getCurrentUserId();
         List<SimpleFileResponse> results = new ArrayList<>();
@@ -154,6 +235,20 @@ public class FileService {
         return results;
     }
 
+    /**
+     * Uploads file content.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Create or prepare the requested domain result.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param files the files parameter
+     * @return the matching result collection
+     * @throws Exception if the requested operation cannot be completed
+     */
     public List<SimpleFileResponse> uploadPublicFiles(MultipartFile[] files) throws Exception {
         UUID ownerId = permissionHelper.getCurrentUserId();
         List<SimpleFileResponse> results = new ArrayList<>();
@@ -183,6 +278,18 @@ public class FileService {
 
     // ──────────────────────────── DOWNLOAD ────────────────────────────
 
+    /**
+     * Downloads file content.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param fileId the file id parameter
+     * @return the download info result
+     * @throws Exception if the requested operation cannot be completed
+     */
     public FileResponse downloadInfo(UUID fileId) throws Exception {
         UUID userId = permissionHelper.getCurrentUserId();
         StoredFile file = getOrThrow(fileId);
@@ -191,6 +298,18 @@ public class FileService {
         return toResponse(file, presignedUrl, userId);
     }
 
+    /**
+     * Downloads file content.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param fileId the file id parameter
+     * @return the download stream result
+     * @throws Exception if the requested operation cannot be completed
+     */
     public InputStream downloadStream(UUID fileId) throws Exception {
         UUID userId = permissionHelper.getCurrentUserId();
         StoredFile file = getOrThrow(fileId);
@@ -200,6 +319,16 @@ public class FileService {
 
     // ──────────────────────────── LIST ────────────────────────────
 
+    /**
+     * Lists file information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @return the matching result collection
+     */
     public List<FileResponse> listFiles() {
         UUID userId = permissionHelper.getCurrentUserId();
         List<StoredFile> ownedFiles = storedFileRepository.findByOwnerIdAndDeletedAtIsNull(userId).stream()
@@ -214,6 +343,19 @@ public class FileService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Lists file information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param folderId the folder id parameter
+     * @return the matching result collection
+     * @throws AppException if a business rule prevents the requested operation
+     */
     public List<FileResponse> listFilesInFolder(UUID folderId) {
         UUID userId = permissionHelper.getCurrentUserId();
         Folder folder = folderRepository.findById(folderId)
@@ -240,6 +382,18 @@ public class FileService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Lists file information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Create or prepare the requested domain result.</li>
+     * </ul>
+     *
+     * @return the matching result collection
+     */
     public List<FileResponse> listAccessibleFiles() {
         UUID userId = permissionHelper.getCurrentUserId();
         List<StoredFile> owned = storedFileRepository.findByOwnerIdAndDeletedAtIsNull(userId);
@@ -271,6 +425,17 @@ public class FileService {
 
     // ──────────────────────────── SEARCH ────────────────────────────
 
+    /**
+     * Searches file information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param query the query parameter
+     * @return the matching result collection
+     */
     public List<SearchResultItem> searchFiles(String query) {
         UUID userId = permissionHelper.getCurrentUserId();
         String q = query == null ? "" : query.trim();
@@ -290,6 +455,18 @@ public class FileService {
 
     // ──────────────────────────── RENAME / MOVE / PERMISSION ────────────────────────────
 
+    /**
+     * Performs rename for file processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Apply the requested state changes according to the domain rules.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param fileId the file id parameter
+     * @param newName the new name parameter
+     */
     @Transactional
     public void rename(UUID fileId, String newName) {
         UUID userId = permissionHelper.getCurrentUserId();
@@ -299,6 +476,19 @@ public class FileService {
         storedFileRepository.save(file);
     }
 
+    /**
+     * Performs move for file processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Apply the requested state changes according to the domain rules.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param fileId the file id parameter
+     * @param newFolderId the new folder id parameter
+     */
     @Transactional
     public void move(UUID fileId, UUID newFolderId) {
         UUID userId = permissionHelper.getCurrentUserId();
@@ -309,6 +499,19 @@ public class FileService {
         storedFileRepository.save(file);
     }
 
+    /**
+     * Updates file data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Apply the requested state changes according to the domain rules.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param fileId the file id parameter
+     * @param permission the permission parameter
+     */
     @Transactional
     public void updatePermission(UUID fileId, Permission permission) {
         UUID userId = permissionHelper.getCurrentUserId();
@@ -320,6 +523,19 @@ public class FileService {
 
     // ──────────────────────────── HELPERS ────────────────────────────
 
+    /**
+     * Returns tức for file processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Remove or clear the requested domain data when allowed.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param requesterId the requester id parameter
+     * @return the tức result
+     * @throws Exception if the requested operation cannot be completed
+     */
     /** Xóa vĩnh viễn file ngay lập tức (dùng trong batchDelete) — không cần file ở trong thùng rác */
     @Transactional
     public void forceDelete(UUID fileId, UUID requesterId) throws Exception {
@@ -329,15 +545,49 @@ public class FileService {
         storedFileRepository.delete(file);
     }
 
+    /**
+     * Retrieves file information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param fileId the file id parameter
+     * @return the get or throw result
+     */
     public StoredFile getOrThrow(UUID fileId) {
         return storedFileRepository.findById(fileId)
                 .orElseThrow(() -> new AppException(DocumentErrorCode.FILE_NOT_FOUND));
     }
 
+    /**
+     * Retrieves file information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @return the get repository result
+     */
     public StoredFileRepository getRepository() {
         return storedFileRepository;
     }
 
+    /**
+     * Returns to response for file processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     * </ul>
+     *
+     * @param file the file parameter
+     * @param presignedUrl the presigned url parameter
+     * @param userId the user id parameter
+     * @return the to response result
+     */
     public FileResponse toResponse(StoredFile file, String presignedUrl, UUID userId) {
         Map<String, Object> owner = null;
         if (file.getOwnerId() != null) {
@@ -347,6 +597,23 @@ public class FileService {
         return toResponse(file, presignedUrl, userId, loadFavoriteIds(userId, List.of(file)), owner);
     }
 
+    /**
+     * Returns to response for file processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Create or prepare the requested domain result.</li>
+     *   <li>Send the required notification or outbound message.</li>
+     * </ul>
+     *
+     * @param file the file parameter
+     * @param presignedUrl the presigned url parameter
+     * @param userId the user id parameter
+     * @param favoriteIds the favorite ids parameter
+     * @param owner the owner parameter
+     * @return the to response result
+     */
     private FileResponse toResponse(StoredFile file, String presignedUrl, UUID userId, Set<UUID> favoriteIds, Map<String, Object> owner) {
         var builder = FileResponse.builder()
                 .id(file.getId())
@@ -378,6 +645,17 @@ public class FileService {
         return builder.build();
     }
 
+    /**
+     * Builds file data for downstream processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Create or prepare the requested domain result.</li>
+     * </ul>
+     *
+     * @param folder the folder parameter
+     * @return the matching result collection
+     */
     private List<FileResponse.BreadcrumbResponse> buildFileBreadcrumbs(Folder folder) {
         List<FileResponse.BreadcrumbResponse> crumbs = new ArrayList<>();
         Folder cur = folder;
@@ -391,6 +669,17 @@ public class FileService {
         return crumbs;
     }
 
+    /**
+     * Returns load users by account id for file processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param accountIds the account ids parameter
+     * @return the load users by account id result
+     */
     private Map<UUID, Map<String, Object>> loadUsersByAccountId(Collection<UUID> accountIds) {
         if (accountIds == null || accountIds.isEmpty()) {
             return Map.of();
@@ -426,6 +715,18 @@ public class FileService {
         }
     }
 
+    /**
+     * Returns load favorite ids for file processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param userId the user id parameter
+     * @param files the files parameter
+     * @return the matching result collection
+     */
     private Set<UUID> loadFavoriteIds(UUID userId, Collection<StoredFile> files) {
         if (userId == null || files == null || files.isEmpty()) {
             return Set.of();
@@ -442,12 +743,34 @@ public class FileService {
                 .collect(Collectors.toSet());
     }
 
+    /**
+     * Resolves file information for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param folderId the folder id parameter
+     * @return the resolve folder result
+     */
     private Folder resolveFolder(UUID folderId) {
         if (folderId == null) return null;
         return folderRepository.findById(folderId)
                 .orElseThrow(() -> new AppException(DocumentErrorCode.FOLDER_NOT_FOUND));
     }
 
+    /**
+     * Validates file data.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     * </ul>
+     *
+     * @param file the file parameter
+     * @throws AppException if a business rule prevents the requested operation
+     */
     private void validateFile(MultipartFile file) {
         if (file == null || file.isEmpty() || file.getOriginalFilename() == null
                 || file.getOriginalFilename().isBlank()) {
@@ -461,19 +784,66 @@ public class FileService {
         return path != null && (path.startsWith("avatar/employee/") || path.startsWith("avatar/group/"));
     }
 
+    /**
+     * Builds file data for downstream processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param folderId the folder id parameter
+     * @param ownerId the owner id parameter
+     * @param fileName the file name parameter
+     * @return the build object key result
+     */
     private String buildObjectKey(UUID folderId, UUID ownerId, String fileName) {
         String folderPart = folderId != null ? String.valueOf(folderId) : "root";
         return "document/owners/" + ownerId + "/" + folderPart + "/" + UUID.randomUUID() + "-" + safeFileName(fileName);
     }
 
+    /**
+     * Builds file data for downstream processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param conversationId the conversation id parameter
+     * @param fileName the file name parameter
+     * @return the build chat object key result
+     */
     private String buildChatObjectKey(String conversationId, String fileName) {
         return "chat/" + safePathSegment(conversationId) + "/" + UUID.randomUUID() + "-" + safeFileName(fileName);
     }
 
+    /**
+     * Builds file data for downstream processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param fileName the file name parameter
+     * @return the build public object key result
+     */
     private String buildPublicObjectKey(String fileName) {
         return "document/public/" + UUID.randomUUID() + "-" + safeFileName(fileName);
     }
 
+    /**
+     * Returns safe file name for file processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param fileName the file name parameter
+     * @return the safe file name result
+     */
     private String safeFileName(String fileName) {
         String normalized = fileName == null ? "file" : fileName.replace('\\', '/');
         int slash = normalized.lastIndexOf('/');
@@ -484,6 +854,17 @@ public class FileService {
         return normalized.isBlank() ? "file" : normalized;
     }
 
+    /**
+     * Returns safe path segment for file processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param value the value parameter
+     * @return the safe path segment result
+     */
     private String safePathSegment(String value) {
         if (value == null || value.isBlank()) {
             return "unknown";

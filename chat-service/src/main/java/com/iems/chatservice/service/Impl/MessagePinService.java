@@ -28,6 +28,21 @@ public class MessagePinService implements IMessagePinService {
 
     private final String SYSTEM_SENDER = "SYSTEM";
 
+    /**
+     * Pins message pin data for quick access.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Create or prepare the requested domain result.</li>
+     *   <li>Apply the requested state changes according to the domain rules.</li>
+     * </ul>
+     *
+     * @param conversationId the conversation id parameter
+     * @param messageId the message id parameter
+     * @param accountId the account id parameter
+     * @return the pin message result
+     */
     @Override
     public Message pinMessage(String conversationId, String messageId, String accountId) {
         Query messageQuery = new Query(Criteria.where("id").is(messageId));
@@ -56,6 +71,21 @@ public class MessagePinService implements IMessagePinService {
         return pinnedMessage;
     }
 
+    /**
+     * Unpins message pin data.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Create or prepare the requested domain result.</li>
+     *   <li>Apply the requested state changes according to the domain rules.</li>
+     * </ul>
+     *
+     * @param conversationId the conversation id parameter
+     * @param messageId the message id parameter
+     * @param accountId the account id parameter
+     * @return the unpin message result
+     */
     @Override
     public Message unpinMessage(String conversationId, String messageId, String accountId) {
         Query messageQuery = new Query(Criteria.where("id").is(messageId));

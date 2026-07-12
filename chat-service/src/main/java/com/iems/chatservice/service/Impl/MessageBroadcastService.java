@@ -31,6 +31,18 @@ public class MessageBroadcastService implements IMessageBroadcastService {
     @Autowired
     private MongoTemplate mongoTemplate;
 
+    /**
+     * Saves message broadcast data.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param message the message parameter
+     * @return the save and broadcast result
+     */
     @Override
     public Message saveAndBroadcast(Message message) {
         Message saved = messageRepository.save(message);
@@ -69,6 +81,19 @@ public class MessageBroadcastService implements IMessageBroadcastService {
         return saved;
     }
 
+    /**
+     * Performs broadcast message update for message broadcast processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Apply the requested state changes according to the domain rules.</li>
+     * </ul>
+     *
+     * @param message the message parameter
+     * @param eventType the event type parameter
+     * @param additionalData the additional data parameter
+     */
     @Override
     public void broadcastMessageUpdate(Message message, String eventType, Map<String, Object> additionalData) {
         Conversation conversation = conversationRepository.findById(message.getConversationId()).orElse(null);
@@ -88,6 +113,17 @@ public class MessageBroadcastService implements IMessageBroadcastService {
         }
     }
 
+    /**
+     * Performs broadcast conversation update for message broadcast processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Apply the requested state changes according to the domain rules.</li>
+     * </ul>
+     *
+     * @param conversation the conversation parameter
+     * @param lastMessage the last message parameter
+     */
     @Override
     public void broadcastConversationUpdate(Conversation conversation, Message lastMessage) {
         try {
@@ -119,6 +155,17 @@ public class MessageBroadcastService implements IMessageBroadcastService {
         }
     }
 
+    /**
+     * Performs broadcast conversation meta update for message broadcast processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Apply the requested state changes according to the domain rules.</li>
+     * </ul>
+     *
+     * @param conversation the conversation parameter
+     * @param changedFields the changed fields parameter
+     */
     @Override
     public void broadcastConversationMetaUpdate(Conversation conversation, java.util.Map<String, Object> changedFields) {
         try {
@@ -139,6 +186,19 @@ public class MessageBroadcastService implements IMessageBroadcastService {
         }
     }
 
+    /**
+     * Retrieves message broadcast information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param conversationId the conversation id parameter
+     * @param accountId the account id parameter
+     * @return the get latest visible message for user result
+     */
     @Override
     public Message getLatestVisibleMessageForUser(String conversationId, String accountId) {
         Criteria criteria = new Criteria().andOperator(

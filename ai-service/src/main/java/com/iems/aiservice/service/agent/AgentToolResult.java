@@ -17,10 +17,32 @@ public record AgentToolResult(
         data = data == null ? Map.of() : Map.copyOf(data);
     }
 
+    /**
+     * Returns answer for agent tool result processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param answer the answer parameter
+     * @return the answer result
+     */
     public static AgentToolResult answer(String answer) {
         return new AgentToolResult(true, answer, List.of(), Map.of());
     }
 
+    /**
+     * Returns error for agent tool result processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param answer the answer parameter
+     * @return the error result
+     */
     public static AgentToolResult error(String answer) {
         return new AgentToolResult(false, answer, List.of(), Map.of());
     }

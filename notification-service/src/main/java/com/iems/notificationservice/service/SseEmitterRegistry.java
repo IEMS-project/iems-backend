@@ -78,10 +78,31 @@ public class SseEmitterRegistry {
         }
     }
 
+    /**
+     * Returns is online for sse emitter processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param userId the user id parameter
+     * @return true if the requested condition is satisfied; otherwise false
+     */
     public boolean isOnline(UUID userId) {
         return emitters.containsKey(userId);
     }
 
+    /**
+     * Retrieves sse emitter information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @return the get online count result
+     */
     public int getOnlineCount() {
         return emitters.size();
     }

@@ -33,6 +33,17 @@ public class ProjectDocumentService {
     private final AiIndexingService aiIndexingService;
     private final ActivityService activityService;
 
+    /**
+     * Performs require project member for project document processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @throws AppException if a business rule prevents the requested operation
+     */
     private void requireProjectMember(UUID projectId) {
         try {
             projectServiceFeignClient.checkMembership(projectId);
@@ -41,6 +52,17 @@ public class ProjectDocumentService {
         }
     }
 
+    /**
+     * Lists project document information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @return the matching result collection
+     */
     public List<ProjectDocumentResponse> listDocuments(UUID projectId) {
         requireProjectMember(projectId);
         return projectDocumentRepository.findByProjectIdOrderByCreatedAtDesc(projectId)
@@ -49,6 +71,17 @@ public class ProjectDocumentService {
                 .toList();
     }
 
+    /**
+     * Lists project document information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @return the matching result collection
+     */
     public List<ProjectDocumentResponse> listEmbeddableDocuments(UUID projectId) {
         requireProjectMember(projectId);
         return projectDocumentRepository
@@ -58,6 +91,20 @@ public class ProjectDocumentService {
                 .toList();
     }
 
+    /**
+     * Creates project document data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Create or prepare the requested domain result.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @param name the name parameter
+     * @param parentId the parent id parameter
+     * @return the create folder result
+     */
     @Transactional
     public ProjectDocumentResponse createFolder(UUID projectId, String name, UUID parentId) {
         requireProjectMember(projectId);
@@ -78,6 +125,18 @@ public class ProjectDocumentService {
         return toResponse(doc);
     }
 
+    /**
+     * Returns init default docs folder for project document processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @return the init default docs folder result
+     */
     @Transactional
     public ProjectDocumentResponse initDefaultDocsFolder(UUID projectId) {
         requireProjectMember(projectId);
@@ -102,6 +161,21 @@ public class ProjectDocumentService {
                 });
     }
 
+    /**
+     * Returns rename document for project document processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Apply the requested state changes according to the domain rules.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @param docId the doc id parameter
+     * @param newName the new name parameter
+     * @return the rename document result
+     */
     @Transactional
     public ProjectDocumentResponse renameDocument(UUID projectId, UUID docId, String newName) {
         requireProjectMember(projectId);
@@ -115,6 +189,22 @@ public class ProjectDocumentService {
         return toResponse(saved);
     }
 
+    /**
+     * Returns set allow embedded for project document processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @param docId the doc id parameter
+     * @param allowEmbedded the allow embedded parameter
+     * @return the set allow embedded result
+     * @throws AppException if a business rule prevents the requested operation
+     */
     @Transactional
     public ProjectDocumentResponse setAllowEmbedded(UUID projectId, UUID docId, boolean allowEmbedded) {
         requireProjectMember(projectId);
@@ -139,6 +229,21 @@ public class ProjectDocumentService {
         return toResponse(savedDoc);
     }
 
+    /**
+     * Returns move document for project document processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Apply the requested state changes according to the domain rules.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @param docId the doc id parameter
+     * @param targetParentId the target parent id parameter
+     * @return the move document result
+     */
     @Transactional
     public ProjectDocumentResponse moveDocument(UUID projectId, UUID docId, UUID targetParentId) {
         requireProjectMember(projectId);
@@ -152,6 +257,24 @@ public class ProjectDocumentService {
         return toResponse(saved);
     }
 
+    /**
+     * Uploads project document content.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Create or prepare the requested domain result.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @param folderId the folder id parameter
+     * @param file the file parameter
+     * @param allowEmbedded the allow embedded parameter
+     * @return the upload document result
+     * @throws Exception if the requested operation cannot be completed
+     * @throws AppException if a business rule prevents the requested operation
+     */
     public ProjectDocumentResponse uploadDocument(UUID projectId,
             UUID folderId,
             MultipartFile file,
@@ -203,6 +326,21 @@ public class ProjectDocumentService {
         return toResponse(doc);
     }
 
+    /**
+     * Deletes project document data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Remove or clear the requested domain data when allowed.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @param docId the doc id parameter
+     * @throws Exception if the requested operation cannot be completed
+     * @throws AppException if a business rule prevents the requested operation
+     */
     @Transactional
     public void deleteDocument(UUID projectId, UUID docId) throws Exception {
         requireProjectMember(projectId);
@@ -220,6 +358,19 @@ public class ProjectDocumentService {
         deleteRecursive(projectId, doc);
     }
 
+    /**
+     * Retrieves project document information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @param docId the doc id parameter
+     * @return the get download link result
+     * @throws Exception if the requested operation cannot be completed
+     */
     public ProjectDocumentResponse getDownloadLink(UUID projectId, UUID docId) throws Exception {
         requireProjectMember(projectId);
 
@@ -230,6 +381,20 @@ public class ProjectDocumentService {
         return toResponse(doc, presignedUrl);
     }
 
+    /**
+     * Deletes project document data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Remove or clear the requested domain data when allowed.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @param doc the doc parameter
+     * @throws Exception if the requested operation cannot be completed
+     */
     private void deleteRecursive(UUID projectId, ProjectDocument doc) throws Exception {
         if (Boolean.TRUE.equals(doc.getIsFolder())) {
             List<ProjectDocument> children = projectDocumentRepository.findByProjectIdAndParentId(projectId,
@@ -248,18 +413,56 @@ public class ProjectDocumentService {
         projectDocumentRepository.delete(doc);
     }
 
+    /**
+     * Performs dispatch index for project document processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Create or prepare the requested domain result.</li>
+     * </ul>
+     *
+     * @param doc the doc parameter
+     */
     private void dispatchIndex(ProjectDocument doc) {
         aiIndexingService.dispatchIndex(doc);
     }
 
+    /**
+     * Performs dispatch deindex for project document processing.
+     *
+     * @param doc the doc parameter
+     */
     private void dispatchDeindex(ProjectDocument doc) {
         aiIndexingService.dispatchDeindex(doc);
     }
 
+    /**
+     * Returns to response for project document processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param doc the doc parameter
+     * @return the to response result
+     */
     private ProjectDocumentResponse toResponse(ProjectDocument doc) {
         return toResponse(doc, null);
     }
 
+    /**
+     * Returns to response for project document processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param doc the doc parameter
+     * @param downloadUrl the download url parameter
+     * @return the to response result
+     */
     private ProjectDocumentResponse toResponse(ProjectDocument doc, String downloadUrl) {
         return ProjectDocumentResponse.builder()
                 .id(doc.getId())
@@ -278,10 +481,33 @@ public class ProjectDocumentService {
                 .build();
     }
 
+    /**
+     * Builds project document data for downstream processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @param fileName the file name parameter
+     * @return the build project object key result
+     */
     private String buildProjectObjectKey(UUID projectId, String fileName) {
         return "document/projects/" + projectId + "/" + UUID.randomUUID() + "-" + safeFileName(fileName);
     }
 
+    /**
+     * Returns safe file name for project document processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param fileName the file name parameter
+     * @return the safe file name result
+     */
     private String safeFileName(String fileName) {
         String normalized = fileName == null ? "file" : fileName.replace('\\', '/');
         int slash = normalized.lastIndexOf('/');
@@ -292,10 +518,33 @@ public class ProjectDocumentService {
         return normalized.isBlank() ? "file" : normalized;
     }
 
+    /**
+     * Returns is rag supported for project document processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param doc the doc parameter
+     * @return true if the requested condition is satisfied; otherwise false
+     */
     private boolean isRagSupported(ProjectDocument doc) {
         return isRagSupported(doc.getFileName(), doc.getFileType());
     }
 
+    /**
+     * Returns is rag supported for project document processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param fileName the file name parameter
+     * @param fileType the file type parameter
+     * @return true if the requested condition is satisfied; otherwise false
+     */
     private boolean isRagSupported(String fileName, String fileType) {
         String normalizedFileName = fileName != null ? fileName.toLowerCase() : "";
         String normalizedFileType = fileType != null ? fileType.toLowerCase() : "";
@@ -310,6 +559,18 @@ public class ProjectDocumentService {
                 || normalizedFileType.contains("markdown");
     }
 
+    /**
+     * Lists project document information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param docId the doc id parameter
+     * @param type the type parameter
+     * @return the matching result collection
+     */
     public List<com.iems.documentservice.dto.response.DocumentActivityResponse> listActivities(UUID docId, String type) {
         return activityService.listActivities(docId, type);
     }

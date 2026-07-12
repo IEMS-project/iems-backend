@@ -38,6 +38,21 @@ public class WorkflowService {
     private final SubscriptionLimitService subscriptionLimitService;
     private final ActivityLogService activityLogService;
 
+    /**
+     * Creates workflow data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Create or prepare the requested domain result.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @param dto the dto parameter
+     * @param userId the user id parameter
+     * @return the create workflow result
+     */
     public Workflow createWorkflow(UUID projectId, CreateWorkflowDto dto, UUID userId) {
         String ownerSub = projectRepository.findById(projectId)
                 .map(p -> p.getOwnerSubscription()).orElse("FREE");
@@ -54,6 +69,22 @@ public class WorkflowService {
         return saved;
     }
 
+    /**
+     * Updates workflow data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Create or prepare the requested domain result.</li>
+     *   <li>Apply the requested state changes according to the domain rules.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param workflowId the workflow id parameter
+     * @param dto the dto parameter
+     * @param userId the user id parameter
+     * @return the update workflow result
+     */
     public Workflow updateWorkflow(UUID workflowId, UpdateWorkflowDto dto, UUID userId) {
         Workflow wf = workflowRepository.findById(workflowId)
                 .orElseThrow(() -> new AppException(ProjectErrorCode.WORKFLOW_NOT_FOUND));
@@ -83,6 +114,19 @@ public class WorkflowService {
         return saved;
     }
 
+    /**
+     * Deletes workflow data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Remove or clear the requested domain data when allowed.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param workflowId the workflow id parameter
+     * @param userId the user id parameter
+     */
     @Transactional
     public void deleteWorkflow(UUID workflowId, UUID userId) {
         Workflow wf = workflowRepository.findById(workflowId)
@@ -98,15 +142,52 @@ public class WorkflowService {
         workflowRepository.delete(wf);
     }
 
+    /**
+     * Retrieves workflow information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @return the matching result collection
+     */
     public List<Workflow> getWorkflowsByProject(UUID projectId) {
         return workflowRepository.findByProjectId(projectId);
     }
 
+    /**
+     * Retrieves workflow information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param workflowId the workflow id parameter
+     * @return the get workflow by id result
+     */
     public Workflow getWorkflowById(UUID workflowId) {
         return workflowRepository.findById(workflowId)
                 .orElseThrow(() -> new AppException(ProjectErrorCode.WORKFLOW_NOT_FOUND));
     }
 
+    /**
+     * Adds workflow data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Create or prepare the requested domain result.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param workflowId the workflow id parameter
+     * @param dto the dto parameter
+     * @param userId the user id parameter
+     * @return the add status result
+     */
     public WorkflowStatus addStatus(UUID workflowId, CreateWorkflowStatusDto dto, UUID userId) {
         Workflow wf = workflowRepository.findById(workflowId)
                 .orElseThrow(() -> new AppException(ProjectErrorCode.WORKFLOW_NOT_FOUND));
@@ -129,6 +210,22 @@ public class WorkflowService {
         return saved;
     }
 
+    /**
+     * Updates workflow data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Create or prepare the requested domain result.</li>
+     *   <li>Apply the requested state changes according to the domain rules.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param statusId the status id parameter
+     * @param dto the dto parameter
+     * @param userId the user id parameter
+     * @return the update status result
+     */
     public WorkflowStatus updateStatus(UUID statusId, UpdateWorkflowStatusDto dto, UUID userId) {
         WorkflowStatus status = workflowStatusRepository.findById(statusId)
                 .orElseThrow(() -> new AppException(ProjectErrorCode.WORKFLOW_STATUS_NOT_FOUND));
@@ -166,6 +263,19 @@ public class WorkflowService {
         return saved;
     }
 
+    /**
+     * Deletes workflow data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Remove or clear the requested domain data when allowed.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param statusId the status id parameter
+     * @param userId the user id parameter
+     */
     public void deleteStatus(UUID statusId, UUID userId) {
         WorkflowStatus status = workflowStatusRepository.findById(statusId)
                 .orElseThrow(() -> new AppException(ProjectErrorCode.WORKFLOW_STATUS_NOT_FOUND));
@@ -180,10 +290,39 @@ public class WorkflowService {
         workflowStatusRepository.delete(status);
     }
 
+    /**
+     * Retrieves workflow information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param workflowId the workflow id parameter
+     * @return the matching result collection
+     */
     public List<WorkflowStatus> getStatuses(UUID workflowId) {
         return workflowStatusRepository.findByWorkflowIdOrderBySortOrderAsc(workflowId);
     }
 
+    /**
+     * Returns sync statuses for workflow processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Apply the requested state changes according to the domain rules.</li>
+     *   <li>Remove or clear the requested domain data when allowed.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param workflowId the workflow id parameter
+     * @param items the items parameter
+     * @param userId the user id parameter
+     * @return the matching result collection
+     * @throws AppException if a business rule prevents the requested operation
+     */
     @Transactional
     public List<WorkflowStatus> syncStatuses(UUID workflowId, List<WorkflowStatusSyncItemDto> items, UUID userId) {
         Workflow wf = workflowRepository.findById(workflowId)
@@ -271,6 +410,21 @@ public class WorkflowService {
         return workflowStatusRepository.findByWorkflowIdOrderBySortOrderAsc(workflowId);
     }
 
+    /**
+     * Adds workflow data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Create or prepare the requested domain result.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param workflowId the workflow id parameter
+     * @param dto the dto parameter
+     * @param userId the user id parameter
+     * @return the add transition result
+     */
     public WorkflowTransition addTransition(UUID workflowId, CreateWorkflowTransitionDto dto, UUID userId) {
         Workflow wf = workflowRepository.findById(workflowId)
                 .orElseThrow(() -> new AppException(ProjectErrorCode.WORKFLOW_NOT_FOUND));
@@ -289,6 +443,19 @@ public class WorkflowService {
         return saved;
     }
 
+    /**
+     * Deletes workflow data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Remove or clear the requested domain data when allowed.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param transitionId the transition id parameter
+     * @param userId the user id parameter
+     */
     public void deleteTransition(UUID transitionId, UUID userId) {
         WorkflowTransition transition = workflowTransitionRepository.findById(transitionId)
                 .orElseThrow(() -> new AppException(ProjectErrorCode.WORKFLOW_TRANSITION_NOT_FOUND));
@@ -303,15 +470,52 @@ public class WorkflowService {
         workflowTransitionRepository.delete(transition);
     }
 
+    /**
+     * Retrieves workflow information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param workflowId the workflow id parameter
+     * @return the matching result collection
+     */
     public List<WorkflowTransition> getTransitions(UUID workflowId) {
         return workflowTransitionRepository.findByWorkflowId(workflowId);
     }
 
+    /**
+     * Returns is valid transition for workflow processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param workflowId the workflow id parameter
+     * @param fromStatusId the from status id parameter
+     * @param toStatusId the to status id parameter
+     * @return true if the requested condition is satisfied; otherwise false
+     */
     public boolean isValidTransition(UUID workflowId, UUID fromStatusId, UUID toStatusId) {
         return workflowTransitionRepository.existsByWorkflowIdAndFromStatusIdAndToStatusId(
                 workflowId, fromStatusId, toStatusId);
     }
 
+    /**
+     * Creates workflow data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Create or prepare the requested domain result.</li>
+     *   <li>Apply the requested state changes according to the domain rules.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @return the create default workflow result
+     */
     @Transactional
     public Workflow createDefaultWorkflow(UUID projectId) {
         Workflow wf = new Workflow();
@@ -335,6 +539,22 @@ public class WorkflowService {
         return wf;
     }
 
+    /**
+     * Creates workflow data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Create or prepare the requested domain result.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param workflowId the workflow id parameter
+     * @param name the name parameter
+     * @param category the category parameter
+     * @param sortOrder the sort order parameter
+     * @param color the color parameter
+     * @return the create status result
+     */
     private WorkflowStatus createStatus(UUID workflowId, String name, StatusCategory category, int sortOrder,
             String color) {
         WorkflowStatus status = new WorkflowStatus();
@@ -346,6 +566,20 @@ public class WorkflowService {
         return workflowStatusRepository.save(status);
     }
 
+    /**
+     * Creates workflow data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Create or prepare the requested domain result.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param workflowId the workflow id parameter
+     * @param fromId the from id parameter
+     * @param toId the to id parameter
+     * @param name the name parameter
+     */
     private void createTransitionInternal(UUID workflowId, UUID fromId, UUID toId, String name) {
         WorkflowTransition transition = new WorkflowTransition();
         transition.setWorkflowId(workflowId);
@@ -355,6 +589,17 @@ public class WorkflowService {
         workflowTransitionRepository.save(transition);
     }
 
+    /**
+     * Returns transition name for workflow processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param transition the transition parameter
+     * @return the transition name result
+     */
     private String transitionName(WorkflowTransition transition) {
         if (transition.getName() != null && !transition.getName().isBlank()) {
             return transition.getName();

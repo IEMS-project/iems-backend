@@ -82,6 +82,13 @@ public class IssueSuggestionService {
     private final OpenRouterEmbeddingService embeddingService;
     private final IssueSuggestionVectorRepository vectorRepository;
 
+    /**
+     * Creates a new issue suggestion service with project API and vector indexing dependencies.
+     *
+     * @param projectBaseUrl the project service base URL
+     * @param embeddingService the embedding service used to compare issue content
+     * @param vectorRepository the repository used to cache issue suggestion vectors
+     */
     public IssueSuggestionService(
             @Value("${ai.agent.project-base-url:http://localhost:8080/project-service}") String projectBaseUrl,
             OpenRouterEmbeddingService embeddingService,
@@ -91,6 +98,20 @@ public class IssueSuggestionService {
         this.vectorRepository = vectorRepository;
     }
 
+    /**
+     * Estimates issue suggestion data.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Create or prepare the requested domain result.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @param request the request parameter
+     * @param authorization the authorization parameter
+     * @return the estimate issue result
+     */
     public IssueEstimateResponse estimateIssue(UUID projectId, IssueEstimateRequest request, String authorization) {
         List<Map<String, Object>> issues = fetchList("/projects/" + projectId + "/issues", authorization);
         List<Map<String, Object>> members = fetchList("/projects/" + projectId + "/members", authorization);
@@ -168,6 +189,21 @@ public class IssueSuggestionService {
                 reasons);
     }
 
+    /**
+     * Builds issue suggestion suggestions.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Create or prepare the requested domain result.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @param sprintId the sprint id parameter
+     * @param request the request parameter
+     * @param authorization the authorization parameter
+     * @return the suggest sprint assignments result
+     */
     public SprintAssignmentResponse suggestSprintAssignments(UUID projectId, UUID sprintId,
             SprintAssignmentRequest request, String authorization) {
         List<Map<String, Object>> allIssues = fetchList("/projects/" + projectId + "/issues", authorization);
@@ -262,6 +298,19 @@ public class IssueSuggestionService {
                 "Task Done không được tính vào workload hiện tại."));
     }
 
+    /**
+     * Builds issue suggestion data for downstream processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     * </ul>
+     *
+     * @param members the members parameter
+     * @param issues the issues parameter
+     * @param doneStatusIds the done status ids parameter
+     * @return the build workload summary result
+     */
     List<Map<String, Object>> buildWorkloadSummary(List<Map<String, Object>> members, List<Map<String, Object>> issues,
             Set<String> doneStatusIds) {
         Map<String, Map<String, Object>> summary = new LinkedHashMap<>();
@@ -298,6 +347,17 @@ public class IssueSuggestionService {
                 .toList();
     }
 
+    /**
+     * Builds issue suggestion suggestions.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Create or prepare the requested domain result.</li>
+     * </ul>
+     *
+     * @param similarIssues the similar issues parameter
+     * @return the suggest story points result
+     */
     Integer suggestStoryPoints(List<Map<String, Object>> similarIssues) {
         List<Integer> points = similarIssues.stream()
                 .map(issue -> intValue(issue.get("storyPoints"), -1))
@@ -310,6 +370,18 @@ public class IssueSuggestionService {
         return nearestFibonacci((int) Math.round(average));
     }
 
+    /**
+     * Returns fetch list for issue suggestion processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param path the path parameter
+     * @param authorization the authorization parameter
+     * @return the fetch list result
+     */
     private List<Map<String, Object>> fetchList(String path, String authorization) {
         try {
             Map<?, ?> response = projectClient.get()
@@ -333,6 +405,18 @@ public class IssueSuggestionService {
         return List.of();
     }
 
+    /**
+     * Returns fetch workflow statuses for issue suggestion processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @param authorization the authorization parameter
+     * @return the fetch workflow statuses result
+     */
     private List<Map<String, Object>> fetchWorkflowStatuses(UUID projectId, String authorization) {
         List<Map<String, Object>> workflows = fetchList("/projects/" + projectId + "/workflows", authorization);
         List<Map<String, Object>> statuses = new ArrayList<>();
@@ -346,6 +430,23 @@ public class IssueSuggestionService {
         return statuses;
     }
 
+    /**
+     * Returns rank similar issues for issue suggestion processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @param requestText the request text parameter
+     * @param requestEmbedding the request embedding parameter
+     * @param issues the issues parameter
+     * @param doneStatusIds the done status ids parameter
+     * @param issueTypeNames the issue type names parameter
+     * @param priorityNames the priority names parameter
+     * @return the matching result collection
+     */
     private List<SimilarIssue> rankSimilarIssues(String projectId,
             String requestText,
             List<Double> requestEmbedding,
@@ -386,6 +487,20 @@ public class IssueSuggestionService {
                 .toList();
     }
 
+    /**
+     * Returns cached embedding for issue suggestion processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @param issueId the issue id parameter
+     * @param text the text parameter
+     * @return the matching result collection
+     */
     private List<Double> cachedEmbedding(String projectId, String issueId, String text) {
         Optional<IssueSuggestionVector> existing;
         try {
@@ -420,6 +535,17 @@ public class IssueSuggestionService {
         return embedding;
     }
 
+    /**
+     * Returns safe embed for issue suggestion processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param text the text parameter
+     * @return the matching result collection
+     */
     private List<Double> safeEmbed(String text) {
         try {
             return embeddingService.embed(text);
@@ -429,6 +555,19 @@ public class IssueSuggestionService {
         }
     }
 
+    /**
+     * Returns choose assignee for issue suggestion processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param workload the workload parameter
+     * @param similarIssues the similar issues parameter
+     * @param suggestedStoryPoints the suggested story points parameter
+     * @return the choose assignee result
+     */
     Map<String, Object> chooseAssignee(List<Map<String, Object>> workload,
             List<Map<String, Object>> similarIssues,
             Integer suggestedStoryPoints) {
@@ -478,6 +617,18 @@ public class IssueSuggestionService {
                 .orElse(null);
     }
 
+    /**
+     * Returns compact issue for issue suggestion processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param issue the issue parameter
+     * @param score the score parameter
+     * @return the compact issue result
+     */
     private Map<String, Object> compactIssue(Map<String, Object> issue, double score) {
         Map<String, Object> compact = new LinkedHashMap<>();
         compact.put("id", issue.get("id"));
@@ -489,6 +640,17 @@ public class IssueSuggestionService {
         return compact;
     }
 
+    /**
+     * Returns top similar issue reason for issue suggestion processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param similarIssues the similar issues parameter
+     * @return the top similar issue reason result
+     */
     private String topSimilarIssueReason(List<Map<String, Object>> similarIssues) {
         Map<String, Object> topIssue = similarIssues.getFirst();
         String issueKey = stringValue(topIssue.get("issueKey"));
@@ -499,6 +661,17 @@ public class IssueSuggestionService {
         return label + " (" + storyPoints + " pts, similarity " + similarityPercent + "%)";
     }
 
+    /**
+     * Returns confidence for for issue suggestion processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param similarIssues the similar issues parameter
+     * @return the confidence for result
+     */
     private double confidenceFor(List<Map<String, Object>> similarIssues) {
         if (similarIssues.isEmpty()) {
             return 0.35;
@@ -507,6 +680,23 @@ public class IssueSuggestionService {
         return Math.min(0.9, Math.max(0.45, topScore));
     }
 
+    /**
+     * Returns issue text for issue suggestion processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param title the title parameter
+     * @param description the description parameter
+     * @param issueTypeId the issue type id parameter
+     * @param issueTypeName the issue type name parameter
+     * @param priorityId the priority id parameter
+     * @param priorityName the priority name parameter
+     * @param labels the labels parameter
+     * @return the issue text result
+     */
     private static String issueText(String title,
             String description,
             String issueTypeId,
@@ -524,6 +714,19 @@ public class IssueSuggestionService {
                 repeatField("labels", labels, 1))).trim();
     }
 
+    /**
+     * Returns repeat field for issue suggestion processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     * </ul>
+     *
+     * @param field the field parameter
+     * @param value the value parameter
+     * @param weight the weight parameter
+     * @return the repeat field result
+     */
     private static String repeatField(String field, String value, int weight) {
         if (value == null || value.isBlank()) {
             return "";
@@ -532,6 +735,18 @@ public class IssueSuggestionService {
         return String.join(" ", java.util.Collections.nCopies(weight, token));
     }
 
+    /**
+     * Returns is done issue for issue suggestion processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param issue the issue parameter
+     * @param doneStatusIds the done status ids parameter
+     * @return true if the requested condition is satisfied; otherwise false
+     */
     private static boolean isDoneIssue(Map<String, Object> issue, Set<String> doneStatusIds) {
         String statusId = stringValue(issue.get("statusId"));
         if (statusId != null && doneStatusIds.contains(statusId)) {
@@ -542,6 +757,17 @@ public class IssueSuggestionService {
         return isDoneText(statusCategory) || isDoneText(statusName);
     }
 
+    /**
+     * Returns is done text for issue suggestion processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param value the value parameter
+     * @return true if the requested condition is satisfied; otherwise false
+     */
     private static boolean isDoneText(String value) {
         return value.contains("done")
                 || value.contains("completed")
@@ -549,6 +775,17 @@ public class IssueSuggestionService {
                 || value.contains("hoan thanh");
     }
 
+    /**
+     * Returns labels text for issue suggestion processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Create or prepare the requested domain result.</li>
+     * </ul>
+     *
+     * @param labels the labels parameter
+     * @return the labels text result
+     */
     private static String labelsText(Object labels) {
         if (labels instanceof Iterable<?> iterable) {
             List<String> names = new ArrayList<>();
@@ -567,6 +804,17 @@ public class IssueSuggestionService {
         return stringValue(labels);
     }
 
+    /**
+     * Returns name by id for issue suggestion processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param items the items parameter
+     * @return the name by id result
+     */
     private static Map<String, String> nameById(List<Map<String, Object>> items) {
         Map<String, String> names = new HashMap<>();
         for (Map<String, Object> item : items) {
@@ -579,6 +827,18 @@ public class IssueSuggestionService {
         return names;
     }
 
+    /**
+     * Returns cosine for issue suggestion processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param left the left parameter
+     * @param right the right parameter
+     * @return the cosine result
+     */
     private static double cosine(List<Double> left, List<Double> right) {
         if (left == null || right == null || left.isEmpty() || left.size() != right.size()) {
             return 0;
@@ -597,6 +857,18 @@ public class IssueSuggestionService {
         return dot / (Math.sqrt(leftNorm) * Math.sqrt(rightNorm));
     }
 
+    /**
+     * Returns text similarity for issue suggestion processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param left the left parameter
+     * @param right the right parameter
+     * @return the text similarity result
+     */
     static double textSimilarity(String left, String right) {
         double lexical = lexicalSimilarity(left, right);
         double phrase = phraseCoverage(left, right);
@@ -604,6 +876,18 @@ public class IssueSuggestionService {
         return Math.max(lexical, Math.max(phrase * 0.85, ngram * 0.65));
     }
 
+    /**
+     * Returns lexical similarity for issue suggestion processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param left the left parameter
+     * @param right the right parameter
+     * @return the lexical similarity result
+     */
     private static double lexicalSimilarity(String left, String right) {
         Set<String> leftWords = words(left);
         Set<String> rightWords = words(right);
@@ -617,6 +901,17 @@ public class IssueSuggestionService {
         return union == 0 ? 0 : (double) intersection / union;
     }
 
+    /**
+     * Returns words for issue suggestion processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param value the value parameter
+     * @return the matching result collection
+     */
     private static Set<String> words(String value) {
         Set<String> result = java.util.Arrays.stream(normalize(value).split("\\s+"))
                 .filter(word -> word.length() > 2)
@@ -630,6 +925,18 @@ public class IssueSuggestionService {
         return result;
     }
 
+    /**
+     * Returns phrase coverage for issue suggestion processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param left the left parameter
+     * @param right the right parameter
+     * @return the phrase coverage result
+     */
     private static double phraseCoverage(String left, String right) {
         List<String> leftWords = significantWords(left);
         List<String> rightWords = significantWords(right);
@@ -643,6 +950,18 @@ public class IssueSuggestionService {
         return (double) covered / leftWords.size();
     }
 
+    /**
+     * Returns char ngram similarity for issue suggestion processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param left the left parameter
+     * @param right the right parameter
+     * @return the char ngram similarity result
+     */
     private static double charNgramSimilarity(String left, String right) {
         Set<String> leftNgrams = charNgrams(left);
         Set<String> rightNgrams = charNgrams(right);
@@ -655,6 +974,17 @@ public class IssueSuggestionService {
         return union.isEmpty() ? 0 : (double) intersection / union.size();
     }
 
+    /**
+     * Returns char ngrams for issue suggestion processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Create or prepare the requested domain result.</li>
+     * </ul>
+     *
+     * @param value the value parameter
+     * @return the matching result collection
+     */
     private static Set<String> charNgrams(String value) {
         String normalized = normalize(value).replace(" ", "");
         if (normalized.length() < 4) {
@@ -667,16 +997,49 @@ public class IssueSuggestionService {
         return ngrams;
     }
 
+    /**
+     * Returns significant words for issue suggestion processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param value the value parameter
+     * @return the matching result collection
+     */
     private static List<String> significantWords(String value) {
         return words(value).stream().toList();
     }
 
+    /**
+     * Returns nearest fibonacci for issue suggestion processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param value the value parameter
+     * @return the nearest fibonacci result
+     */
     private static int nearestFibonacci(int value) {
         return FIBONACCI_POINTS.stream()
                 .min(Comparator.comparingInt(point -> Math.abs(point - value)))
                 .orElse(3);
     }
 
+    /**
+     * Returns normalize for issue suggestion processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param value the value parameter
+     * @return the normalize result
+     */
     private static String normalize(String value) {
         if (value == null) {
             return "";
@@ -686,6 +1049,18 @@ public class IssueSuggestionService {
         return noMarks.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", " ").trim();
     }
 
+    /**
+     * Returns int value for issue suggestion processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param value the value parameter
+     * @param fallback the fallback parameter
+     * @return the int value result
+     */
     private static int intValue(Object value, int fallback) {
         if (value instanceof Number number) {
             return number.intValue();
@@ -700,6 +1075,18 @@ public class IssueSuggestionService {
         return fallback;
     }
 
+    /**
+     * Returns double value for issue suggestion processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param value the value parameter
+     * @param fallback the fallback parameter
+     * @return the double value result
+     */
     private static double doubleValue(Object value, double fallback) {
         if (value instanceof Number number) {
             return number.doubleValue();
@@ -714,14 +1101,47 @@ public class IssueSuggestionService {
         return fallback;
     }
 
+    /**
+     * Returns string value for issue suggestion processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param value the value parameter
+     * @return the string value result
+     */
     private static String stringValue(Object value) {
         return value == null ? null : String.valueOf(value);
     }
 
+    /**
+     * Returns string value for issue suggestion processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param value the value parameter
+     * @return the string value result
+     */
     private static String stringValue(UUID value) {
         return value == null ? null : value.toString();
     }
 
+    /**
+     * Returns first non blank for issue suggestion processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param values the values parameter
+     * @return the first non blank result
+     */
     private static String firstNonBlank(String... values) {
         for (String value : values) {
             if (value != null && !value.isBlank()) {
@@ -731,6 +1151,18 @@ public class IssueSuggestionService {
         return null;
     }
 
+    /**
+     * Returns first non blank for issue suggestion processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param map the map parameter
+     * @param keys the keys parameter
+     * @return the first non blank result
+     */
     private static String firstNonBlank(Map<String, Object> map, String... keys) {
         for (String key : keys) {
             String value = stringValue(map.get(key));
@@ -741,6 +1173,17 @@ public class IssueSuggestionService {
         return null;
     }
 
+    /**
+     * Returns display name for issue suggestion processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     * </ul>
+     *
+     * @param member the member parameter
+     * @return the display name result
+     */
     private static String displayName(Map<String, Object> member) {
         String name = firstNonBlank(member, "userName", "fullName", "name", "userEmail", "email");
         return name == null ? "Team member" : name;

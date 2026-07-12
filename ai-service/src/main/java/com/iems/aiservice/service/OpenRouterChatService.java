@@ -31,6 +31,14 @@ public class OpenRouterChatService {
     private final ObjectMapper objectMapper;
     private final String systemPrompt;
 
+    /**
+     * Creates a new open router chat service instance.
+     *
+     * @param openRouterRestClient the open router rest client parameter
+     * @param aiProperties the ai properties parameter
+     * @param objectMapper the object mapper parameter
+     * @param resourceLoader the resource loader parameter
+     */
     public OpenRouterChatService(RestClient openRouterRestClient,
             AiProperties aiProperties,
             ObjectMapper objectMapper,
@@ -41,6 +49,22 @@ public class OpenRouterChatService {
         this.systemPrompt = loadSystemPrompt(resourceLoader, aiProperties.getSystemPromptFile());
     }
 
+    /**
+     * Returns ask for open router chat processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Coordinate with external services needed by the operation.</li>
+     * </ul>
+     *
+     * @param question the question parameter
+     * @param selectedDocumentIds the selected document ids parameter
+     * @param documentContext the document context parameter
+     * @param conversationContext the conversation context parameter
+     * @return the ask result
+     * @throws IllegalStateException if the requested operation cannot be completed
+     */
     public String ask(String question,
             List<String> selectedDocumentIds,
             String documentContext,
@@ -78,6 +102,21 @@ public class OpenRouterChatService {
         throw new IllegalStateException("Unable to parse answer from OpenRouter response");
     }
 
+    /**
+     * Performs stream ask for open router chat processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Coordinate with external services needed by the operation.</li>
+     * </ul>
+     *
+     * @param question the question parameter
+     * @param selectedDocumentIds the selected document ids parameter
+     * @param documentContext the document context parameter
+     * @param conversationContext the conversation context parameter
+     * @param onChunk the on chunk parameter
+     */
     public void streamAsk(String question,
             List<String> selectedDocumentIds,
             String documentContext,
@@ -136,6 +175,22 @@ public class OpenRouterChatService {
                 });
     }
 
+    /**
+     * Returns describe image for open router chat processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Coordinate with external services needed by the operation.</li>
+     * </ul>
+     *
+     * @param fileName the file name parameter
+     * @param contentType the content type parameter
+     * @param imageBytes the image bytes parameter
+     * @return the describe image result
+     * @throws IllegalArgumentException if the request contains invalid arguments
+     * @throws IllegalStateException if the requested operation cannot be completed
+     */
     public String describeImage(String fileName, String contentType, byte[] imageBytes) {
         ensureApiKeyConfigured();
         if (imageBytes == null || imageBytes.length == 0) {
@@ -168,6 +223,18 @@ public class OpenRouterChatService {
         return text.trim();
     }
 
+    /**
+     * Returns post json with key rotation for open router chat processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Coordinate with external services needed by the operation.</li>
+     * </ul>
+     *
+     * @param uri the uri parameter
+     * @param payload the payload parameter
+     * @return the post json with key rotation result
+     */
     private Map<?, ?> postJsonWithKeyRotation(String uri, Map<String, Object> payload) {
         int attempts = Math.max(1, aiProperties.configuredApiKeys().size());
         RestClientResponseException lastRetryable = null;
@@ -191,15 +258,48 @@ public class OpenRouterChatService {
         throw lastRetryable;
     }
 
+    /**
+     * Returns is retryable open router key error for open router chat processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param ex the ex parameter
+     * @return true if the requested condition is satisfied; otherwise false
+     */
     private boolean isRetryableOpenRouterKeyError(RestClientResponseException ex) {
         int status = ex.getStatusCode().value();
         return status == 401 || status == 402 || status == 429;
     }
 
+    /**
+     * Returns bearer for open router chat processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param apiKey the api key parameter
+     * @return the bearer result
+     */
     private String bearer(String apiKey) {
         return "Bearer " + (apiKey == null ? "" : apiKey);
     }
 
+    /**
+     * Returns extract message content for open router chat processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param response the response parameter
+     * @return the extract message content result
+     */
     private String extractMessageContent(Map<?, ?> response) {
         if (response == null || !(response.get("choices") instanceof List<?> choices) || choices.isEmpty()) {
             return null;
@@ -215,6 +315,19 @@ public class OpenRouterChatService {
         return null;
     }
 
+    /**
+     * Returns repair vietnamese markdown if needed for open router chat processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Coordinate with external services needed by the operation.</li>
+     * </ul>
+     *
+     * @param answer the answer parameter
+     * @param originalPrompt the original prompt parameter
+     * @return the repair vietnamese markdown if needed result
+     */
     private String repairVietnameseMarkdownIfNeeded(String answer, String originalPrompt) {
         if (!looksMostlyEnglish(answer)) {
             return answer;
@@ -239,6 +352,18 @@ public class OpenRouterChatService {
         return repaired == null || repaired.isBlank() ? answer : normalizeMarkdown(repaired.trim());
     }
 
+    /**
+     * Returns is small talk or capability question for open router chat processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param question the question parameter
+     * @param documentContext the document context parameter
+     * @return true if the requested condition is satisfied; otherwise false
+     */
     private boolean isSmallTalkOrCapabilityQuestion(String question, String documentContext) {
         if (documentContext != null && !documentContext.isBlank()) {
             return false;
@@ -268,10 +393,31 @@ public class OpenRouterChatService {
         return (greeting || asksCapability) && !explicitProjectRequest;
     }
 
+    /**
+     * Returns capability answer for open router chat processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @return the capability answer result
+     */
     private String capabilityAnswer() {
         return "Xin chào! Mình có thể giúp bạn hỏi đáp, tóm tắt tình hình project, lập top việc ưu tiên, phân tích rủi ro/workload và chuẩn bị thao tác cập nhật issue qua nút Allow khi cần.";
     }
 
+    /**
+     * Normalizes open router chat content.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param text the text parameter
+     * @return the normalize for intent result
+     */
     private String normalizeForIntent(String text) {
         String lowered = text.toLowerCase().trim();
         String decomposed = java.text.Normalizer.normalize(lowered, java.text.Normalizer.Form.NFD);
@@ -279,10 +425,32 @@ public class OpenRouterChatService {
                 .replace('đ', 'd');
     }
 
+    /**
+     * Normalizes open router chat content.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param text the text parameter
+     * @return the normalize markdown result
+     */
     private String normalizeMarkdown(String text) {
         return AgentMarkdownNormalizer.normalize(text);
     }
 
+    /**
+     * Returns looks mostly english for open router chat processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     * </ul>
+     *
+     * @param text the text parameter
+     * @return true if the requested condition is satisfied; otherwise false
+     */
     private boolean looksMostlyEnglish(String text) {
         if (text == null || text.isBlank()) {
             return false;
@@ -297,6 +465,18 @@ public class OpenRouterChatService {
         return englishHits >= 3 && englishHits > vietnameseHits;
     }
 
+    /**
+     * Counts open router chat records.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param text the text parameter
+     * @param needles the needles parameter
+     * @return the count contains result
+     */
     private int countContains(String text, String... needles) {
         int count = 0;
         for (String needle : needles) {
@@ -307,6 +487,20 @@ public class OpenRouterChatService {
         return count;
     }
 
+    /**
+     * Builds open router chat data for downstream processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param question the question parameter
+     * @param selectedDocumentIds the selected document ids parameter
+     * @param documentContext the document context parameter
+     * @param conversationContext the conversation context parameter
+     * @return the build scoped question result
+     */
     private String buildScopedQuestion(String question,
             List<String> selectedDocumentIds,
             String documentContext,
@@ -355,6 +549,19 @@ public class OpenRouterChatService {
         return prompt.toString();
     }
 
+    /**
+     * Returns load system prompt for open router chat processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     * </ul>
+     *
+     * @param resourceLoader the resource loader parameter
+     * @param promptPath the prompt path parameter
+     * @return the load system prompt result
+     * @throws IllegalStateException if the requested operation cannot be completed
+     */
     private String loadSystemPrompt(ResourceLoader resourceLoader, String promptPath) {
         String resolvedPath = (promptPath == null || promptPath.isBlank())
                 ? "classpath:prompts/systemt_prompt.txt"
@@ -377,6 +584,16 @@ public class OpenRouterChatService {
         }
     }
 
+    /**
+     * Ensures that open router chat requirements are satisfied.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     * </ul>
+     *
+     * @throws IllegalStateException if the requested operation cannot be completed
+     */
     private void ensureApiKeyConfigured() {
         if (!aiProperties.hasApiKey()) {
             throw new IllegalStateException("OPENROUTER_API_KEY or OPENROUTER_API_KEYS is not configured");

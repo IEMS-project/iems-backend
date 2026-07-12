@@ -67,6 +67,17 @@ public class SubscriptionLimitService {
         return "FREE";
     }
 
+    /**
+     * Returns extract subscription from token for subscription limit processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     * </ul>
+     *
+     * @param token the token parameter
+     * @return the extract subscription from token result
+     */
     private String extractSubscriptionFromToken(String token) {
         try {
             // JWT is base64url: header.payload.signature
@@ -81,6 +92,16 @@ public class SubscriptionLimitService {
         return "FREE";
     }
 
+    /**
+     * Returns is current user premium for subscription limit processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @return true if the requested condition is satisfied; otherwise false
+     */
     public boolean isCurrentUserPremium() {
         return "PREMIUM".equalsIgnoreCase(getCurrentUserSubscription());
     }
@@ -181,6 +202,19 @@ public class SubscriptionLimitService {
      */
     public static final int FREE_MAX_CUSTOM_ROLES = 2;
 
+    /**
+     * Checks subscription limit rules for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Create or prepare the requested domain result.</li>
+     * </ul>
+     *
+     * @param currentCustomRoleCount the current custom role count parameter
+     * @param ownerSubscription the owner subscription parameter
+     * @throws AppException if a business rule prevents the requested operation
+     */
     public void checkCanCreateCustomRole(long currentCustomRoleCount, String ownerSubscription) {
         SubscriptionLimitSettings settings = settingsFor(isProjectPremium(ownerSubscription));
         int limit = settings.getMaxCustomRolesPerProject();
@@ -248,6 +282,17 @@ public class SubscriptionLimitService {
         return settingsFor(isProjectPremium(ownerSubscription)).getActivityLogDays();
     }
 
+    /**
+     * Returns settings for for subscription limit processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param premium the premium parameter
+     * @return the settings for result
+     */
     public SubscriptionLimitSettings settingsFor(boolean premium) {
         return settingsService.getSettings(premium ? "PREMIUM" : "FREE");
     }

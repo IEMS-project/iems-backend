@@ -74,6 +74,22 @@ public class UserService {
         }
     }
 
+    /**
+     * Updates user data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Apply the requested state changes according to the domain rules.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param id the id parameter
+     * @param userRequest the user request parameter
+     * @return an optional result when matching data is available
+     * @throws AppException if a business rule prevents the requested operation
+     */
     public Optional<UserResponseDto> updateUser(UUID id, UpdateUserDto userRequest) {
         try {
             return repository.findById(id)
@@ -91,6 +107,22 @@ public class UserService {
         }
     }
 
+    /**
+     * Updates user data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Apply the requested state changes according to the domain rules.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param accountId the account id parameter
+     * @param userRequest the user request parameter
+     * @return an optional result when matching data is available
+     * @throws AppException if a business rule prevents the requested operation
+     */
     public Optional<UserResponseDto> updateMyProfile(UUID accountId, CreateUserDto userRequest) {
         try {
             return repository.findByAccountId(accountId)
@@ -111,6 +143,18 @@ public class UserService {
         }
     }
 
+    /**
+     * Retrieves user information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @return the matching result collection
+     * @throws AppException if a business rule prevents the requested operation
+     */
     public List<UserBasicInfoDto> getAllUserBasicInfos() {
         try {
             return repository.findAll()
@@ -126,6 +170,22 @@ public class UserService {
         }
     }
 
+    /**
+     * Searches user information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param query the query parameter
+     * @param page the page parameter
+     * @param size the size parameter
+     * @param excludeAccountIds the exclude account ids parameter
+     * @return the paginated result set
+     * @throws AppException if a business rule prevents the requested operation
+     */
     public Page<UserBasicInfoDto> searchUserBasicInfos(String query, int page, int size, List<UUID> excludeAccountIds) {
         try {
             String normalizedQuery = query == null ? "" : query.trim().toLowerCase();
@@ -144,6 +204,18 @@ public class UserService {
         }
     }
 
+    /**
+     * Retrieves user information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @return the matching result collection
+     * @throws AppException if a business rule prevents the requested operation
+     */
     public List<UserBasicInfoDto> getProjectManagerCandidates() {
         try {
             // Only ADMIN role can be project managers
@@ -172,6 +244,19 @@ public class UserService {
         }
     }
 
+    /**
+     * Retrieves user information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param id the id parameter
+     * @return an optional result when matching data is available
+     * @throws AppException if a business rule prevents the requested operation
+     */
     public Optional<UserResponseDto> getUserById(UUID id) {
         try {
             return repository.findById(id)
@@ -192,6 +277,19 @@ public class UserService {
         }
     }
 
+    /**
+     * Retrieves user information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param accountId the account id parameter
+     * @return an optional result when matching data is available
+     * @throws AppException if a business rule prevents the requested operation
+     */
     public Optional<UserResponseDto> getUserByAccountId(UUID accountId) {
         try {
             return repository.findByAccountId(accountId)
@@ -212,6 +310,17 @@ public class UserService {
         }
     }
 
+    /**
+     * Retrieves user information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param accountId the account id parameter
+     * @return the get account subscription result
+     */
     public AccountSubscriptionResponseDto getAccountSubscription(UUID accountId) {
         Account account = accountRepository.findById(accountId)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXIST));
@@ -222,6 +331,19 @@ public class UserService {
                 account.getPremiumUntil());
     }
 
+    /**
+     * Retrieves user information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param request the request parameter
+     * @return the matching result collection
+     * @throws AppException if a business rule prevents the requested operation
+     */
     public List<UserResponseDto> getUsersByID(UserIdsDto request) {
         try {
             if (request == null || request.getIds() == null || request.getIds().isEmpty()) {
@@ -247,6 +369,19 @@ public class UserService {
         }
     }
 
+    /**
+     * Retrieves user information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param request the request parameter
+     * @return the matching result collection
+     * @throws AppException if a business rule prevents the requested operation
+     */
     public List<UserResponseDto> getUsersByAccountIds(com.iems.iamservice.dto.request.AccountIdsDto request) {
         try {
             if (request == null || request.getAccountIds() == null || request.getAccountIds().isEmpty()) {
@@ -271,6 +406,17 @@ public class UserService {
         }
     }
 
+    /**
+     * Converts user data to the target representation.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param userRequest the user request parameter
+     * @return the convert to user result
+     */
     public User convertToUser(CreateUserDto userRequest) {
         if (userRequest == null)
             return null;
@@ -286,6 +432,17 @@ public class UserService {
         return user;
     }
 
+    /**
+     * Converts user data to the target representation.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param user the user parameter
+     * @return the convert to user response result
+     */
     public UserResponseDto convertToUserResponse(User user) {
         if (user == null)
             return null;
@@ -301,6 +458,12 @@ public class UserService {
                 user.getImage());
     }
 
+    /**
+     * Applies user changes.
+     *
+     * @param user the user parameter
+     * @param userRequest the user request parameter
+     */
     private void applyUpdates(User user, UpdateUserDto userRequest) {
         if (userRequest.getFirstName() != null)
             user.setFirstName(userRequest.getFirstName());
@@ -321,6 +484,12 @@ public class UserService {
 
     }
 
+    /**
+     * Applies user changes.
+     *
+     * @param user the user parameter
+     * @param userRequest the user request parameter
+     */
     private void applySelfProfileUpdates(User user, CreateUserDto userRequest) {
         if (userRequest.getFirstName() != null)
             user.setFirstName(userRequest.getFirstName());
@@ -340,6 +509,18 @@ public class UserService {
             user.setImage(userRequest.getImage());
     }
 
+    /**
+     * Returns has self profile changes for user processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param user the user parameter
+     * @param userRequest the user request parameter
+     * @return true if the requested condition is satisfied; otherwise false
+     */
     private boolean hasSelfProfileChanges(User user, CreateUserDto userRequest) {
         return (userRequest.getFirstName() != null && !Objects.equals(user.getFirstName(), userRequest.getFirstName()))
                 || (userRequest.getLastName() != null && !Objects.equals(user.getLastName(), userRequest.getLastName()))
@@ -351,6 +532,22 @@ public class UserService {
                 || (userRequest.getImage() != null && !Objects.equals(user.getImage(), userRequest.getImage()));
     }
 
+    /**
+     * Updates user data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Apply the requested state changes according to the domain rules.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param accountId the account id parameter
+     * @param imageUrl the image url parameter
+     * @return an optional result when matching data is available
+     * @throws AppException if a business rule prevents the requested operation
+     */
     public Optional<UserResponseDto> updateAvatarByAccountId(UUID accountId, String imageUrl) {
         try {
             return repository.findByAccountId(accountId)
@@ -368,12 +565,36 @@ public class UserService {
         }
     }
 
+    /**
+     * Retrieves user information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param accountId the account id parameter
+     * @return the get notification preferences result
+     */
     public String getNotificationPreferences(UUID accountId) {
         return repository.findByAccountId(accountId)
                 .map(User::getNotificationPreferences)
                 .orElse(null);
     }
 
+    /**
+     * Updates user data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Apply the requested state changes according to the domain rules.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param accountId the account id parameter
+     * @param preferencesJson the preferences json parameter
+     */
     public void updateNotificationPreferences(UUID accountId, String preferencesJson) {
         repository.findByAccountId(accountId).ifPresent(user -> {
             user.setNotificationPreferences(preferencesJson);

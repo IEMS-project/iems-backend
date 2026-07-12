@@ -26,6 +26,21 @@ public class MessageReactionService implements IMessageReactionService {
     @Autowired
     private IMessageBroadcastService messageBroadcastService;
 
+    /**
+     * Adds message reaction data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Create or prepare the requested domain result.</li>
+     *   <li>Apply the requested state changes according to the domain rules.</li>
+     * </ul>
+     *
+     * @param messageId the message id parameter
+     * @param accountId the account id parameter
+     * @param emoji the emoji parameter
+     * @return the add reaction result
+     */
     @Override
     public Message addReaction(String messageId, String accountId, String emoji) {
         Query query = new Query(Criteria.where("id").is(messageId));
@@ -39,6 +54,20 @@ public class MessageReactionService implements IMessageReactionService {
         return updatedMessage;
     }
 
+    /**
+     * Removes message reaction data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Remove or clear the requested domain data when allowed.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param messageId the message id parameter
+     * @param accountId the account id parameter
+     * @return the remove reaction result
+     */
     @Override
     public Message removeReaction(String messageId, String accountId) {
         Message message = messageRepository.findById(messageId).orElse(null);

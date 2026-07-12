@@ -33,6 +33,16 @@ public class ObjectStorageService {
     private final String publicBaseUrl;
     private final Duration presignedUrlExpiration;
 
+    /**
+     * Creates a new object storage service instance.
+     *
+     * @param s3Client the s3 client parameter
+     * @param s3Presigner the s3 presigner parameter
+     * @param bucket the bucket parameter
+     * @param region the region parameter
+     * @param publicBaseUrl the public base url parameter
+     * @param expirationMinutes the expiration minutes parameter
+     */
     public ObjectStorageService(S3Client s3Client,
                                 S3Presigner s3Presigner,
                                 @Value("${storage.s3.bucket}") String bucket,
@@ -47,10 +57,36 @@ public class ObjectStorageService {
         this.presignedUrlExpiration = Duration.ofMinutes(expirationMinutes);
     }
 
+    /**
+     * Generates object storage data.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Create or prepare the requested domain result.</li>
+     * </ul>
+     *
+     * @param objectKey the object key parameter
+     * @param timestamp the timestamp parameter
+     * @return the generate upload signature result
+     */
     public Map<String, Object> generateUploadSignature(String objectKey, long timestamp) {
         return generateUploadSignature(objectKey, timestamp, null);
     }
 
+    /**
+     * Generates object storage data.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Create or prepare the requested domain result.</li>
+     *   <li>Coordinate with external services needed by the operation.</li>
+     * </ul>
+     *
+     * @param objectKey the object key parameter
+     * @param timestamp the timestamp parameter
+     * @param contentType the content type parameter
+     * @return the generate upload signature result
+     */
     public Map<String, Object> generateUploadSignature(String objectKey, long timestamp, String contentType) {
         ensureBucketConfigured();
         PutObjectRequest.Builder putObjectRequestBuilder = PutObjectRequest.builder()
@@ -77,12 +113,38 @@ public class ObjectStorageService {
         return response;
     }
 
+    /**
+     * Uploads object storage content.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Create or prepare the requested domain result.</li>
+     * </ul>
+     *
+     * @param objectKey the object key parameter
+     * @param inputStream the input stream parameter
+     * @param size the size parameter
+     * @param contentType the content type parameter
+     */
     public void upload(String objectKey, InputStream inputStream, long size, String contentType) {
         ensureBucketConfigured();
         PutObjectRequest request = putObjectRequest(objectKey, contentType, size);
         s3Client.putObject(request, RequestBody.fromInputStream(inputStream, size));
     }
 
+    /**
+     * Uploads object storage content.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Create or prepare the requested domain result.</li>
+     *   <li>Coordinate with external services needed by the operation.</li>
+     * </ul>
+     *
+     * @param objectKey the object key parameter
+     * @param file the file parameter
+     * @throws Exception if the requested operation cannot be completed
+     */
     public void upload(String objectKey, MultipartFile file) throws Exception {
         ensureBucketConfigured();
         Path tempFile = Files.createTempFile("iems-s3-upload-", ".tmp");
@@ -95,6 +157,17 @@ public class ObjectStorageService {
         }
     }
 
+    /**
+     * Downloads object storage content.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Coordinate with external services needed by the operation.</li>
+     * </ul>
+     *
+     * @param objectKey the object key parameter
+     * @return the download result
+     */
     public InputStream download(String objectKey) {
         ensureBucketConfigured();
         GetObjectRequest request = GetObjectRequest.builder()
@@ -105,6 +178,17 @@ public class ObjectStorageService {
         return objectStream;
     }
 
+    /**
+     * Deletes object storage data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Remove or clear the requested domain data when allowed.</li>
+     *   <li>Coordinate with external services needed by the operation.</li>
+     * </ul>
+     *
+     * @param objectKey the object key parameter
+     */
     public void delete(String objectKey) {
         ensureBucketConfigured();
         DeleteObjectRequest request = DeleteObjectRequest.builder()
@@ -117,6 +201,17 @@ public class ObjectStorageService {
         });
     }
 
+    /**
+     * Returns presign get url for object storage processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Coordinate with external services needed by the operation.</li>
+     * </ul>
+     *
+     * @param objectKey the object key parameter
+     * @return the presign get url result
+     */
     public String presignGetUrl(String objectKey) {
         ensureBucketConfigured();
         GetObjectRequest getObjectRequest = GetObjectRequest.builder()
@@ -130,6 +225,17 @@ public class ObjectStorageService {
         return s3Presigner.presignGetObject(presignRequest).url().toString();
     }
 
+    /**
+     * Builds object storage data for downstream processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Coordinate with external services needed by the operation.</li>
+     * </ul>
+     *
+     * @param objectKey the object key parameter
+     * @return the build public url result
+     */
     public String buildPublicUrl(String objectKey) {
         ensureBucketConfigured();
         if (!publicBaseUrl.isBlank()) {
@@ -139,16 +245,56 @@ public class ObjectStorageService {
         return "https://" + bucket + ".s3." + region + ".amazonaws.com/" + encodeKey(objectKey);
     }
 
+    /**
+     * Uploads object storage content.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Create or prepare the requested domain result.</li>
+     * </ul>
+     *
+     * @param objectKey the object key parameter
+     * @param inputStream the input stream parameter
+     * @param size the size parameter
+     * @param contentType the content type parameter
+     * @return the upload and get url result
+     */
     public String uploadAndGetUrl(String objectKey, InputStream inputStream, long size, String contentType) {
         upload(objectKey, inputStream, size, contentType);
         return buildPublicUrl(objectKey);
     }
 
+    /**
+     * Uploads object storage content.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Create or prepare the requested domain result.</li>
+     * </ul>
+     *
+     * @param objectKey the object key parameter
+     * @param file the file parameter
+     * @return the upload and get url result
+     * @throws Exception if the requested operation cannot be completed
+     */
     public String uploadAndGetUrl(String objectKey, MultipartFile file) throws Exception {
         upload(objectKey, file);
         return buildPublicUrl(objectKey);
     }
 
+    /**
+     * Stores object storage data.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Coordinate with external services needed by the operation.</li>
+     * </ul>
+     *
+     * @param objectKey the object key parameter
+     * @param contentType the content type parameter
+     * @param size the size parameter
+     * @return the put object request result
+     */
     private PutObjectRequest putObjectRequest(String objectKey, String contentType, long size) {
         PutObjectRequest.Builder builder = PutObjectRequest.builder()
                 .bucket(bucket)
@@ -162,12 +308,34 @@ public class ObjectStorageService {
         return builder.build();
     }
 
+    /**
+     * Ensures that object storage requirements are satisfied.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Coordinate with external services needed by the operation.</li>
+     * </ul>
+     *
+     * @throws IllegalStateException if the requested operation cannot be completed
+     */
     private void ensureBucketConfigured() {
         if (bucket == null || bucket.isBlank()) {
             throw new IllegalStateException("S3 bucket is not configured. Set AWS_S3_BUCKET or storage.s3.bucket.");
         }
     }
 
+    /**
+     * Executes the object storage operation.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Coordinate with external services needed by the operation.</li>
+     * </ul>
+     *
+     * @param action the action parameter
+     * @return the execute with retry result
+     */
     private <T> T executeWithRetry(RetryableAction<T> action) {
         int maxAttempts = 3;
         long backoffMs = 500;
@@ -193,10 +361,32 @@ public class ObjectStorageService {
         throw lastException;
     }
 
+    /**
+     * Returns trim trailing slash for object storage processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param value the value parameter
+     * @return the trim trailing slash result
+     */
     private String trimTrailingSlash(String value) {
         return value.endsWith("/") ? value.substring(0, value.length() - 1) : value;
     }
 
+    /**
+     * Returns encode key for object storage processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param objectKey the object key parameter
+     * @return the encode key result
+     */
     private String encodeKey(String objectKey) {
         String[] parts = objectKey.split("/");
         for (int i = 0; i < parts.length; i++) {

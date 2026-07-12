@@ -7,6 +7,17 @@ public class AgentInputSanitizer {
 
     private static final int MAX_QUESTION_CHARS = 4_000;
 
+    /**
+     * Sanitizes agent input input.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param question the question parameter
+     * @return the sanitize question result
+     */
     public String sanitizeQuestion(String question) {
         if (question == null) {
             return "";

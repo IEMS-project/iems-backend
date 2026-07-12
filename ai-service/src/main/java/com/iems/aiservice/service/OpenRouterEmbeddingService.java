@@ -18,6 +18,19 @@ public class OpenRouterEmbeddingService {
     private final RestClient openRouterRestClient;
     private final AiProperties aiProperties;
 
+    /**
+     * Returns embed for open router embedding processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Coordinate with external services needed by the operation.</li>
+     * </ul>
+     *
+     * @param text the text parameter
+     * @return the matching result collection
+     * @throws IllegalStateException if the requested operation cannot be completed
+     */
     public List<Double> embed(String text) {
         ensureApiKeyConfigured();
 
@@ -38,12 +51,33 @@ public class OpenRouterEmbeddingService {
         throw new IllegalStateException("Unable to parse embedding from OpenRouter response");
     }
 
+    /**
+     * Ensures that open router embedding requirements are satisfied.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     * </ul>
+     *
+     * @throws IllegalStateException if the requested operation cannot be completed
+     */
     private void ensureApiKeyConfigured() {
         if (!aiProperties.hasApiKey()) {
             throw new IllegalStateException("OPENROUTER_API_KEY or OPENROUTER_API_KEYS is not configured");
         }
     }
 
+    /**
+     * Returns post json with key rotation for open router embedding processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param payload the payload parameter
+     * @return the post json with key rotation result
+     */
     private Map<?, ?> postJsonWithKeyRotation(Map<String, Object> payload) {
         int attempts = Math.max(1, aiProperties.configuredApiKeys().size());
         RestClientResponseException lastRetryable = null;
@@ -66,6 +100,17 @@ public class OpenRouterEmbeddingService {
         throw lastRetryable;
     }
 
+    /**
+     * Returns is retryable open router key error for open router embedding processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param ex the ex parameter
+     * @return true if the requested condition is satisfied; otherwise false
+     */
     private boolean isRetryableOpenRouterKeyError(RestClientResponseException ex) {
         int status = ex.getStatusCode().value();
         return status == 401 || status == 402 || status == 429;

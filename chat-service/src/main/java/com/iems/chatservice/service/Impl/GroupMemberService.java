@@ -38,6 +38,22 @@ public class GroupMemberService implements IGroupMemberService {
     @Autowired
     private IUserService userService;
 
+    /**
+     * Adds group member data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Create or prepare the requested domain result.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     *   <li>Send the required notification or outbound message.</li>
+     * </ul>
+     *
+     * @param conversationId the conversation id parameter
+     * @param accountId the account id parameter
+     * @return the add member result
+     */
     @Override
     public Conversation addMember(String conversationId, String accountId) {
         UUID actorAccountId = userService.getAccountIdFromRequest();
@@ -64,6 +80,20 @@ public class GroupMemberService implements IGroupMemberService {
         return updated;
     }
 
+    /**
+     * Removes group member data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Remove or clear the requested domain data when allowed.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param conversationId the conversation id parameter
+     * @param accountId the account id parameter
+     * @return the remove member result
+     */
     @Override
     public Conversation removeMember(String conversationId, String accountId) {
         UUID actorAccountId = userService.getAccountIdFromRequest();
@@ -92,6 +122,17 @@ public class GroupMemberService implements IGroupMemberService {
         return updated;
     }
 
+    /**
+     * Creates group member data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Create or prepare the requested domain result.</li>
+     * </ul>
+     *
+     * @param conversationId the conversation id parameter
+     * @param content the content parameter
+     */
     @Override
     public void createAndBroadcastSystemLog(String conversationId, String content) {
         Message log = new Message();
@@ -103,6 +144,19 @@ public class GroupMemberService implements IGroupMemberService {
         messageBroadcastService.saveAndBroadcast(log);
     }
 
+    /**
+     * Performs broadcast member event for group member processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Send the required notification or outbound message.</li>
+     * </ul>
+     *
+     * @param conversation the conversation parameter
+     * @param event the event parameter
+     * @param targetAccountId the target account id parameter
+     * @param actorAccountId the actor account id parameter
+     */
     @Override
     public void broadcastMemberEvent(Conversation conversation, String event, String targetAccountId, String actorAccountId) {
         try {

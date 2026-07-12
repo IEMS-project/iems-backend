@@ -33,6 +33,19 @@ public class ConversationService implements IConversationService {
     private IUserService userService;
 
 
+    /**
+     * Retrieves conversation information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Create or prepare the requested domain result.</li>
+     *   <li>Send the required notification or outbound message.</li>
+     * </ul>
+     *
+     * @return the get conversations by user result
+     */
     public List<Map<String, Object>> getConversationsByUser() {
         UUID accountId = userService.getAccountIdFromRequest();
         String accountIdStr = accountId.toString();
@@ -145,6 +158,19 @@ public class ConversationService implements IConversationService {
         return result;
     }
 
+    /**
+     * Retrieves conversation information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param conversationId the conversation id parameter
+     * @param accountId the account id parameter
+     * @return the get last message for conversation result
+     */
     @Override
     public Message getLastMessageForConversation(String conversationId, String accountId) {
         Criteria lastMessageCriteria = new Criteria().andOperator(
@@ -196,21 +222,69 @@ public class ConversationService implements IConversationService {
         return lastMessage;
     }
     
+    /**
+     * Finds conversation information that matches the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param conversationId the conversation id parameter
+     * @return the find by id result
+     */
     @Override
     public Conversation findById(String conversationId) {
         return conversationRepository.findById(conversationId).orElse(null);
     }
     
+    /**
+     * Saves conversation data.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param conversation the conversation parameter
+     * @return the save result
+     */
     @Override
     public Conversation save(Conversation conversation) {
         return conversationRepository.save(conversation);
     }
     
+    /**
+     * Finds conversation information that matches the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param accountId the account id parameter
+     * @return the matching result collection
+     */
     @Override
     public List<Conversation> findByMembersContaining(String accountId) {
         return conversationRepository.findByMembersContaining(accountId);
     }
     
+    /**
+     * Pins conversation data for quick access.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Create or prepare the requested domain result.</li>
+     *   <li>Apply the requested state changes according to the domain rules.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param conversationId the conversation id parameter
+     * @return true if the requested condition is satisfied; otherwise false
+     */
     @Override
     public boolean pinConversation(String conversationId) {
         UUID accountId = userService.getAccountIdFromRequest();
@@ -243,6 +317,21 @@ public class ConversationService implements IConversationService {
         }
     }
     
+    /**
+     * Unpins conversation data.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Apply the requested state changes according to the domain rules.</li>
+     *   <li>Remove or clear the requested domain data when allowed.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param conversationId the conversation id parameter
+     * @return true if the requested condition is satisfied; otherwise false
+     */
     @Override
     public boolean unpinConversation(String conversationId) {
         UUID accountId = userService.getAccountIdFromRequest();
@@ -272,6 +361,21 @@ public class ConversationService implements IConversationService {
         }
     }
     
+    /**
+     * Marks conversation data according to the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Create or prepare the requested domain result.</li>
+     *   <li>Apply the requested state changes according to the domain rules.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param conversationId the conversation id parameter
+     * @return true if the requested condition is satisfied; otherwise false
+     */
     @Override
     public boolean markConversationAsUnread(String conversationId) {
         UUID accountId = userService.getAccountIdFromRequest();
@@ -304,6 +408,21 @@ public class ConversationService implements IConversationService {
         }
     }
     
+    /**
+     * Returns toggle notification settings for conversation processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Apply the requested state changes according to the domain rules.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     *   <li>Send the required notification or outbound message.</li>
+     * </ul>
+     *
+     * @param conversationId the conversation id parameter
+     * @return true if the requested condition is satisfied; otherwise false
+     */
     @Override
     public boolean toggleNotificationSettings(String conversationId) {
         UUID accountId = userService.getAccountIdFromRequest();
@@ -337,6 +456,22 @@ public class ConversationService implements IConversationService {
         }
     }
     
+    /**
+     * Clears conversation state.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Apply the requested state changes according to the domain rules.</li>
+     *   <li>Remove or clear the requested domain data when allowed.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param conversationId the conversation id parameter
+     * @param accountId the account id parameter
+     * @return true if the requested condition is satisfied; otherwise false
+     */
     @Override
     public boolean clearManualUnreadMark(String conversationId, String accountId) {
         try {

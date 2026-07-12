@@ -23,6 +23,18 @@ public class ProjectRepositoryService {
 
     private final ProjectRepositoryRepository projectRepositoryRepository;
 
+    /**
+     * Creates project repository data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Create or prepare the requested domain result.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param dto the dto parameter
+     * @return the create repository result
+     */
     @Transactional
     public ProjectRepositoryDto createRepository(CreateProjectRepositoryDto dto) {
         log.info("Creating repository for project: {}", dto.getProjectId());
@@ -38,6 +50,17 @@ public class ProjectRepositoryService {
         return mapToDto(savedRepository);
     }
 
+    /**
+     * Retrieves project repository information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @return the matching result collection
+     */
     public List<ProjectRepositoryDto> getRepositoriesByProjectId(UUID projectId) {
         log.info("Getting repositories for project: {}", projectId);
         
@@ -48,6 +71,17 @@ public class ProjectRepositoryService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Retrieves project repository information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param id the id parameter
+     * @return the get repository by id result
+     */
     public ProjectRepositoryDto getRepositoryById(UUID id) {
         log.info("Getting repository by id: {}", id);
         
@@ -57,6 +91,20 @@ public class ProjectRepositoryService {
         return mapToDto(repository);
     }
 
+    /**
+     * Updates project repository data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Apply the requested state changes according to the domain rules.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param id the id parameter
+     * @param dto the dto parameter
+     * @return the update repository result
+     */
     @Transactional
     public ProjectRepositoryDto updateRepository(UUID id, UpdateProjectRepositoryDto dto) {
         log.info("Updating repository: {}", id);
@@ -72,6 +120,19 @@ public class ProjectRepositoryService {
         return mapToDto(updatedRepository);
     }
 
+    /**
+     * Deletes project repository data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Remove or clear the requested domain data when allowed.</li>
+     * </ul>
+     *
+     * @param id the id parameter
+     * @throws AppException if a business rule prevents the requested operation
+     */
     @Transactional
     public void deleteRepository(UUID id) {
         log.info("Deleting repository: {}", id);
@@ -83,12 +144,33 @@ public class ProjectRepositoryService {
         projectRepositoryRepository.deleteById(id);
     }
 
+    /**
+     * Deletes project repository data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Remove or clear the requested domain data when allowed.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     */
     @Transactional
     public void deleteRepositoriesByProjectId(UUID projectId) {
         log.info("Deleting all repositories for project: {}", projectId);
         projectRepositoryRepository.deleteByProjectId(projectId);
     }
 
+    /**
+     * Maps project repository data to the target representation.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param repository the repository parameter
+     * @return the map to dto result
+     */
     private ProjectRepositoryDto mapToDto(GithubRepository repository) {
         return ProjectRepositoryDto.builder()
                 .id(repository.getId())

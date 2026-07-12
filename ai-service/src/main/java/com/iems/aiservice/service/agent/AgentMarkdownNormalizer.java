@@ -2,9 +2,23 @@ package com.iems.aiservice.service.agent;
 
 public final class AgentMarkdownNormalizer {
 
+    /**
+     * Creates a new agent markdown service instance.
+     */
     private AgentMarkdownNormalizer() {
     }
 
+    /**
+     * Normalizes agent markdown content.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param text the text parameter
+     * @return the normalize result
+     */
     public static String normalize(String text) {
         if (text == null || text.isBlank()) {
             return text;

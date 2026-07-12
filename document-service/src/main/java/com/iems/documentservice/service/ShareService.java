@@ -31,6 +31,14 @@ public class ShareService {
     private final UserServiceFeignClient userServiceFeignClient;
     private final PermissionHelper permissionHelper;
 
+    /**
+     * Creates a new share service instance.
+     *
+     * @param shareRepository the share repository parameter
+     * @param storedFileRepository the stored file repository parameter
+     * @param userServiceFeignClient the user service feign client parameter
+     * @param permissionHelper the permission helper parameter
+     */
     public ShareService(ShareRepository shareRepository,
                         StoredFileRepository storedFileRepository,
                         UserServiceFeignClient userServiceFeignClient,
@@ -41,6 +49,21 @@ public class ShareService {
         this.permissionHelper = permissionHelper;
     }
 
+    /**
+     * Performs share item for share processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param itemId the item id parameter
+     * @param type the type parameter
+     * @param request the request parameter
+     * @throws AppException if a business rule prevents the requested operation
+     */
     @Transactional
     public void shareItem(UUID itemId, String type, ShareRequest request) {
         UUID ownerId = permissionHelper.getCurrentUserId();
@@ -69,6 +92,19 @@ public class ShareService {
         }
     }
 
+    /**
+     * Performs unshare item for share processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     * </ul>
+     *
+     * @param itemId the item id parameter
+     * @param type the type parameter
+     * @param request the request parameter
+     * @throws AppException if a business rule prevents the requested operation
+     */
     @Transactional
     public void unshareItem(UUID itemId, String type, ShareRequest request) {
         UUID ownerId = permissionHelper.getCurrentUserId();
@@ -80,6 +116,21 @@ public class ShareService {
         }
     }
 
+    /**
+     * Retrieves share information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Send the required notification or outbound message.</li>
+     * </ul>
+     *
+     * @param itemId the item id parameter
+     * @param type the type parameter
+     * @return the matching result collection
+     * @throws AppException if a business rule prevents the requested operation
+     */
     public List<SharedUserResponse> getSharedUsers(UUID itemId, String type) {
         UUID ownerId = permissionHelper.getCurrentUserId();
         if (!permissionHelper.validateTargetExistsAndOwned(itemId, type, ownerId)) {
@@ -106,6 +157,22 @@ public class ShareService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Updates share data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Apply the requested state changes according to the domain rules.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param shareId the share id parameter
+     * @param permission the permission parameter
+     * @return the update share permission result
+     * @throws AppException if a business rule prevents the requested operation
+     */
     @Transactional
     public Share updateSharePermission(UUID shareId, SharePermission permission) {
         UUID ownerId = permissionHelper.getCurrentUserId();
@@ -119,6 +186,21 @@ public class ShareService {
         return share;
     }
 
+    /**
+     * Removes share data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Remove or clear the requested domain data when allowed.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param shareId the share id parameter
+     * @return the remove share result
+     * @throws AppException if a business rule prevents the requested operation
+     */
     @Transactional
     public Share removeShare(UUID shareId) {
         UUID ownerId = permissionHelper.getCurrentUserId();
@@ -131,6 +213,17 @@ public class ShareService {
         return share;
     }
 
+    /**
+     * Returns load users by account id for share processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param shares the shares parameter
+     * @return the load users by account id result
+     */
     private Map<UUID, Map<String, Object>> loadUsersByAccountId(List<Share> shares) {
         if (shares == null || shares.isEmpty()) {
             return Map.of();

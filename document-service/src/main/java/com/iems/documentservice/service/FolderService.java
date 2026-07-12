@@ -29,6 +29,15 @@ public class FolderService {
     private final PermissionHelper permissionHelper;
     private final UserServiceFeignClient userServiceFeignClient;
 
+    /**
+     * Creates a new folder service instance.
+     *
+     * @param folderRepository the folder repository parameter
+     * @param shareRepository the share repository parameter
+     * @param favoriteRepository the favorite repository parameter
+     * @param permissionHelper the permission helper parameter
+     * @param userServiceFeignClient the user service feign client parameter
+     */
     public FolderService(FolderRepository folderRepository,
                          ShareRepository shareRepository,
                          FavoriteRepository favoriteRepository,
@@ -41,6 +50,19 @@ public class FolderService {
         this.userServiceFeignClient = userServiceFeignClient;
     }
 
+    /**
+     * Creates folder data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Create or prepare the requested domain result.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param request the request parameter
+     * @return the create folder result
+     */
     @Transactional
     public FolderResponse createFolder(CreateFolderRequest request) {
         UUID userId = permissionHelper.getCurrentUserId();
@@ -59,6 +81,18 @@ public class FolderService {
         return toResponse(saved, userId);
     }
 
+    /**
+     * Lists folder information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Create or prepare the requested domain result.</li>
+     * </ul>
+     *
+     * @return the matching result collection
+     */
     public List<FolderResponse> listFolders() {
         UUID userId = permissionHelper.getCurrentUserId();
         List<Folder> owned = folderRepository.findByOwnerIdAndDeletedAtIsNull(userId);
@@ -84,6 +118,19 @@ public class FolderService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Lists folder information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Create or prepare the requested domain result.</li>
+     * </ul>
+     *
+     * @param parentId the parent id parameter
+     * @return the matching result collection
+     */
     public List<FolderResponse> listByParent(UUID parentId) {
         UUID userId = permissionHelper.getCurrentUserId();
         Set<UUID> accessible = new HashSet<>();
@@ -115,6 +162,18 @@ public class FolderService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Performs rename for folder processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Apply the requested state changes according to the domain rules.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param folderId the folder id parameter
+     * @param newName the new name parameter
+     */
     @Transactional
     public void rename(UUID folderId, String newName) {
         UUID userId = permissionHelper.getCurrentUserId();
@@ -124,6 +183,21 @@ public class FolderService {
         folderRepository.save(folder);
     }
 
+    /**
+     * Performs move for folder processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Apply the requested state changes according to the domain rules.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param folderId the folder id parameter
+     * @param newParentId the new parent id parameter
+     * @throws AppException if a business rule prevents the requested operation
+     */
     @Transactional
     public void move(UUID folderId, UUID newParentId) {
         UUID userId = permissionHelper.getCurrentUserId();
@@ -144,6 +218,19 @@ public class FolderService {
         folderRepository.save(folder);
     }
 
+    /**
+     * Updates folder data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Apply the requested state changes according to the domain rules.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param folderId the folder id parameter
+     * @param permission the permission parameter
+     */
     @Transactional
     public void updatePermission(UUID folderId, Permission permission) {
         UUID userId = permissionHelper.getCurrentUserId();
@@ -153,6 +240,12 @@ public class FolderService {
         folderRepository.save(folder);
     }
 
+    /**
+     * Returns folder for folder processing.
+     *
+     * @param folderId the folder id parameter
+     * @return the folder result
+     */
     /** Soft-delete folder và toàn bộ sub-folder (file do TrashService xử lý) */
     @Transactional
     public void softDelete(UUID folderId) {
@@ -171,6 +264,17 @@ public class FolderService {
                 .forEach(this::softDeleteRecursive);
     }
 
+    /**
+     * Searches folder information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param query the query parameter
+     * @return the matching result collection
+     */
     public List<com.iems.documentservice.dto.response.SearchResultItem> searchFolders(String query) {
         UUID userId = permissionHelper.getCurrentUserId();
         String q = query == null ? "" : query.trim();
@@ -185,15 +289,48 @@ public class FolderService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Retrieves folder information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param folderId the folder id parameter
+     * @return the get or throw result
+     */
     public Folder getOrThrow(UUID folderId) {
         return folderRepository.findById(folderId)
                 .orElseThrow(() -> new AppException(DocumentErrorCode.FOLDER_NOT_FOUND));
     }
 
+    /**
+     * Retrieves folder information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @return the get repository result
+     */
     public FolderRepository getRepository() {
         return folderRepository;
     }
 
+    /**
+     * Returns to response for folder processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     * </ul>
+     *
+     * @param folder the folder parameter
+     * @param userId the user id parameter
+     * @return the to response result
+     */
     public FolderResponse toResponse(Folder folder, UUID userId) {
         Map<String, Object> owner = null;
         if (folder.getOwnerId() != null) {
@@ -203,6 +340,22 @@ public class FolderService {
         return toResponse(folder, userId, loadFavoriteIds(userId, List.of(folder)), owner);
     }
 
+    /**
+     * Returns to response for folder processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Create or prepare the requested domain result.</li>
+     *   <li>Send the required notification or outbound message.</li>
+     * </ul>
+     *
+     * @param folder the folder parameter
+     * @param userId the user id parameter
+     * @param favoriteIds the favorite ids parameter
+     * @param owner the owner parameter
+     * @return the to response result
+     */
     private FolderResponse toResponse(Folder folder, UUID userId, Set<UUID> favoriteIds, Map<String, Object> owner) {
         var builder = FolderResponse.builder()
                 .id(folder.getId())
@@ -227,6 +380,17 @@ public class FolderService {
         return builder.build();
     }
 
+    /**
+     * Builds folder data for downstream processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Create or prepare the requested domain result.</li>
+     * </ul>
+     *
+     * @param folder the folder parameter
+     * @return the matching result collection
+     */
     private List<FolderResponse.BreadcrumbResponse> buildFolderBreadcrumbs(Folder folder) {
         List<FolderResponse.BreadcrumbResponse> crumbs = new ArrayList<>();
         Folder cur = folder;
@@ -240,6 +404,17 @@ public class FolderService {
         return crumbs;
     }
 
+    /**
+     * Returns load users by account id for folder processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param accountIds the account ids parameter
+     * @return the load users by account id result
+     */
     private Map<UUID, Map<String, Object>> loadUsersByAccountId(Collection<UUID> accountIds) {
         if (accountIds == null || accountIds.isEmpty()) {
             return Map.of();
@@ -275,6 +450,18 @@ public class FolderService {
         }
     }
 
+    /**
+     * Returns load favorite ids for folder processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param userId the user id parameter
+     * @param folders the folders parameter
+     * @return the matching result collection
+     */
     private Set<UUID> loadFavoriteIds(UUID userId, Collection<Folder> folders) {
         if (userId == null || folders == null || folders.isEmpty()) {
             return Set.of();

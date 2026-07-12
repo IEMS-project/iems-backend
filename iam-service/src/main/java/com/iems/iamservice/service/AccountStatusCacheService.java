@@ -22,6 +22,17 @@ public class AccountStatusCacheService {
     @Value("${iam.account-status-cache.ttl-seconds:30}")
     private long ttlSeconds;
 
+    /**
+     * Returns is enabled for account status cache processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param accountId the account id parameter
+     * @return true if the requested condition is satisfied; otherwise false
+     */
     public boolean isEnabled(UUID accountId) {
         if (accountId == null) {
             return false;
@@ -44,12 +55,33 @@ public class AccountStatusCacheService {
         }
     }
 
+    /**
+     * Updates account status cache data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Apply the requested state changes according to the domain rules.</li>
+     * </ul>
+     *
+     * @param accountId the account id parameter
+     * @param enabled the enabled parameter
+     */
     public void update(UUID accountId, boolean enabled) {
         if (accountId != null) {
             cache.put(accountId, new CacheEntry(enabled, Instant.now()));
         }
     }
 
+    /**
+     * Evicts cached account status cache state.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Remove or clear the requested domain data when allowed.</li>
+     * </ul>
+     *
+     * @param accountId the account id parameter
+     */
     public void evict(UUID accountId) {
         if (accountId != null) {
             cache.remove(accountId);

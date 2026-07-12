@@ -27,6 +27,18 @@ public class MemberPermissionService {
     private final ProjectMemberRepository projectMemberRepository;
     private final RoleRepository roleRepository;
 
+    /**
+     * Retrieves member permission information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @param accountId the account id parameter
+     * @return the get member permissions result
+     */
     public MemberPermissionsResponseDto getMemberPermissions(UUID projectId, UUID accountId) {
         validateMembership(projectId, accountId);
 
@@ -46,6 +58,20 @@ public class MemberPermissionService {
         return new MemberPermissionsResponseDto(granted, denied);
     }
 
+    /**
+     * Performs grant permission for member permission processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Remove or clear the requested domain data when allowed.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @param accountId the account id parameter
+     * @param permission the permission parameter
+     */
     @Transactional
     public void grantPermission(UUID projectId, UUID accountId, ProjectPermission permission) {
         validateMemberPermissionEditable(projectId, accountId);
@@ -60,6 +86,20 @@ public class MemberPermissionService {
         memberPermissionRepository.save(mp);
     }
 
+    /**
+     * Performs deny permission for member permission processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Remove or clear the requested domain data when allowed.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @param accountId the account id parameter
+     * @param permission the permission parameter
+     */
     @Transactional
     public void denyPermission(UUID projectId, UUID accountId, ProjectPermission permission) {
         validateMemberPermissionEditable(projectId, accountId);
@@ -74,24 +114,68 @@ public class MemberPermissionService {
         memberPermissionRepository.save(mp);
     }
 
+    /**
+     * Performs reset permission for member permission processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @param accountId the account id parameter
+     * @param permission the permission parameter
+     */
     @Transactional
     public void resetPermission(UUID projectId, UUID accountId, ProjectPermission permission) {
         validateMemberPermissionEditable(projectId, accountId);
         memberPermissionRepository.deleteByProjectIdAndAccountIdAndPermission(projectId, accountId, permission);
     }
 
+    /**
+     * Performs reset all permissions for member permission processing.
+     *
+     * @param projectId the project id parameter
+     * @param accountId the account id parameter
+     */
     @Transactional
     public void resetAllPermissions(UUID projectId, UUID accountId) {
         validateMemberPermissionEditable(projectId, accountId);
         memberPermissionRepository.deleteByProjectIdAndAccountId(projectId, accountId);
     }
 
+    /**
+     * Validates member permission data.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @param accountId the account id parameter
+     * @throws AppException if a business rule prevents the requested operation
+     */
     private void validateMembership(UUID projectId, UUID accountId) {
         if (!projectMemberRepository.existsByProjectIdAndAccountId(projectId, accountId)) {
             throw new AppException(ProjectErrorCode.MEMBER_NOT_FOUND);
         }
     }
 
+    /**
+     * Validates member permission data.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @param accountId the account id parameter
+     * @throws AppException if a business rule prevents the requested operation
+     */
     private void validateMemberPermissionEditable(UUID projectId, UUID accountId) {
         ProjectMember member = projectMemberRepository.findByProjectIdAndAccountId(projectId, accountId)
                 .orElseThrow(() -> new AppException(ProjectErrorCode.MEMBER_NOT_FOUND));

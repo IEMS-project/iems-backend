@@ -37,6 +37,23 @@ public class CommentService {
     private final ProjectRepository projectRepository;
     private final ActorNameResolver actorNameResolver;
 
+    /**
+     * Adds comment data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Create or prepare the requested domain result.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     *   <li>Send the required notification or outbound message.</li>
+     * </ul>
+     *
+     * @param issueId the issue id parameter
+     * @param authorId the author id parameter
+     * @param content the content parameter
+     * @param parentCommentId the parent comment id parameter
+     * @return the add comment result
+     */
     @Transactional
     public Comment addComment(UUID issueId, UUID authorId, String content, UUID parentCommentId) {
         Comment comment = new Comment();
@@ -93,6 +110,18 @@ public class CommentService {
         return saved;
     }
 
+    /**
+     * Returns extract mentioned user ids for comment processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Create or prepare the requested domain result.</li>
+     * </ul>
+     *
+     * @param content the content parameter
+     * @return the matching result collection
+     */
     private List<UUID> extractMentionedUserIds(String content) {
         if (content == null || content.isBlank()) return List.of();
         List<UUID> ids = new ArrayList<>();
@@ -109,6 +138,23 @@ public class CommentService {
         return ids;
     }
 
+    /**
+     * Updates comment data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Apply the requested state changes according to the domain rules.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param commentId the comment id parameter
+     * @param content the content parameter
+     * @param userId the user id parameter
+     * @return the update comment result
+     * @throws AppException if a business rule prevents the requested operation
+     */
     public Comment updateComment(UUID commentId, String content, UUID userId) {
         Comment comment = commentRepository.findById(commentId)
                 .orElseThrow(() -> new AppException(ProjectErrorCode.COMMENT_NOT_FOUND));
@@ -119,6 +165,20 @@ public class CommentService {
         return commentRepository.save(comment);
     }
 
+    /**
+     * Deletes comment data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Remove or clear the requested domain data when allowed.</li>
+     * </ul>
+     *
+     * @param commentId the comment id parameter
+     * @param userId the user id parameter
+     * @throws AppException if a business rule prevents the requested operation
+     */
     @Transactional
     public void deleteComment(UUID commentId, UUID userId) {
         Comment comment = commentRepository.findById(commentId)
@@ -129,12 +189,35 @@ public class CommentService {
         deleteCommentTree(comment);
     }
 
+    /**
+     * Deletes comment data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Remove or clear the requested domain data when allowed.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param comment the comment parameter
+     */
     private void deleteCommentTree(Comment comment) {
         List<Comment> children = commentRepository.findByParentCommentId(comment.getId());
         children.forEach(this::deleteCommentTree);
         commentRepository.delete(comment);
     }
 
+    /**
+     * Retrieves comment information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param issueId the issue id parameter
+     * @return the matching result collection
+     */
     public List<CommentResponseDto> getCommentsByIssue(UUID issueId) {
         List<Comment> comments = commentRepository.findByIssueIdOrderByCreatedAtAsc(issueId);
         if (comments.isEmpty())
@@ -179,6 +262,17 @@ public class CommentService {
         }).collect(Collectors.toList());
     }
 
+    /**
+     * Returns trim for comment processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param s the s parameter
+     * @return the trim result
+     */
     private String trim(String s) {
         return s != null ? s.trim() : "";
     }

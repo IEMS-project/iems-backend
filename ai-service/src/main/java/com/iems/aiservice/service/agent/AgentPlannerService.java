@@ -26,12 +26,33 @@ public class AgentPlannerService {
     private final AgentIntentRouterService intentRouterService;
     private final PendingActionStore pendingActionStore;
 
+    /**
+     * Creates a new agent planner service instance.
+     *
+     * @param intentRouterService the intent router service parameter
+     * @param pendingActionStore the pending action store parameter
+     */
     public AgentPlannerService(AgentIntentRouterService intentRouterService,
             PendingActionStore pendingActionStore) {
         this.intentRouterService = intentRouterService;
         this.pendingActionStore = pendingActionStore;
     }
 
+    /**
+     * Plans agent planner actions.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Coordinate with external services needed by the operation.</li>
+     * </ul>
+     *
+     * @param userId the user id parameter
+     * @param conversationId the conversation id parameter
+     * @param request the request parameter
+     * @param conversationContext the conversation context parameter
+     * @return the plan result
+     */
     public AgentPlan plan(String userId,
             String conversationId,
             AgentChatRequest request,
@@ -104,6 +125,21 @@ public class AgentPlannerService {
                 "");
     }
 
+    /**
+     * Plans agent planner actions.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Create or prepare the requested domain result.</li>
+     *   <li>Apply the requested state changes according to the domain rules.</li>
+     * </ul>
+     *
+     * @param intent the intent parameter
+     * @param question the question parameter
+     * @param normalized the normalized parameter
+     * @param projectId the project id parameter
+     * @return the plan issue write result
+     */
     private AgentPlan planIssueWrite(AgentIntent intent, String question, String normalized, String projectId) {
         if (projectId == null || projectId.isBlank()) {
             return AgentPlan.clarify(
@@ -177,6 +213,17 @@ public class AgentPlannerService {
                 "");
     }
 
+    /**
+     * Returns is read project intent for agent planner processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param intent the intent parameter
+     * @return true if the requested condition is satisfied; otherwise false
+     */
     private static boolean isReadProjectIntent(AgentIntent intent) {
         return intent == AgentIntent.ISSUE_QUERY
                 || intent == AgentIntent.ISSUE_ANALYSIS
@@ -190,6 +237,17 @@ public class AgentPlannerService {
                 || intent == AgentIntent.DEADLINE_CHECK;
     }
 
+    /**
+     * Returns read tool for for agent planner processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param intent the intent parameter
+     * @return the read tool for result
+     */
     private static String readToolFor(AgentIntent intent) {
         return switch (intent) {
             case DAILY_PLAN -> "daily_plan";
@@ -201,6 +259,18 @@ public class AgentPlannerService {
         };
     }
 
+    /**
+     * Returns refine project intent for agent planner processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param intent the intent parameter
+     * @param normalized the normalized parameter
+     * @return the refine project intent result
+     */
     private static AgentIntent refineProjectIntent(AgentIntent intent, String normalized) {
         if (intent == AgentIntent.DAILY_PLAN) {
             return intent;
@@ -220,11 +290,34 @@ public class AgentPlannerService {
         return intent;
     }
 
+    /**
+     * Returns extract issue key for agent planner processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param question the question parameter
+     * @return the extract issue key result
+     */
     private static String extractIssueKey(String question) {
         Matcher matcher = ISSUE_KEY_PATTERN.matcher(question == null ? "" : question.toUpperCase(Locale.ROOT));
         return matcher.find() ? matcher.group(1) : null;
     }
 
+    /**
+     * Returns extract target status for agent planner processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param question the question parameter
+     * @param normalized the normalized parameter
+     * @return the extract target status result
+     */
     private static String extractTargetStatus(String question, String normalized) {
         if (containsAny(normalized, "done", "hoan thanh", "closed")) {
             return "Done";
@@ -243,6 +336,17 @@ public class AgentPlannerService {
         return "";
     }
 
+    /**
+     * Returns clean target status for agent planner processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param rawStatus the raw status parameter
+     * @return the clean target status result
+     */
     private static String cleanTargetStatus(String rawStatus) {
         if (rawStatus == null) {
             return "";
@@ -254,6 +358,17 @@ public class AgentPlannerService {
         return cleaned.replaceAll("\\s+", " ");
     }
 
+    /**
+     * Returns extract assignee text for agent planner processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Create or prepare the requested domain result.</li>
+     * </ul>
+     *
+     * @param question the question parameter
+     * @return the extract assignee text result
+     */
     private static String extractAssigneeText(String question) {
         if (question == null || question.isBlank()) {
             return "";
@@ -269,6 +384,17 @@ public class AgentPlannerService {
         return "";
     }
 
+    /**
+     * Returns is confirmation for agent planner processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param normalized the normalized parameter
+     * @return true if the requested condition is satisfied; otherwise false
+     */
     private static boolean isConfirmation(String normalized) {
         return normalized.matches("^(dung|dung roi|ok|okay|oke|yes|xac nhan|confirm|cap nhat di|lam di|chay di).*$")
                 || normalized.contains("ok cap nhat")
@@ -276,12 +402,36 @@ public class AgentPlannerService {
                 || normalized.contains("cu lam");
     }
 
+    /**
+     * Returns looks like issue write for agent planner processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Create or prepare the requested domain result.</li>
+     *   <li>Apply the requested state changes according to the domain rules.</li>
+     * </ul>
+     *
+     * @param normalized the normalized parameter
+     * @return true if the requested condition is satisfied; otherwise false
+     */
     private static boolean looksLikeIssueWrite(String normalized) {
         return containsAny(normalized,
                 "cap nhat", "update", "chuyen", "doi", "assign", "gan", "assignee",
                 "done", "hoan thanh", "in progress", "dang lam", "todo", "to do");
     }
 
+    /**
+     * Returns looks like explicit issue write for agent planner processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param question the question parameter
+     * @param normalized the normalized parameter
+     * @return true if the requested condition is satisfied; otherwise false
+     */
     private static boolean looksLikeExplicitIssueWrite(String question, String normalized) {
         if (!looksLikeIssueWrite(normalized)) {
             return false;
@@ -296,10 +446,33 @@ public class AgentPlannerService {
                 && containsAny(normalized, "sang", "to", "thanh", "status", "trang thai");
     }
 
+    /**
+     * Returns looks like create issue for agent planner processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Create or prepare the requested domain result.</li>
+     * </ul>
+     *
+     * @param normalized the normalized parameter
+     * @return true if the requested condition is satisfied; otherwise false
+     */
     private static boolean looksLikeCreateIssue(String normalized) {
         return containsAny(normalized, "tao issue", "create issue", "tao task", "them issue");
     }
 
+    /**
+     * Returns contains any for agent planner processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param text the text parameter
+     * @param needles the needles parameter
+     * @return true if the requested condition is satisfied; otherwise false
+     */
     private static boolean containsAny(String text, String... needles) {
         for (String needle : needles) {
             if (text.contains(needle)) {
@@ -309,6 +482,17 @@ public class AgentPlannerService {
         return false;
     }
 
+    /**
+     * Normalizes agent planner content.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param value the value parameter
+     * @return the normalize result
+     */
     private static String normalize(String value) {
         if (value == null) {
             return "";

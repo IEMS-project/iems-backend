@@ -358,6 +358,22 @@ public class AuthService {
         }
     }
 
+    /**
+     * Authenticates a user and creates a login session.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     *   <li>Send the required notification or outbound message.</li>
+     * </ul>
+     *
+     * @param provider the provider parameter
+     * @param profile the profile parameter
+     * @return the login with oauth profile result
+     * @throws AppException if a business rule prevents the requested operation
+     */
     private LoginResponseDto loginWithOAuthProfile(String provider, OAuthProfile profile) {
         if (profile.email() == null || profile.email().isBlank()) {
             throw new AppException(ErrorCode.INVALID_REQUEST);
@@ -391,6 +407,23 @@ public class AuthService {
         return buildLoginResponse(account, roles, accessToken, refreshToken);
     }
 
+    /**
+     * Creates auth data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Create or prepare the requested domain result.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     *   <li>Send the required notification or outbound message.</li>
+     * </ul>
+     *
+     * @param provider the provider parameter
+     * @param email the email parameter
+     * @param displayName the display name parameter
+     * @param avatarUrl the avatar url parameter
+     * @return the create oauth account result
+     */
     private Account createOAuthAccount(String provider, String email, String displayName, String avatarUrl) {
         String username = buildUniqueUsername(email);
 
@@ -422,6 +455,18 @@ public class AuthService {
         return savedAccount;
     }
 
+    /**
+     * Builds auth data for downstream processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Send the required notification or outbound message.</li>
+     * </ul>
+     *
+     * @param email the email parameter
+     * @return the build unique username result
+     */
     private String buildUniqueUsername(String email) {
         String localPart = email.split("@")[0];
         String base = localPart.replaceAll("[^a-zA-Z0-9._-]", "").trim();
@@ -438,6 +483,18 @@ public class AuthService {
         return candidate;
     }
 
+    /**
+     * Returns split name for auth processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param rawName the raw name parameter
+     * @param fallbackFirstName the fallback first name parameter
+     * @return the split name result
+     */
     private NameParts splitName(String rawName, String fallbackFirstName) {
         if (rawName == null || rawName.isBlank()) {
             return new NameParts(fallbackFirstName, "OAuth");
@@ -458,6 +515,19 @@ public class AuthService {
         return new NameParts(firstName, lastNameBuilder.toString());
     }
 
+    /**
+     * Returns exchange google code for access token for auth processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Create or prepare the requested domain result.</li>
+     * </ul>
+     *
+     * @param code the code parameter
+     * @return the exchange google code for access token result
+     * @throws AppException if a business rule prevents the requested operation
+     */
     private String exchangeGoogleCodeForAccessToken(String code) {
         MultiValueMap<String, String> formData = new LinkedMultiValueMap<>();
         formData.add("code", code);
@@ -483,6 +553,19 @@ public class AuthService {
         return accessToken;
     }
 
+    /**
+     * Returns fetch google profile for auth processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Send the required notification or outbound message.</li>
+     * </ul>
+     *
+     * @param accessToken the access token parameter
+     * @return the fetch google profile result
+     * @throws AppException if a business rule prevents the requested operation
+     */
     private OAuthProfile fetchGoogleProfile(String accessToken) {
         Map<String, Object> response = webClientBuilder.build()
                 .get()
@@ -503,6 +586,19 @@ public class AuthService {
         );
     }
 
+    /**
+     * Returns fetch google profile from id token for auth processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Send the required notification or outbound message.</li>
+     * </ul>
+     *
+     * @param idToken the id token parameter
+     * @return the fetch google profile from id token result
+     * @throws AppException if a business rule prevents the requested operation
+     */
     private OAuthProfile fetchGoogleProfileFromIdToken(String idToken) {
         Map<String, Object> response = webClientBuilder.build()
                 .get()
@@ -527,6 +623,19 @@ public class AuthService {
         );
     }
 
+    /**
+     * Returns exchange github code for access token for auth processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Create or prepare the requested domain result.</li>
+     * </ul>
+     *
+     * @param code the code parameter
+     * @return the exchange github code for access token result
+     * @throws AppException if a business rule prevents the requested operation
+     */
     private String exchangeGithubCodeForAccessToken(String code) {
         MultiValueMap<String, String> formData = new LinkedMultiValueMap<>();
         formData.add("client_id", githubClientId);
@@ -552,6 +661,19 @@ public class AuthService {
         return accessToken;
     }
 
+    /**
+     * Returns fetch github profile for auth processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Send the required notification or outbound message.</li>
+     * </ul>
+     *
+     * @param accessToken the access token parameter
+     * @return the fetch github profile result
+     * @throws AppException if a business rule prevents the requested operation
+     */
     private OAuthProfile fetchGithubProfile(String accessToken) {
         Map<String, Object> userResponse = webClientBuilder.build()
                 .get()
@@ -582,6 +704,17 @@ public class AuthService {
         return new OAuthProfile(email, name, asString(userResponse.get("avatar_url")));
     }
 
+    /**
+     * Returns fetch github primary email for auth processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Send the required notification or outbound message.</li>
+     * </ul>
+     *
+     * @param accessToken the access token parameter
+     * @return the fetch github primary email result
+     */
     private String fetchGithubPrimaryEmail(String accessToken) {
         List<Map<String, Object>> emails = webClientBuilder.build()
                 .get()
@@ -616,10 +749,35 @@ public class AuthService {
         return asString(emails.getFirst().get("email"));
     }
 
+    /**
+     * Returns as string for auth processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param value the value parameter
+     * @return the as string result
+     */
     private String asString(Object value) {
         return value == null ? null : Objects.toString(value, null);
     }
 
+    /**
+     * Builds auth data for downstream processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Send the required notification or outbound message.</li>
+     * </ul>
+     *
+     * @param user the user parameter
+     * @param roles the roles parameter
+     * @param accessToken the access token parameter
+     * @param refreshToken the refresh token parameter
+     * @return the build login response result
+     */
     private LoginResponseDto buildLoginResponse(Account user, Set<String> roles, String accessToken, String refreshToken) {
         return LoginResponseDto.builder()
                 .accessToken(accessToken)

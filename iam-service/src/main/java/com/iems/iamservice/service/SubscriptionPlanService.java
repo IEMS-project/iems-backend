@@ -26,6 +26,9 @@ public class SubscriptionPlanService {
     private final SubscriptionPlanRepository subscriptionPlanRepository;
     private final PaymentTransactionRepository paymentTransactionRepository;
 
+    /**
+     * Ensures that subscription plan requirements are satisfied.
+     */
     @Transactional
     public void ensureDefaultPlans() {
         seedPlanIfMissing("week", "Week", "Quick trial for individuals or small teams.", 49_000L, 7, false, 10);
@@ -33,6 +36,24 @@ public class SubscriptionPlanService {
         seedPlanIfMissing("year", "Year", "Best value for teams using IEMS long term.", 1_499_000L, 365, false, 30);
     }
 
+    /**
+     * Performs seed plan if missing for subscription plan processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param code the code parameter
+     * @param name the name parameter
+     * @param description the description parameter
+     * @param price the price parameter
+     * @param durationDays the duration days parameter
+     * @param recommended the recommended parameter
+     * @param sortOrder the sort order parameter
+     */
     private void seedPlanIfMissing(String code, String name, String description, long price,
                                    int durationDays, boolean recommended, int sortOrder) {
         if (subscriptionPlanRepository.existsByCodeIgnoreCase(code)) {
@@ -51,6 +72,16 @@ public class SubscriptionPlanService {
                 .build());
     }
 
+    /**
+     * Lists subscription plan information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @return the matching result collection
+     */
     public List<SubscriptionPlanResponse> listAll() {
         return List.of(
                 findPlanResponseOrDefault("week"),
@@ -59,12 +90,33 @@ public class SubscriptionPlanService {
         );
     }
 
+    /**
+     * Lists subscription plan information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @return the matching result collection
+     */
     public List<SubscriptionPlanResponse> listActive() {
         return listAll().stream()
                 .filter(plan -> Boolean.TRUE.equals(plan.getActive()))
                 .toList();
     }
 
+    /**
+     * Finds subscription plan information that matches the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param code the code parameter
+     * @return the find active by code result
+     */
     public SubscriptionPlan findActiveByCode(String code) {
         ensureDefaultPlans();
         return subscriptionPlanRepository.findByCodeIgnoreCase(normalizeCode(code))
@@ -72,12 +124,36 @@ public class SubscriptionPlanService {
                 .orElseThrow(() -> new AppException(ErrorCode.PAYMENT_INVALID_PLAN));
     }
 
+    /**
+     * Finds subscription plan information that matches the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param code the code parameter
+     * @return the find by code result
+     */
     public SubscriptionPlan findByCode(String code) {
         ensureDefaultPlans();
         return subscriptionPlanRepository.findByCodeIgnoreCase(normalizeCode(code))
                 .orElseThrow(() -> new AppException(ErrorCode.SUBSCRIPTION_NOT_FOUND));
     }
 
+    /**
+     * Creates subscription plan data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Create or prepare the requested domain result.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param request the request parameter
+     * @return the create result
+     */
     @Transactional
     public SubscriptionPlanResponse create(SubscriptionPlanRequest request) {
         String code = normalizeCode(request.getCode());
@@ -87,6 +163,22 @@ public class SubscriptionPlanService {
         return toResponse(subscriptionPlanRepository.save(plan));
     }
 
+    /**
+     * Updates subscription plan data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Apply the requested state changes according to the domain rules.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param id the id parameter
+     * @param request the request parameter
+     * @return the update result
+     * @throws AppException if a business rule prevents the requested operation
+     */
     @Transactional
     public SubscriptionPlanResponse update(UUID id, SubscriptionPlanRequest request) {
         SubscriptionPlan plan = getEntity(id);
@@ -100,6 +192,19 @@ public class SubscriptionPlanService {
         return toResponse(subscriptionPlanRepository.save(plan));
     }
 
+    /**
+     * Returns set active for subscription plan processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param id the id parameter
+     * @param active the active parameter
+     * @return the set active result
+     */
     @Transactional
     public SubscriptionPlanResponse setActive(UUID id, boolean active) {
         SubscriptionPlan plan = getEntity(id);
@@ -107,6 +212,18 @@ public class SubscriptionPlanService {
         return toResponse(subscriptionPlanRepository.save(plan));
     }
 
+    /**
+     * Deletes subscription plan data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Remove or clear the requested domain data when allowed.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param id the id parameter
+     */
     @Transactional
     public void delete(UUID id) {
         SubscriptionPlan plan = getEntity(id);
@@ -118,12 +235,30 @@ public class SubscriptionPlanService {
         subscriptionPlanRepository.delete(plan);
     }
 
+    /**
+     * Retrieves subscription plan information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param id the id parameter
+     * @return the get entity result
+     */
     private SubscriptionPlan getEntity(UUID id) {
         ensureDefaultPlans();
         return subscriptionPlanRepository.findById(id)
                 .orElseThrow(() -> new AppException(ErrorCode.SUBSCRIPTION_NOT_FOUND));
     }
 
+    /**
+     * Applies subscription plan changes.
+     *
+     * @param plan the plan parameter
+     * @param request the request parameter
+     * @param code the code parameter
+     */
     private void apply(SubscriptionPlan plan, SubscriptionPlanRequest request, String code) {
         plan.setCode(code);
         plan.setName(request.getName().trim());
@@ -136,6 +271,18 @@ public class SubscriptionPlanService {
         plan.setSortOrder(request.getSortOrder() == null ? 0 : request.getSortOrder());
     }
 
+    /**
+     * Normalizes subscription plan content.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     * </ul>
+     *
+     * @param code the code parameter
+     * @return the normalize code result
+     * @throws AppException if a business rule prevents the requested operation
+     */
     private String normalizeCode(String code) {
         if (!StringUtils.hasText(code)) {
             throw new AppException(ErrorCode.PAYMENT_INVALID_PLAN);
@@ -143,6 +290,17 @@ public class SubscriptionPlanService {
         return code.trim().toLowerCase();
     }
 
+    /**
+     * Returns to response for subscription plan processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     * </ul>
+     *
+     * @param plan the plan parameter
+     * @return the to response result
+     */
     public SubscriptionPlanResponse toResponse(SubscriptionPlan plan) {
         return SubscriptionPlanResponse.builder()
                 .id(plan.getId()).code(plan.getCode()).name(plan.getName()).description(plan.getDescription())
@@ -152,6 +310,16 @@ public class SubscriptionPlanService {
                 .build();
     }
 
+    /**
+     * Returns default plan responses for subscription plan processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @return the matching result collection
+     */
     private List<SubscriptionPlanResponse> defaultPlanResponses() {
         return List.of(
                 defaultPlanResponse("week", "Week", "Quick trial for individuals or small teams.", 49_000L, 7, false, 10),
@@ -160,6 +328,18 @@ public class SubscriptionPlanService {
         );
     }
 
+    /**
+     * Finds subscription plan information that matches the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param code the code parameter
+     * @return the find plan response or default result
+     */
     private SubscriptionPlanResponse findPlanResponseOrDefault(String code) {
         try {
             Optional<SubscriptionPlan> plan = subscriptionPlanRepository.findByCodeIgnoreCase(code);
@@ -170,6 +350,18 @@ public class SubscriptionPlanService {
         }
     }
 
+    /**
+     * Returns default plan response for for subscription plan processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     * </ul>
+     *
+     * @param code the code parameter
+     * @return the default plan response for result
+     * @throws AppException if a business rule prevents the requested operation
+     */
     private SubscriptionPlanResponse defaultPlanResponseFor(String code) {
         return switch (code) {
             case "week" -> defaultPlanResponse("week", "Week", "Quick trial for individuals or small teams.", 49_000L, 7, false, 10);
@@ -179,6 +371,23 @@ public class SubscriptionPlanService {
         };
     }
 
+    /**
+     * Returns default plan response for subscription plan processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     * </ul>
+     *
+     * @param code the code parameter
+     * @param name the name parameter
+     * @param description the description parameter
+     * @param price the price parameter
+     * @param durationDays the duration days parameter
+     * @param recommended the recommended parameter
+     * @param sortOrder the sort order parameter
+     * @return the default plan response result
+     */
     private SubscriptionPlanResponse defaultPlanResponse(String code, String name, String description, long price,
                                                          int durationDays, boolean recommended, int sortOrder) {
         return SubscriptionPlanResponse.builder()

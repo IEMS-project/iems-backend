@@ -49,10 +49,35 @@ public class AgentIntentRouterService {
             "vay sao", "tai sao", "cai nao", "uu tien cai nao", "lam gi tiep", "next", "more",
             "explain more", "what next");
 
+    /**
+     * Routes agent intent router processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param question the question parameter
+     * @return the route result
+     */
     public AgentDecision route(String question) {
         return route(question, null, null, null);
     }
 
+    /**
+     * Routes agent intent router processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param question the question parameter
+     * @param projectId the project id parameter
+     * @param selectedDocumentIds the selected document ids parameter
+     * @param conversationContext the conversation context parameter
+     * @return the route result
+     */
     public AgentDecision route(String question,
             String projectId,
             List<String> selectedDocumentIds,
@@ -140,6 +165,17 @@ public class AgentIntentRouterService {
         return new AgentDecision(AgentIntent.GENERAL_CHAT, 0.68, "fallback_general_chat");
     }
 
+    /**
+     * Returns looks project related for agent intent router processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     * </ul>
+     *
+     * @param normalized the normalized parameter
+     * @return true if the requested condition is satisfied; otherwise false
+     */
     private static boolean looksProjectRelated(String normalized) {
         return containsAnyFuzzy(normalized, Set.of(
                 "du an", "project", "sprint", "backlog", "team", "member", "cong viec", "tien do",
@@ -147,6 +183,17 @@ public class AgentIntentRouterService {
                 "review", "bao cao", "tong quan"));
     }
 
+    /**
+     * Returns is small talk or capability question for agent intent router processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param normalized the normalized parameter
+     * @return true if the requested condition is satisfied; otherwise false
+     */
     private static boolean isSmallTalkOrCapabilityQuestion(String normalized) {
         boolean greeting = normalized.matches("^(hi|hello|hey|xin chao|chao|alo|yo)(\\b|[!.?,\\s]).*")
                 || normalized.matches(".*\\b(chao ban|xin chao ban)\\b.*");
@@ -170,6 +217,17 @@ public class AgentIntentRouterService {
         return (greeting || asksCapability) && !explicitProjectRequest;
     }
 
+    /**
+     * Returns is my issue list question for agent intent router processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param normalized the normalized parameter
+     * @return true if the requested condition is satisfied; otherwise false
+     */
     private static boolean isMyIssueListQuestion(String normalized) {
         boolean mentionsWork = normalized.contains("task") || normalized.contains("issue")
                 || normalized.contains("cong viec") || normalized.contains("viec");
@@ -179,6 +237,17 @@ public class AgentIntentRouterService {
         return mentionsWork && mentionsMe && !asksTodayPlan;
     }
 
+    /**
+     * Returns is direct sprint question for agent intent router processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param normalized the normalized parameter
+     * @return true if the requested condition is satisfied; otherwise false
+     */
     private static boolean isDirectSprintQuestion(String normalized) {
         if (normalized.contains("rui ro") || normalized.contains("risk") || normalized.contains("blocker")) {
             return false;
@@ -190,6 +259,20 @@ public class AgentIntentRouterService {
                 || normalized.contains("backlog");
     }
 
+    /**
+     * Returns is explicit issue update for agent intent router processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Create or prepare the requested domain result.</li>
+     *   <li>Apply the requested state changes according to the domain rules.</li>
+     * </ul>
+     *
+     * @param original the original parameter
+     * @param normalized the normalized parameter
+     * @return true if the requested condition is satisfied; otherwise false
+     */
     private static boolean isExplicitIssueUpdate(String original, String normalized) {
         boolean hasAction = containsAnyFuzzy(normalized, ISSUE_ACTION_TERMS);
         if (!hasAction) {
@@ -210,6 +293,17 @@ public class AgentIntentRouterService {
         return (hasTargetIssue || hasDirectObject) && (hasTargetStatus || hasAssignmentTarget);
     }
 
+    /**
+     * Normalizes agent intent router content.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param text the text parameter
+     * @return the normalize result
+     */
     private static String normalize(String text) {
         String lowered = text.toLowerCase().trim();
         String decomposed = Normalizer.normalize(lowered, Normalizer.Form.NFD);
@@ -217,6 +311,18 @@ public class AgentIntentRouterService {
                 .replace('đ', 'd');
     }
 
+    /**
+     * Returns contains any fuzzy for agent intent router processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param text the text parameter
+     * @param terms the terms parameter
+     * @return true if the requested condition is satisfied; otherwise false
+     */
     private static boolean containsAnyFuzzy(String text, Set<String> terms) {
         for (String term : terms) {
             if (matchesTermFuzzy(text, term)) {
@@ -226,6 +332,18 @@ public class AgentIntentRouterService {
         return false;
     }
 
+    /**
+     * Returns contains any exact for agent intent router processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param text the text parameter
+     * @param terms the terms parameter
+     * @return true if the requested condition is satisfied; otherwise false
+     */
     private static boolean containsAnyExact(String text, String... terms) {
         for (String term : terms) {
             if (text.contains(term)) {
@@ -235,6 +353,18 @@ public class AgentIntentRouterService {
         return false;
     }
 
+    /**
+     * Returns matches term fuzzy for agent intent router processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param text the text parameter
+     * @param term the term parameter
+     * @return true if the requested condition is satisfied; otherwise false
+     */
     private static boolean matchesTermFuzzy(String text, String term) {
         if (text.contains(term)) {
             return true;
@@ -273,6 +403,18 @@ public class AgentIntentRouterService {
         return true;
     }
 
+    /**
+     * Returns is similar word for agent intent router processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param a the a parameter
+     * @param b the b parameter
+     * @return true if the requested condition is satisfied; otherwise false
+     */
     private static boolean isSimilarWord(String a, String b) {
         if (a.equals(b)) {
             return true;
@@ -282,6 +424,18 @@ public class AgentIntentRouterService {
         return levenshtein(a, b) <= threshold;
     }
 
+    /**
+     * Returns levenshtein for agent intent router processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param a the a parameter
+     * @param b the b parameter
+     * @return the levenshtein result
+     */
     private static int levenshtein(String a, String b) {
         int[][] dp = new int[a.length() + 1][b.length() + 1];
         for (int i = 0; i <= a.length(); i++) {

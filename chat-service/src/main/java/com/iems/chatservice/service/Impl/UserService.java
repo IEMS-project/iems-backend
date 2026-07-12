@@ -20,6 +20,16 @@ public class UserService implements IUserService {
     @Autowired
     private UserServiceFeignClient userServiceFeignClient;
 
+    /**
+     * Retrieves user information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @return the get account id from request result
+     */
     @Override
     public UUID getAccountIdFromRequest() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
@@ -28,6 +38,17 @@ public class UserService implements IUserService {
         return userId;
     }
 
+    /**
+     * Retrieves user information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param userId the user id parameter
+     * @return an optional result when matching data is available
+     */
     @Override
     public Optional<UserDetailDto> getUserById(UUID userId) {
         try {
@@ -47,6 +68,18 @@ public class UserService implements IUserService {
     }
 
 
+    /**
+     * Converts user data to the target representation.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Send the required notification or outbound message.</li>
+     * </ul>
+     *
+     * @param userData the user data parameter
+     * @return the convert to user detail dto result
+     */
     public UserDetailDto convertToUserDetailDto(Map<String, Object> userData) {
         UserDetailDto dto = new UserDetailDto();
         dto.setId(UUID.fromString(userData.get("id").toString()));
@@ -81,6 +114,17 @@ public class UserService implements IUserService {
         return dto;
     }
 
+    /**
+     * Resolves user information for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Send the required notification or outbound message.</li>
+     * </ul>
+     *
+     * @param userId the user id parameter
+     * @return the resolve user name result
+     */
     @Override
     public String resolveUserName(String userId) {
         try {

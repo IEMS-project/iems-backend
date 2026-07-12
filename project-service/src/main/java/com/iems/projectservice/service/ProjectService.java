@@ -69,12 +69,38 @@ public class ProjectService {
     private final SubscriptionLimitService subscriptionLimitService;
     private final ProjectSubscriptionSyncService projectSubscriptionSyncService;
 
+    /**
+     * Retrieves project information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @return the get user id from request result
+     */
     public UUID getUserIdFromRequest() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         JwtUserDetails userDetails = (JwtUserDetails) authentication.getPrincipal();
         return userDetails.getUserId();
     }
 
+    /**
+     * Creates project data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Create or prepare the requested domain result.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     *   <li>Coordinate with external services needed by the operation.</li>
+     * </ul>
+     *
+     * @param dto the dto parameter
+     * @return the create project result
+     * @throws AppException if a business rule prevents the requested operation
+     */
     @Transactional
     public Project createProject(CreateProjectDto dto) {
         log.info("Creating project: {}", dto.getName());
@@ -167,6 +193,22 @@ public class ProjectService {
         return savedProject;
     }
 
+    /**
+     * Updates project data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Apply the requested state changes according to the domain rules.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @param dto the dto parameter
+     * @return the update project result
+     * @throws AppException if a business rule prevents the requested operation
+     */
     @Transactional
     public Project updateProject(UUID projectId, UpdateProjectDto dto) {
         log.info("Updating project: {}", projectId);
@@ -198,6 +240,22 @@ public class ProjectService {
         return projectRepository.save(project);
     }
 
+    /**
+     * Updates project data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Apply the requested state changes according to the domain rules.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @param avatarUrl the avatar url parameter
+     * @return the update project avatar result
+     * @throws AppException if a business rule prevents the requested operation
+     */
     @Transactional
     public Project updateProjectAvatar(UUID projectId, String avatarUrl) {
         UUID currentUserId = getUserIdFromRequest();
@@ -212,6 +270,20 @@ public class ProjectService {
         return projectRepository.save(project);
     }
 
+    /**
+     * Deletes project data for the request.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     *   <li>Remove or clear the requested domain data when allowed.</li>
+     *   <li>Persist the resulting domain changes.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @throws AppException if a business rule prevents the requested operation
+     */
     @Transactional
     public void deleteProject(UUID projectId) {
         Project project = projectRepository.findById(projectId)
@@ -262,6 +334,19 @@ public class ProjectService {
         projectRepository.delete(project);
     }
 
+    /**
+     * Retrieves project information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param projectId the project id parameter
+     * @return the get project by id result
+     * @throws AppException if a business rule prevents the requested operation
+     */
     public Project getProjectById(UUID projectId) {
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new AppException(ProjectErrorCode.PROJECT_NOT_FOUND));
@@ -272,6 +357,16 @@ public class ProjectService {
         return project;
     }
 
+    /**
+     * Retrieves project information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @return the matching result collection
+     */
     public List<ProjectTableDto> getProjectsTable() {
         List<Project> projects = projectRepository.findAll();
         if (projects.isEmpty())
@@ -321,6 +416,18 @@ public class ProjectService {
         }).collect(Collectors.toList());
     }
 
+    /**
+     * Retrieves project information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Load the domain data required for the operation.</li>
+     * </ul>
+     *
+     * @param page the page parameter
+     * @param size the size parameter
+     * @return the paginated result set
+     */
     public PagedResponseDto<MyProjectResponseDto> getMyProjects(int page, int size) {
         UUID accountId = getUserIdFromRequest();
         int safePage = Math.max(page, 0);
@@ -338,6 +445,17 @@ public class ProjectService {
                 result.isLast());
     }
 
+    /**
+     * Returns enrich my projects for project processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param projects the projects parameter
+     * @return the matching result collection
+     */
     private List<MyProjectResponseDto> enrichMyProjects(List<Project> projects) {
         if (projects == null || projects.isEmpty()) {
             return List.of();
@@ -372,6 +490,18 @@ public class ProjectService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Returns to my project response for project processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param project the project parameter
+     * @param manager the manager parameter
+     * @return the to my project response result
+     */
     private MyProjectResponseDto toMyProjectResponse(Project project, UserDetailDto manager) {
         String managerName = manager != null
                 ? (Optional.ofNullable(manager.getFirstName()).orElse("").trim() + " "
@@ -396,10 +526,32 @@ public class ProjectService {
         return dto;
     }
 
+    /**
+     * Returns has permission to update project for project processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Apply the requested state changes according to the domain rules.</li>
+     * </ul>
+     *
+     * @param project the project parameter
+     * @param accountId the account id parameter
+     * @return true if the requested condition is satisfied; otherwise false
+     */
     private boolean hasPermissionToUpdateProject(Project project, UUID accountId) {
         return project.getManagerAccountId().equals(accountId) || isAdmin(accountId);
     }
 
+    /**
+     * Returns extract authorization header for project processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @return the extract authorization header result
+     */
     private String extractAuthorizationHeader() {
         try {
             var attributes = RequestContextHolder.getRequestAttributes();
@@ -412,6 +564,17 @@ public class ProjectService {
         return null;
     }
 
+    /**
+     * Returns is admin for project processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param accountId the account id parameter
+     * @return true if the requested condition is satisfied; otherwise false
+     */
     public boolean isAdmin(UUID accountId) {
         try {
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
@@ -428,6 +591,17 @@ public class ProjectService {
     }
 
     // --- User info helpers (via Feign) ---
+    /**
+     * Retrieves project information.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param accountId the account id parameter
+     * @return an optional result when matching data is available
+     */
     public Optional<UserDetailDto> getUserById(UUID accountId) {
         try {
             ResponseEntity<Map<String, Object>> response = userServiceFeignClient.getUserByAccountId(accountId);
@@ -443,6 +617,18 @@ public class ProjectService {
         }
     }
 
+    /**
+     * Converts project data to the target representation.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Validate the request and enforce applicable business constraints.</li>
+     *   <li>Send the required notification or outbound message.</li>
+     * </ul>
+     *
+     * @param userData the user data parameter
+     * @return the convert to user detail dto result
+     */
     private UserDetailDto convertToUserDetailDto(Map<String, Object> userData) {
         return new UserDetailDto(
                 UUID.fromString(userData.get("id").toString()),

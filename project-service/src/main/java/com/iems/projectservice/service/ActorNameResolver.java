@@ -53,6 +53,18 @@ public class ActorNameResolver {
         }
     }
 
+    /**
+     * Builds actor name data for downstream processing.
+     *
+     * <p><strong>Business:</strong></p>
+     * <ul>
+     *   <li>Transform domain data into the response required by the caller.</li>
+     * </ul>
+     *
+     * @param first the first parameter
+     * @param last the last parameter
+     * @return the build name result
+     */
     private String buildName(String first, String last) {
         String f = first != null ? first.trim() : "";
         String l = last  != null ? last.trim()  : "";
